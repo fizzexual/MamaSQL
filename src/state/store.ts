@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { getBackend } from "../ipc/backend";
 import type {
   AppError,
+  ColumnDef,
   ColumnInfo,
   ConnectionConfig,
   HistoryEntry,
@@ -36,6 +37,9 @@ export interface AppStore {
   openTableData: (table: string) => Promise<void>;
   editCell: (rowIndex: number, colIndex: number, value: unknown) => Promise<void>;
   deleteRowAt: (rowIndex: number) => Promise<void>;
+  addRow: (columns: string[], values: unknown[]) => Promise<void>;
+  dropTable: (table: string) => Promise<void>;
+  createTable: (name: string, columns: ColumnDef[]) => Promise<void>;
 }
 
 const backend = getBackend();
@@ -158,6 +162,45 @@ export const useStore = create<AppStore>((set, get) => ({
       await backend.deleteRow(activeConnectionId, editTable.table, editTable.pkColumn, pkValue);
       const rows = result.rows.filter((_, i) => i !== rowIndex);
       set({ result: { ...result, rows }, error: null });
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  addRow: async (columns, values) => {
+    const { activeConnectionId, editTable } = get();
+    if (!activeConnectionId || !editTable) return;
+    try {
+      await backend.insertRow(activeConnectionId, editTable.table, columns, values);
+      await get().openTableData(editTable.table); // refresh to show the new row + its PK
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  dropTable: async (table) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    try {
+      await backend.dropTable(id, table);
+      const tables = await backend.listTables(id);
+      set((s) => ({
+        schema: { tables, columnsByTable: {} },
+        editTable: s.editTable?.table === table ? null : s.editTable,
+        result: s.editTable?.table === table ? null : s.result,
+      }));
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  createTable: async (name, columns) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    try {
+      await backend.createTable(id, name, columns);
+      const tables = await backend.listTables(id);
+      set({ schema: { tables, columnsByTable: {} } });
     } catch (e) {
       set({ error: normalizeError(e) });
     }

@@ -1,6 +1,7 @@
 import type { Backend } from "./backend";
 import type {
   AppError,
+  ColumnDef,
   ColumnInfo,
   ConnectionConfig,
   HistoryEntry,
@@ -179,6 +180,22 @@ class MockBackend implements Backend {
       return i >= 0 ? values[i] : null;
     });
     t.rows.push(row);
+  }
+
+  async dropTable(_c: string, table: string): Promise<void> {
+    Reflect.deleteProperty(SAMPLE, table.toLowerCase());
+  }
+
+  async createTable(_c: string, name: string, columns: ColumnDef[]): Promise<void> {
+    SAMPLE[name.toLowerCase()] = {
+      columns: columns.map((c) => ({
+        name: c.name,
+        dataType: c.dataType,
+        nullable: c.nullable,
+        isPrimaryKey: c.primaryKey,
+      })),
+      rows: [],
+    };
   }
 }
 

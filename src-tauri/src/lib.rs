@@ -53,6 +53,8 @@ pub fn run() {
             commands::update_cell,
             commands::delete_row,
             commands::insert_row,
+            commands::drop_table,
+            commands::create_table,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

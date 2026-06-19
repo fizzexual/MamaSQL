@@ -77,6 +77,16 @@ pub struct ColumnInfo {
     pub is_primary_key: bool,
 }
 
+/// A column definition for the visual create-table designer.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ColumnDef {
+    pub name: String,
+    pub data_type: String,
+    pub nullable: bool,
+    pub primary_key: bool,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

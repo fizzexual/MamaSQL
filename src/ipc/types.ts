@@ -38,6 +38,13 @@ export interface ColumnInfo {
   isPrimaryKey: boolean;
 }
 
+export interface ColumnDef {
+  name: string;
+  dataType: string;
+  nullable: boolean;
+  primaryKey: boolean;
+}
+
 export interface HistoryEntry {
   id: number;
   connectionId: string;

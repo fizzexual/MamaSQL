@@ -3,7 +3,7 @@
 //! type). This keeps a stray quote or backtick in a cell from breaking — or
 //! injecting into — the statement.
 
-use crate::types::Engine;
+use crate::types::{ColumnDef, Engine};
 use serde_json::Value;
 
 fn quote_ident(engine: Engine, name: &str) -> String {
@@ -67,6 +67,27 @@ pub fn build_insert(engine: Engine, table: &str, columns: &[String], values: &[V
     )
 }
 
+pub fn build_drop_table(engine: Engine, table: &str) -> String {
+    format!("DROP TABLE {}", quote_ident(engine, table))
+}
+
+pub fn build_create_table(engine: Engine, table: &str, columns: &[ColumnDef]) -> String {
+    let cols = columns
+        .iter()
+        .map(|c| {
+            let mut s = format!("{} {}", quote_ident(engine, &c.name), c.data_type);
+            if c.primary_key {
+                s.push_str(" PRIMARY KEY");
+            } else if !c.nullable {
+                s.push_str(" NOT NULL");
+            }
+            s
+        })
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("CREATE TABLE {} ({})", quote_ident(engine, table), cols)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -100,6 +121,20 @@ mod tests {
         assert_eq!(
             build_update(Engine::Sqlite, "t", "c", &json!(true), "id", &json!(1)),
             r#"UPDATE "t" SET "c" = TRUE WHERE "id" = '1'"#
+        );
+    }
+
+    #[test]
+    fn drop_and_create_table() {
+        assert_eq!(build_drop_table(Engine::Postgres, "t"), r#"DROP TABLE "t""#);
+        let cols = vec![
+            ColumnDef { name: "id".into(), data_type: "SERIAL".into(), nullable: false, primary_key: true },
+            ColumnDef { name: "name".into(), data_type: "TEXT".into(), nullable: false, primary_key: false },
+            ColumnDef { name: "note".into(), data_type: "TEXT".into(), nullable: true, primary_key: false },
+        ];
+        assert_eq!(
+            build_create_table(Engine::Postgres, "t", &cols),
+            r#"CREATE TABLE "t" ("id" SERIAL PRIMARY KEY, "name" TEXT NOT NULL, "note" TEXT)"#
         );
     }
 

@@ -9,9 +9,11 @@ export function ResultsGrid() {
   const editTable = useStore((s) => s.editTable);
   const editCell = useStore((s) => s.editCell);
   const deleteRowAt = useStore((s) => s.deleteRowAt);
+  const addRow = useStore((s) => s.addRow);
   const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
   const [editing, setEditing] = useState<{ row: number; col: number } | null>(null);
   const [draft, setDraft] = useState("");
+  const [newRow, setNewRow] = useState<string[] | null>(null);
 
   const editable = !!editTable;
   const pkIdx = useMemo(
@@ -24,7 +26,7 @@ export function ResultsGrid() {
 
   const rows = useMemo(() => {
     if (!result) return [];
-    if (editable || !sort) return result.rows; // no sorting while editing (keep row indexes stable)
+    if (editable || !sort) return result.rows;
     const copy = [...result.rows];
     copy.sort((a, b) => {
       const x = a[sort.col];
@@ -60,13 +62,27 @@ export function ResultsGrid() {
   };
 
   const startEdit = (row: number, col: number) => {
-    if (!editTable?.pkColumn || col === pkIdx) return; // need a PK; PK column is read-only
+    if (!editTable?.pkColumn || col === pkIdx) return;
     setEditing({ row, col });
     setDraft(result.rows[row][col] == null ? "" : String(result.rows[row][col]));
   };
   const commitEdit = () => {
     if (editing) void editCell(editing.row, editing.col, draft);
     setEditing(null);
+  };
+
+  const saveNewRow = () => {
+    if (!newRow) return;
+    const cols: string[] = [];
+    const vals: unknown[] = [];
+    result.columns.forEach((c, i) => {
+      if (newRow[i] !== "") {
+        cols.push(c.name);
+        vals.push(newRow[i]);
+      }
+    });
+    void addRow(cols, vals);
+    setNewRow(null);
   };
 
   return (
@@ -81,6 +97,15 @@ export function ResultsGrid() {
         <span className="rows-count">{result.rows.length} rows</span>
         {result.truncated && <span className="badge">truncated</span>}
         <div className="spacer" />
+        {editTable?.pkColumn &&
+          (newRow ? (
+            <>
+              <button className="primary" onClick={saveNewRow}>Save row</button>
+              <button onClick={() => setNewRow(null)}>Cancel</button>
+            </>
+          ) : (
+            <button onClick={() => setNewRow(result.columns.map(() => ""))}>＋ Add row</button>
+          ))}
         <button onClick={() => download("result.csv", toCsv(result))}>Export CSV</button>
         <button onClick={() => download("result.json", toJson(result))}>Export JSON</button>
       </div>
@@ -103,6 +128,30 @@ export function ResultsGrid() {
             </tr>
           </thead>
           <tbody>
+            {newRow && (
+              <tr className="new-row">
+                <td className="rownum">
+                  <button className="row-del" title="Cancel" onClick={() => setNewRow(null)}>✕</button>
+                </td>
+                <td className="rownum">＋</td>
+                {result.columns.map((c, ci) => (
+                  <td key={ci}>
+                    <input
+                      className="cell-input"
+                      placeholder={c.name}
+                      value={newRow[ci]}
+                      onChange={(e) =>
+                        setNewRow((nr) => (nr ? nr.map((v, j) => (j === ci ? e.target.value : v)) : nr))
+                      }
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveNewRow();
+                        if (e.key === "Escape") setNewRow(null);
+                      }}
+                    />
+                  </td>
+                ))}
+              </tr>
+            )}
             {rows.map((row, ri) => (
               <tr key={ri}>
                 {editable && (

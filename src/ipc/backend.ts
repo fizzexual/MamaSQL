@@ -1,6 +1,7 @@
 import { mockBackend } from "./mock";
 import { tauriBackend } from "./tauri";
 import type {
+  ColumnDef,
   ColumnInfo,
   ConnectionConfig,
   HistoryEntry,
@@ -30,6 +31,8 @@ export interface Backend {
   ): Promise<void>;
   deleteRow(connectionId: string, table: string, pkColumn: string, pkValue: unknown): Promise<void>;
   insertRow(connectionId: string, table: string, columns: string[], values: unknown[]): Promise<void>;
+  dropTable(connectionId: string, table: string): Promise<void>;
+  createTable(connectionId: string, name: string, columns: ColumnDef[]): Promise<void>;
 }
 
 /** True when running inside the Tauri webview (vs a plain browser). */

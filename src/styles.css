@@ -205,6 +205,46 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .row-del:hover:not(:disabled) { background: #fee2e2; color: var(--danger); }
 .row-del:disabled { opacity: 0.3; cursor: default; }
+.mini.danger:hover { color: var(--danger); }
+.new-row { background: var(--accent-soft); }
+.new-row td { padding: 4px 6px; }
+
+/* Create-table modal */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(15, 23, 42, 0.35);
+  display: flex; align-items: center; justify-content: center; z-index: 50;
+}
+.modal {
+  background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+  width: 580px; max-width: 92vw; max-height: 86vh; overflow: auto;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.25);
+}
+.modal-head { padding: 14px 18px; font-weight: 700; border-bottom: 1px solid var(--border); }
+.modal-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 9px; }
+.modal-name {
+  border: 1px solid var(--border-strong); border-radius: 7px; padding: 9px 11px;
+  font-family: var(--mono); font-size: 14px;
+}
+.modal-name:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-soft); border-color: var(--accent); }
+.coldef { display: grid; grid-template-columns: 1.4fr 1.2fr 44px 44px 28px; gap: 8px; align-items: center; }
+.coldef-head { font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); padding: 0 2px; }
+.coldef input, .coldef select {
+  border: 1px solid var(--border-strong); border-radius: 6px; padding: 6px 8px;
+  font-size: 12.5px; font-family: var(--mono);
+}
+.coldef input[type="checkbox"] { justify-self: center; width: auto; }
+.add-col {
+  align-self: flex-start; background: none; border: 1px dashed var(--border-strong);
+  border-radius: 7px; padding: 7px 12px; color: var(--accent); font-size: 12.5px;
+}
+.add-col:hover { background: var(--panel-2); }
+.modal-actions {
+  display: flex; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--border); justify-content: flex-end;
+}
+.modal-actions button {
+  border: 1px solid var(--border-strong); background: #fff; border-radius: 7px; padding: 8px 16px; font-size: 13px;
+}
+.modal-actions .primary { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
 
 /* ---------- History ---------- */
 .history { padding: 6px; overflow: auto; }

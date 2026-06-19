@@ -31,4 +31,7 @@ export const tauriBackend: Backend = {
     invoke<void>("delete_row", { connectionId, table, pkColumn, pkValue }),
   insertRow: (connectionId, table, columns, values) =>
     invoke<void>("insert_row", { connectionId, table, columns, values }),
+  dropTable: (connectionId, table) => invoke<void>("drop_table", { connectionId, table }),
+  createTable: (connectionId, name, columns) =>
+    invoke<void>("create_table", { connectionId, name, columns }),
 };

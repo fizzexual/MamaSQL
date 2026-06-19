@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { CreateTableModal } from "./CreateTableModal";
 import { useStore } from "../state/store";
 
 export function SchemaTree() {
   const tables = useStore((s) => s.schema.tables);
   const activeId = useStore((s) => s.activeConnectionId);
+  const [creating, setCreating] = useState(false);
 
   if (!activeId) {
     return (
@@ -16,12 +18,18 @@ export function SchemaTree() {
 
   return (
     <section className="panel grow">
-      <div className="panel-head">Tables</div>
+      <div className="panel-head">
+        <span>Tables</span>
+        <button className="icon-btn" title="New table" onClick={() => setCreating(true)}>
+          ＋
+        </button>
+      </div>
       <ul className="tree">
         {tables.map((t) => (
           <TableNode key={t.name} name={t.name} kind={t.kind} />
         ))}
       </ul>
+      {creating && <CreateTableModal onClose={() => setCreating(false)} />}
     </section>
   );
 }
@@ -32,6 +40,7 @@ function TableNode({ name, kind }: { name: string; kind: string }) {
   const columns = useStore((s) => s.schema.columnsByTable[name]);
   const setSql = useStore((s) => s.setSql);
   const openTableData = useStore((s) => s.openTableData);
+  const dropTable = useStore((s) => s.dropTable);
 
   const toggle = async () => {
     if (!open) await expandTable(name);
@@ -57,6 +66,15 @@ function TableNode({ name, kind }: { name: string; kind: string }) {
         </button>
         <button className="mini" title="Edit data" onClick={() => openTableData(name)}>
           ✎
+        </button>
+        <button
+          className="mini danger"
+          title="Drop table"
+          onClick={() => {
+            if (window.confirm(`Drop table ${name}? This cannot be undone.`)) void dropTable(name);
+          }}
+        >
+          🗑
         </button>
       </div>
       {open && columns && (

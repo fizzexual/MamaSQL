@@ -3,7 +3,7 @@ use crate::error::{AppError, AppResult};
 use crate::schema;
 use crate::secrets;
 use crate::store::{HistoryEntry, Store};
-use crate::types::{ColumnInfo, ConnectionConfig, Engine, QueryResult, TableInfo};
+use crate::types::{ColumnDef, ColumnInfo, ConnectionConfig, Engine, QueryResult, TableInfo};
 use tauri::State;
 
 /// Shared application state, managed by Tauri and injected into commands.
@@ -171,6 +171,35 @@ pub async fn insert_row(
     let driver = state.registry.get(&connection_id).await?;
     let sql = crate::editing::build_insert(engine, &table, &columns, &values);
     driver.execute(&sql).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn drop_table(
+    state: State<'_, AppState>,
+    connection_id: String,
+    table: String,
+) -> AppResult<()> {
+    let engine = engine_of(&state.store, &connection_id).await?;
+    let driver = state.registry.get(&connection_id).await?;
+    driver
+        .execute(&crate::editing::build_drop_table(engine, &table))
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn create_table(
+    state: State<'_, AppState>,
+    connection_id: String,
+    name: String,
+    columns: Vec<ColumnDef>,
+) -> AppResult<()> {
+    let engine = engine_of(&state.store, &connection_id).await?;
+    let driver = state.registry.get(&connection_id).await?;
+    driver
+        .execute(&crate::editing::build_create_table(engine, &name, &columns))
+        .await?;
     Ok(())
 }
 
