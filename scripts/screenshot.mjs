@@ -38,13 +38,13 @@ try {
     await page.waitForTimeout(350);
     await page.screenshot({ path: "screenshot.png" });
 
-    // Table-actions dropdown menu.
-    await page.click(".bud-bc-menu");
-    await page.waitForSelector(".bud-menu", { timeout: 3000 });
-    await page.waitForTimeout(120);
-    await page.screenshot({ path: "screenshot-menu.png" });
+    // Open the row inspector (form-based row editor).
+    await page.click(".rn-expand");
+    await page.waitForSelector(".bud-inspector", { timeout: 3000 });
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: "screenshot-inspector.png" });
 
-    console.log("wrote screenshot-skeleton.png, screenshot.png, screenshot-menu.png");
+    console.log("wrote screenshot-skeleton.png, screenshot.png, screenshot-inspector.png");
   } catch (e) {
     console.log("interaction error: " + e.message);
     await page.screenshot({ path: "screenshot.png" });

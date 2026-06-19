@@ -29,6 +29,7 @@ export interface AppStore {
   loadingTables: boolean;
   loadingResult: boolean;
   view: "data" | "sql" | "history";
+  inspectorRow: number | null;
 
   loadConnections: () => Promise<void>;
   saveConnection: (cfg: ConnectionConfig, password?: string | null) => Promise<void>;
@@ -55,6 +56,8 @@ export interface AppStore {
   renameColumn: (table: string, from: string, to: string) => Promise<void>;
   renameTable: (from: string, to: string) => Promise<void>;
   importCsv: (table: string, headers: string[], rows: string[][]) => Promise<void>;
+  openInspector: (rowIndex: number) => void;
+  closeInspector: () => void;
 }
 
 const backend = getBackend();
@@ -73,6 +76,7 @@ export const useStore = create<AppStore>((set, get) => ({
   loadingTables: false,
   loadingResult: false,
   view: "data",
+  inspectorRow: null,
 
   loadConnections: async () => {
     set({ connections: await backend.listConnections() });
@@ -138,7 +142,7 @@ export const useStore = create<AppStore>((set, get) => ({
     const id = get().activeConnectionId;
     if (!id) return;
     const sql = `SELECT * FROM ${table} LIMIT 200;`;
-    set({ view: "data", loadingResult: true, error: null, sql, editTable: { table, pkColumn: null } });
+    set({ view: "data", loadingResult: true, error: null, sql, editTable: { table, pkColumn: null }, inspectorRow: null });
     try {
       // Column introspection is best-effort — it must never block the data load.
       try {
@@ -194,7 +198,16 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       await backend.deleteRow(activeConnectionId, editTable.table, editTable.pkColumn, pkValue);
       const rows = result.rows.filter((_, i) => i !== rowIndex);
-      set({ result: { ...result, rows }, error: null });
+      set((s) => ({
+        result: { ...result, rows },
+        error: null,
+        inspectorRow:
+          s.inspectorRow === null || s.inspectorRow === rowIndex
+            ? null
+            : s.inspectorRow > rowIndex
+              ? s.inspectorRow - 1
+              : s.inspectorRow,
+      }));
     } catch (e) {
       set({ error: normalizeError(e) });
     }
@@ -342,6 +355,9 @@ export const useStore = create<AppStore>((set, get) => ({
       set({ error: normalizeError(e) });
     }
   },
+
+  openInspector: (rowIndex) => set({ inspectorRow: rowIndex }),
+  closeInspector: () => set({ inspectorRow: null }),
 }));
 
 function normalizeError(e: unknown): AppError {

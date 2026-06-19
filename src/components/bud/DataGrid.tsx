@@ -66,6 +66,8 @@ export function DataGrid() {
   const deleteRowAt = useStore((s) => s.deleteRowAt);
   const addRow = useStore((s) => s.addRow);
   const addColumn = useStore((s) => s.addColumn);
+  const openInspector = useStore((s) => s.openInspector);
+  const inspectorRow = useStore((s) => s.inspectorRow);
   const columns = useStore((s) => (editTable ? s.schema.columnsByTable[editTable.table] : undefined));
   const [editing, setEditing] = useState<{ row: number; col: number } | null>(null);
   const [draft, setDraft] = useState("");
@@ -197,7 +199,7 @@ export function DataGrid() {
             </tr>
           )}
           {result.rows.map((row, ri) => (
-            <tr key={ri}>
+            <tr key={ri} className={ri === inspectorRow ? "row-open" : ""}>
               <td className="bud-checkcol">
                 <input type="checkbox" className="bud-rowcheck" />
                 <button
@@ -211,7 +213,12 @@ export function DataGrid() {
                   ✕
                 </button>
               </td>
-              <td className="bud-rownum">{ri + 1}</td>
+              <td className="bud-rownum">
+                <span className="rn-num">{ri + 1}</span>
+                <button className="rn-expand" title="Edit row in panel" onClick={() => openInspector(ri)}>
+                  ⤢
+                </button>
+              </td>
               {row.map((cell, ci) => (
                 <td key={ci} className={cell == null ? "bud-null" : ""} onDoubleClick={() => startEdit(ri, ci)}>
                   {editing && editing.row === ri && editing.col === ci ? (
