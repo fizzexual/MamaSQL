@@ -6,7 +6,6 @@ name: Release
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -31,6 +30,13 @@ jobs:
       - name: Install JS dependencies
         run: npm install
 
+      - name: Stamp version 0.1.${{ github.run_number }}
+        shell: pwsh
+        run: |
+          $p = "src-tauri/tauri.conf.json"
+          (Get-Content $p -Raw) -replace '"version":\s*"[^"]*"', '"version": "0.1.${{ github.run_number }}"' | Set-Content $p -Encoding utf8
+          Write-Output "App version -> 0.1.${{ github.run_number }}"
+
       - name: Build standalone .exe (no installer / no wizard)
         run: npm run tauri build -- --no-bundle
 
@@ -44,8 +50,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: dist-exe/MamaSQL.exe
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
-          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Latest build' }}
+          tag_name: v0.1.${{ github.run_number }}
+          name: v0.1.${{ github.run_number }}
           prerelease: false
           make_latest: true
           fail_on_unmatched_files: true
