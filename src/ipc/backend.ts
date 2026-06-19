@@ -20,6 +20,16 @@ export interface Backend {
   listTables(connectionId: string): Promise<TableInfo[]>;
   listColumns(connectionId: string, table: string): Promise<ColumnInfo[]>;
   recentHistory(limit: number): Promise<HistoryEntry[]>;
+  updateCell(
+    connectionId: string,
+    table: string,
+    pkColumn: string,
+    pkValue: unknown,
+    column: string,
+    value: unknown,
+  ): Promise<void>;
+  deleteRow(connectionId: string, table: string, pkColumn: string, pkValue: unknown): Promise<void>;
+  insertRow(connectionId: string, table: string, columns: string[], values: unknown[]): Promise<void>;
 }
 
 /** True when running inside the Tauri webview (vs a plain browser). */

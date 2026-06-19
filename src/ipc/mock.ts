@@ -142,6 +142,44 @@ class MockBackend implements Backend {
   async recentHistory(limit: number): Promise<HistoryEntry[]> {
     return this.history.slice(0, limit);
   }
+
+  async updateCell(
+    _c: string,
+    table: string,
+    pkColumn: string,
+    pkValue: unknown,
+    column: string,
+    value: unknown,
+  ): Promise<void> {
+    const t = SAMPLE[table.toLowerCase()];
+    if (!t) return;
+    const pkIdx = t.columns.findIndex((c) => c.name === pkColumn);
+    const colIdx = t.columns.findIndex((c) => c.name === column);
+    const row = t.rows.find((r) => String(r[pkIdx]) === String(pkValue));
+    if (row && colIdx >= 0) row[colIdx] = value;
+  }
+
+  async deleteRow(_c: string, table: string, pkColumn: string, pkValue: unknown): Promise<void> {
+    const t = SAMPLE[table.toLowerCase()];
+    if (!t) return;
+    const pkIdx = t.columns.findIndex((c) => c.name === pkColumn);
+    t.rows = t.rows.filter((r) => String(r[pkIdx]) !== String(pkValue));
+  }
+
+  async insertRow(
+    _c: string,
+    table: string,
+    columns: string[],
+    values: unknown[],
+  ): Promise<void> {
+    const t = SAMPLE[table.toLowerCase()];
+    if (!t) return;
+    const row = t.columns.map((col) => {
+      const i = columns.indexOf(col.name);
+      return i >= 0 ? values[i] : null;
+    });
+    t.rows.push(row);
+  }
 }
 
 export const mockBackend: Backend = new MockBackend();

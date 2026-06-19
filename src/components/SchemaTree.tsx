@@ -31,6 +31,7 @@ function TableNode({ name, kind }: { name: string; kind: string }) {
   const expandTable = useStore((s) => s.expandTable);
   const columns = useStore((s) => s.schema.columnsByTable[name]);
   const setSql = useStore((s) => s.setSql);
+  const openTableData = useStore((s) => s.openTableData);
 
   const toggle = async () => {
     if (!open) await expandTable(name);
@@ -53,6 +54,9 @@ function TableNode({ name, kind }: { name: string; kind: string }) {
           onClick={() => setSql(`SELECT * FROM ${name} LIMIT 100;`)}
         >
           ⌁
+        </button>
+        <button className="mini" title="Edit data" onClick={() => openTableData(name)}>
+          ✎
         </button>
       </div>
       {open && columns && (

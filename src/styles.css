@@ -190,6 +190,21 @@ ul { list-style: none; margin: 0; padding: 0; }
 .grid tbody tr:hover { background: var(--accent-soft); }
 .grid .rownum { background: var(--panel-2); color: var(--faint); text-align: right; width: 44px; font-family: var(--mono); position: sticky; left: 0; }
 .grid td.null { color: var(--faint); font-style: italic; }
+.grid td { cursor: default; }
+
+/* Inline editing */
+.badge.edit { background: var(--accent-soft); color: var(--accent); }
+.cell-input {
+  width: 100%; box-sizing: border-box; border: 1px solid var(--accent); border-radius: 4px;
+  padding: 4px 6px; font-family: var(--mono); font-size: 12.5px; color: var(--text);
+}
+.cell-input:focus { outline: none; box-shadow: 0 0 0 2px var(--accent-soft); }
+.row-del {
+  background: none; border: none; color: var(--faint); font-size: 12px;
+  width: 18px; height: 18px; border-radius: 4px; line-height: 1;
+}
+.row-del:hover:not(:disabled) { background: #fee2e2; color: var(--danger); }
+.row-del:disabled { opacity: 0.3; cursor: default; }
 
 /* ---------- History ---------- */
 .history { padding: 6px; overflow: auto; }

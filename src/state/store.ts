@@ -23,6 +23,7 @@ export interface AppStore {
   error: AppError | null;
   running: boolean;
   history: HistoryEntry[];
+  editTable: { table: string; pkColumn: string | null } | null;
 
   loadConnections: () => Promise<void>;
   saveConnection: (cfg: ConnectionConfig, password?: string | null) => Promise<void>;
@@ -32,6 +33,9 @@ export interface AppStore {
   setSql: (sql: string) => void;
   run: () => Promise<void>;
   loadHistory: () => Promise<void>;
+  openTableData: (table: string) => Promise<void>;
+  editCell: (rowIndex: number, colIndex: number, value: unknown) => Promise<void>;
+  deleteRowAt: (rowIndex: number) => Promise<void>;
 }
 
 const backend = getBackend();
@@ -45,6 +49,7 @@ export const useStore = create<AppStore>((set, get) => ({
   error: null,
   running: false,
   history: [],
+  editTable: null,
 
   loadConnections: async () => {
     set({ connections: await backend.listConnections() });
@@ -90,7 +95,7 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ running: true, error: null });
     try {
       const result = await backend.runQuery(activeConnectionId, sql);
-      set({ result, running: false });
+      set({ result, running: false, editTable: null });
       await get().loadHistory();
     } catch (e) {
       set({ error: normalizeError(e), result: null, running: false });
@@ -99,6 +104,63 @@ export const useStore = create<AppStore>((set, get) => ({
 
   loadHistory: async () => {
     set({ history: await backend.recentHistory(50) });
+  },
+
+  openTableData: async (table) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    await get().expandTable(table);
+    const cols = get().schema.columnsByTable[table] ?? [];
+    const pkColumn = cols.find((c) => c.isPrimaryKey)?.name ?? null;
+    const sql = `SELECT * FROM ${table} LIMIT 200;`;
+    set({ sql, error: null, running: true });
+    try {
+      const result = await backend.runQuery(id, sql);
+      set({ result, running: false, editTable: { table, pkColumn } });
+      await get().loadHistory();
+    } catch (e) {
+      set({ error: normalizeError(e), result: null, running: false, editTable: null });
+    }
+  },
+
+  editCell: async (rowIndex, colIndex, value) => {
+    const { activeConnectionId, result, editTable } = get();
+    if (!activeConnectionId || !result || !editTable?.pkColumn) return;
+    const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
+    if (pkIdx < 0) return;
+    const pkValue = result.rows[rowIndex][pkIdx];
+    const column = result.columns[colIndex].name;
+    try {
+      await backend.updateCell(
+        activeConnectionId,
+        editTable.table,
+        editTable.pkColumn,
+        pkValue,
+        column,
+        value,
+      );
+      const rows = result.rows.map((r, i) =>
+        i === rowIndex ? r.map((c, j) => (j === colIndex ? value : c)) : r,
+      );
+      set({ result: { ...result, rows }, error: null });
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  deleteRowAt: async (rowIndex) => {
+    const { activeConnectionId, result, editTable } = get();
+    if (!activeConnectionId || !result || !editTable?.pkColumn) return;
+    const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
+    if (pkIdx < 0) return;
+    const pkValue = result.rows[rowIndex][pkIdx];
+    try {
+      await backend.deleteRow(activeConnectionId, editTable.table, editTable.pkColumn, pkValue);
+      const rows = result.rows.filter((_, i) => i !== rowIndex);
+      set({ result: { ...result, rows }, error: null });
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
   },
 }));
 

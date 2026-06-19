@@ -25,4 +25,10 @@ export const tauriBackend: Backend = {
   listColumns: (connectionId, table) =>
     invoke<ColumnInfo[]>("list_columns", { connectionId, table }),
   recentHistory: (limit) => invoke<HistoryEntry[]>("recent_history", { limit }),
+  updateCell: (connectionId, table, pkColumn, pkValue, column, value) =>
+    invoke<void>("update_cell", { connectionId, table, pkColumn, pkValue, column, value }),
+  deleteRow: (connectionId, table, pkColumn, pkValue) =>
+    invoke<void>("delete_row", { connectionId, table, pkColumn, pkValue }),
+  insertRow: (connectionId, table, columns, values) =>
+    invoke<void>("insert_row", { connectionId, table, columns, values }),
 };
