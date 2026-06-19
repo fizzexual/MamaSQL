@@ -203,6 +203,67 @@ pub async fn create_table(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn add_column(
+    state: State<'_, AppState>,
+    connection_id: String,
+    table: String,
+    column: ColumnDef,
+) -> AppResult<()> {
+    let engine = engine_of(&state.store, &connection_id).await?;
+    let driver = state.registry.get(&connection_id).await?;
+    driver
+        .execute(&crate::editing::build_add_column(engine, &table, &column))
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn drop_column(
+    state: State<'_, AppState>,
+    connection_id: String,
+    table: String,
+    column: String,
+) -> AppResult<()> {
+    let engine = engine_of(&state.store, &connection_id).await?;
+    let driver = state.registry.get(&connection_id).await?;
+    driver
+        .execute(&crate::editing::build_drop_column(engine, &table, &column))
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn rename_column(
+    state: State<'_, AppState>,
+    connection_id: String,
+    table: String,
+    from: String,
+    to: String,
+) -> AppResult<()> {
+    let engine = engine_of(&state.store, &connection_id).await?;
+    let driver = state.registry.get(&connection_id).await?;
+    driver
+        .execute(&crate::editing::build_rename_column(engine, &table, &from, &to))
+        .await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn rename_table(
+    state: State<'_, AppState>,
+    connection_id: String,
+    from: String,
+    to: String,
+) -> AppResult<()> {
+    let engine = engine_of(&state.store, &connection_id).await?;
+    let driver = state.registry.get(&connection_id).await?;
+    driver
+        .execute(&crate::editing::build_rename_table(engine, &from, &to))
+        .await?;
+    Ok(())
+}
+
 /// One-click local engine: create a fresh SQLite database file in the app data
 /// dir and save it as a connection.
 #[tauri::command]

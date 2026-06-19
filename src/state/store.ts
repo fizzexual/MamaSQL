@@ -26,6 +26,9 @@ export interface AppStore {
   history: HistoryEntry[];
   editTable: { table: string; pkColumn: string | null } | null;
   detected: ConnectionConfig[];
+  loadingTables: boolean;
+  loadingResult: boolean;
+  view: "data" | "sql" | "history";
 
   loadConnections: () => Promise<void>;
   saveConnection: (cfg: ConnectionConfig, password?: string | null) => Promise<void>;
@@ -44,6 +47,14 @@ export interface AppStore {
   createLocalDatabase: (name: string) => Promise<void>;
   scanLocal: () => Promise<void>;
   addDetected: (cfg: ConnectionConfig) => Promise<void>;
+  setView: (v: "data" | "sql" | "history") => void;
+  refresh: () => Promise<void>;
+  reload: (table: string) => Promise<void>;
+  addColumn: (table: string, column: ColumnDef) => Promise<void>;
+  dropColumn: (table: string, column: string) => Promise<void>;
+  renameColumn: (table: string, from: string, to: string) => Promise<void>;
+  renameTable: (from: string, to: string) => Promise<void>;
+  importCsv: (table: string, headers: string[], rows: string[][]) => Promise<void>;
 }
 
 const backend = getBackend();
@@ -59,6 +70,9 @@ export const useStore = create<AppStore>((set, get) => ({
   history: [],
   editTable: null,
   detected: [],
+  loadingTables: false,
+  loadingResult: false,
+  view: "data",
 
   loadConnections: async () => {
     set({ connections: await backend.listConnections() });
@@ -76,9 +90,14 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   openAndIntrospect: async (id) => {
-    await backend.openConnection(id);
-    const tables = await backend.listTables(id);
-    set({ activeConnectionId: id, schema: { tables, columnsByTable: {} } });
+    set({ activeConnectionId: id, loadingTables: true, error: null });
+    try {
+      await backend.openConnection(id);
+      const tables = await backend.listTables(id);
+      set({ schema: { tables, columnsByTable: {} }, loadingTables: false });
+    } catch (e) {
+      set({ error: normalizeError(e), loadingTables: false });
+    }
   },
 
   expandTable: async (table) => {
@@ -118,17 +137,18 @@ export const useStore = create<AppStore>((set, get) => ({
   openTableData: async (table) => {
     const id = get().activeConnectionId;
     if (!id) return;
+    set({ view: "data", loadingResult: true, error: null });
     await get().expandTable(table);
     const cols = get().schema.columnsByTable[table] ?? [];
     const pkColumn = cols.find((c) => c.isPrimaryKey)?.name ?? null;
     const sql = `SELECT * FROM ${table} LIMIT 200;`;
-    set({ sql, error: null, running: true });
+    set({ sql, editTable: { table, pkColumn } });
     try {
       const result = await backend.runQuery(id, sql);
-      set({ result, running: false, editTable: { table, pkColumn } });
+      set({ result, loadingResult: false });
       await get().loadHistory();
     } catch (e) {
-      set({ error: normalizeError(e), result: null, running: false, editTable: null });
+      set({ error: normalizeError(e), result: null, loadingResult: false });
     }
   },
 
@@ -234,6 +254,82 @@ export const useStore = create<AppStore>((set, get) => ({
       await backend.saveConnection(cfg, null);
       await get().loadConnections();
       await get().openAndIntrospect(cfg.id);
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  setView: (v) => set({ view: v }),
+
+  refresh: async () => {
+    const t = get().editTable?.table;
+    if (t) await get().openTableData(t);
+  },
+
+  reload: async (table) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    const tables = await backend.listTables(id);
+    set((s) => {
+      const columnsByTable = { ...s.schema.columnsByTable };
+      delete columnsByTable[table];
+      return { schema: { tables, columnsByTable } };
+    });
+    await get().openTableData(table);
+  },
+
+  addColumn: async (table, column) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    try {
+      await backend.addColumn(id, table, column);
+      await get().reload(table);
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  dropColumn: async (table, column) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    try {
+      await backend.dropColumn(id, table, column);
+      await get().reload(table);
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  renameColumn: async (table, from, to) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    try {
+      await backend.renameColumn(id, table, from, to);
+      await get().reload(table);
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  renameTable: async (from, to) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    try {
+      await backend.renameTable(id, from, to);
+      const tables = await backend.listTables(id);
+      set({ schema: { tables, columnsByTable: {} } });
+      await get().openTableData(to);
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  importCsv: async (table, headers, rows) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    try {
+      for (const r of rows) await backend.insertRow(id, table, headers, r);
+      await get().reload(table);
     } catch (e) {
       set({ error: normalizeError(e) });
     }

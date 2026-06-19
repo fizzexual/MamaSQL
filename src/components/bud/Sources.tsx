@@ -15,6 +15,8 @@ export function Sources() {
   const scanLocal = useStore((s) => s.scanLocal);
   const addDetected = useStore((s) => s.addDetected);
   const createLocalDatabase = useStore((s) => s.createLocalDatabase);
+  const [filter, setFilter] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     loadConnections();
@@ -28,7 +30,13 @@ export function Sources() {
       <div className="bud-sources-head">
         <span>Sources</span>
         <div className="bud-sources-actions">
-          <button className="icon-btn" title="Search">⌕</button>
+          <button
+            className={`icon-btn ${searchOpen ? "active" : ""}`}
+            title="Filter tables"
+            onClick={() => setSearchOpen((v) => !v)}
+          >
+            ⌕
+          </button>
           <button
             className="icon-btn"
             title="New local database"
@@ -41,15 +49,21 @@ export function Sources() {
           </button>
         </div>
       </div>
+      {searchOpen && (
+        <input
+          className="bud-src-filter"
+          autoFocus
+          placeholder="Filter tables…"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+      )}
       <div className="bud-sources-list">
-        <div className="bud-src static">
-          <span className="bud-src-ic">◍</span> App users
-        </div>
-        <div className="bud-src static">
-          <span className="bud-src-ic">🛡</span> Manage roles
-        </div>
+        {connections.length === 0 && (
+          <div className="bud-ds-empty">No sources yet — click ＋ above or add a detected one below.</div>
+        )}
         {connections.map((c) => (
-          <Datasource key={c.id} id={c.id} name={c.name} engine={c.engine} />
+          <Datasource key={c.id} id={c.id} name={c.name} engine={c.engine} filter={filter} />
         ))}
         {newDetections.length > 0 && (
           <div className="bud-detected">
@@ -70,10 +84,21 @@ export function Sources() {
   );
 }
 
-function Datasource({ id, name, engine }: { id: string; name: string; engine: Engine }) {
+function Datasource({
+  id,
+  name,
+  engine,
+  filter,
+}: {
+  id: string;
+  name: string;
+  engine: Engine;
+  filter: string;
+}) {
   const [open, setOpen] = useState(true);
   const activeId = useStore((s) => s.activeConnectionId);
   const tables = useStore((s) => s.schema.tables);
+  const loadingTables = useStore((s) => s.loadingTables);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const openTableData = useStore((s) => s.openTableData);
   const editTable = useStore((s) => s.editTable);
@@ -81,8 +106,10 @@ function Datasource({ id, name, engine }: { id: string; name: string; engine: En
 
   const toggle = async () => {
     if (!isActive) await openAndIntrospect(id);
-    setOpen(true);
+    setOpen((v) => (isActive ? !v : true));
   };
+
+  const shown = tables.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()));
 
   return (
     <div className="bud-ds">
@@ -91,21 +118,31 @@ function Datasource({ id, name, engine }: { id: string; name: string; engine: En
         <span className="bud-src-ic">{engineIcon(engine)}</span>
         <span className="bud-src-name">{name}</span>
       </div>
-      {isActive && open && (
-        <div className="bud-ds-tables">
-          {tables.length === 0 && <div className="bud-ds-empty">No tables</div>}
-          {tables.map((t) => (
-            <div
-              key={t.name}
-              className={`bud-table ${editTable?.table === t.name ? "active" : ""}`}
-              onClick={() => openTableData(t.name)}
-            >
-              <span className="bud-table-ic">{t.kind === "view" ? "◫" : "▦"}</span>
-              {t.name}
-            </div>
-          ))}
-        </div>
-      )}
+      {isActive &&
+        open &&
+        (loadingTables ? (
+          <div className="bud-ds-tables">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div className="bud-table skel" key={i}>
+                <span className="sk sk-row" style={{ width: `${50 + ((i * 17) % 40)}%` }} />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="bud-ds-tables">
+            {shown.length === 0 && <div className="bud-ds-empty">{filter ? "No match" : "No tables"}</div>}
+            {shown.map((t) => (
+              <div
+                key={t.name}
+                className={`bud-table ${editTable?.table === t.name ? "active" : ""}`}
+                onClick={() => openTableData(t.name)}
+              >
+                <span className="bud-table-ic">{t.kind === "view" ? "◫" : "▦"}</span>
+                {t.name}
+              </div>
+            ))}
+          </div>
+        ))}
     </div>
   );
 }

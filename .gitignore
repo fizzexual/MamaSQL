@@ -39,5 +39,5 @@ Thumbs.db
 *.local
 
 # Screenshot helper output
-/screenshot.png
+/screenshot*.png
 /_shot.*

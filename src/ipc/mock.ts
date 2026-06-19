@@ -63,6 +63,9 @@ const SAMPLE: Record<string, SampleTable> = {
   },
 };
 
+/** Small artificial latency so the browser demo exercises loading/skeleton states. */
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 class MockBackend implements Backend {
   private connections = new Map<string, ConnectionConfig>();
   private history: HistoryEntry[] = [];
@@ -95,6 +98,7 @@ class MockBackend implements Backend {
 
   async runQuery(connectionId: string, sql: string): Promise<QueryResult> {
     const started = performance.now();
+    await wait(300);
     this.history.unshift({
       id: ++this.histId,
       connectionId,
@@ -135,9 +139,11 @@ class MockBackend implements Backend {
   }
 
   async listTables(): Promise<TableInfo[]> {
+    await wait(260);
     return Object.keys(SAMPLE).map((name) => ({ name, kind: "table", schema: null }));
   }
   async listColumns(_connectionId: string, table: string): Promise<ColumnInfo[]> {
+    await wait(120);
     return SAMPLE[table.toLowerCase()]?.columns ?? [];
   }
   async recentHistory(limit: number): Promise<HistoryEntry[]> {
@@ -196,6 +202,39 @@ class MockBackend implements Backend {
       })),
       rows: [],
     };
+  }
+
+  async addColumn(_c: string, table: string, column: ColumnDef): Promise<void> {
+    const t = SAMPLE[table.toLowerCase()];
+    if (!t) return;
+    t.columns.push({
+      name: column.name,
+      dataType: column.dataType,
+      nullable: column.nullable,
+      isPrimaryKey: column.primaryKey,
+    });
+    t.rows.forEach((r) => r.push(null));
+  }
+
+  async dropColumn(_c: string, table: string, column: string): Promise<void> {
+    const t = SAMPLE[table.toLowerCase()];
+    if (!t) return;
+    const i = t.columns.findIndex((c) => c.name === column);
+    if (i < 0) return;
+    t.columns.splice(i, 1);
+    t.rows.forEach((r) => r.splice(i, 1));
+  }
+
+  async renameColumn(_c: string, table: string, from: string, to: string): Promise<void> {
+    const col = SAMPLE[table.toLowerCase()]?.columns.find((c) => c.name === from);
+    if (col) col.name = to;
+  }
+
+  async renameTable(_c: string, from: string, to: string): Promise<void> {
+    const t = SAMPLE[from.toLowerCase()];
+    if (!t) return;
+    SAMPLE[to.toLowerCase()] = t;
+    Reflect.deleteProperty(SAMPLE, from.toLowerCase());
   }
 
   async createLocalDatabase(name: string): Promise<ConnectionConfig> {

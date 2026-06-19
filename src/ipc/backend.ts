@@ -33,6 +33,10 @@ export interface Backend {
   insertRow(connectionId: string, table: string, columns: string[], values: unknown[]): Promise<void>;
   dropTable(connectionId: string, table: string): Promise<void>;
   createTable(connectionId: string, name: string, columns: ColumnDef[]): Promise<void>;
+  addColumn(connectionId: string, table: string, column: ColumnDef): Promise<void>;
+  dropColumn(connectionId: string, table: string, column: string): Promise<void>;
+  renameColumn(connectionId: string, table: string, from: string, to: string): Promise<void>;
+  renameTable(connectionId: string, from: string, to: string): Promise<void>;
   createLocalDatabase(name: string): Promise<ConnectionConfig>;
   scanLocalDatabases(): Promise<ConnectionConfig[]>;
 }

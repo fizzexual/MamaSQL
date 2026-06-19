@@ -28,3 +28,37 @@ export function download(filename: string, content: string): void {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/** Parse CSV text into headers + rows (handles quoted fields and "" escapes). */
+export function fromCsv(text: string): { headers: string[]; rows: string[][] } {
+  const lines = text.replace(/\r\n/g, "\n").split("\n").filter((l) => l.length > 0);
+  const parseLine = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = "";
+    let q = false;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      if (q) {
+        if (ch === '"' && line[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else if (ch === '"') {
+          q = false;
+        } else {
+          cur += ch;
+        }
+      } else if (ch === '"') {
+        q = true;
+      } else if (ch === ",") {
+        out.push(cur);
+        cur = "";
+      } else {
+        cur += ch;
+      }
+    }
+    out.push(cur);
+    return out;
+  };
+  if (lines.length === 0) return { headers: [], rows: [] };
+  return { headers: parseLine(lines[0]), rows: lines.slice(1).map(parseLine) };
+}

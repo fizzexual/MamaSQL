@@ -88,6 +88,44 @@ pub fn build_create_table(engine: Engine, table: &str, columns: &[ColumnDef]) ->
     format!("CREATE TABLE {} ({})", quote_ident(engine, table), cols)
 }
 
+pub fn build_add_column(engine: Engine, table: &str, col: &ColumnDef) -> String {
+    let mut s = format!(
+        "ALTER TABLE {} ADD COLUMN {} {}",
+        quote_ident(engine, table),
+        quote_ident(engine, &col.name),
+        col.data_type
+    );
+    if !col.nullable && !col.primary_key {
+        s.push_str(" NOT NULL");
+    }
+    s
+}
+
+pub fn build_drop_column(engine: Engine, table: &str, column: &str) -> String {
+    format!(
+        "ALTER TABLE {} DROP COLUMN {}",
+        quote_ident(engine, table),
+        quote_ident(engine, column)
+    )
+}
+
+pub fn build_rename_column(engine: Engine, table: &str, from: &str, to: &str) -> String {
+    format!(
+        "ALTER TABLE {} RENAME COLUMN {} TO {}",
+        quote_ident(engine, table),
+        quote_ident(engine, from),
+        quote_ident(engine, to)
+    )
+}
+
+pub fn build_rename_table(engine: Engine, from: &str, to: &str) -> String {
+    format!(
+        "ALTER TABLE {} RENAME TO {}",
+        quote_ident(engine, from),
+        quote_ident(engine, to)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,6 +173,27 @@ mod tests {
         assert_eq!(
             build_create_table(Engine::Postgres, "t", &cols),
             r#"CREATE TABLE "t" ("id" SERIAL PRIMARY KEY, "name" TEXT NOT NULL, "note" TEXT)"#
+        );
+    }
+
+    #[test]
+    fn alter_builders() {
+        assert_eq!(
+            build_rename_column(Engine::Postgres, "t", "a", "b"),
+            r#"ALTER TABLE "t" RENAME COLUMN "a" TO "b""#
+        );
+        assert_eq!(
+            build_drop_column(Engine::MySql, "t", "c"),
+            "ALTER TABLE `t` DROP COLUMN `c`"
+        );
+        assert_eq!(
+            build_rename_table(Engine::Postgres, "old", "new"),
+            r#"ALTER TABLE "old" RENAME TO "new""#
+        );
+        let col = ColumnDef { name: "note".into(), data_type: "TEXT".into(), nullable: true, primary_key: false };
+        assert_eq!(
+            build_add_column(Engine::Sqlite, "t", &col),
+            r#"ALTER TABLE "t" ADD COLUMN "note" TEXT"#
         );
     }
 

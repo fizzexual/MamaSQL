@@ -3,10 +3,10 @@
 // sandboxed to a different folder, so this is how we eyeball the UI.
 //
 // Usage: run `npm run dev` in one shell, then `npm run screenshot` in another.
+// Writes screenshot-skeleton.png, screenshot.png, screenshot-menu.png.
 import { chromium } from "playwright-core";
 
 const url = process.env.URL || "http://localhost:1420";
-const out = process.env.OUT || "screenshot.png";
 
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 try {
@@ -22,20 +22,33 @@ try {
       await page.waitForTimeout(500);
     }
   }
-  // Best-effort: drive a populated view (connect → expand → run).
   try {
-    await page.waitForSelector(".conn-name", { timeout: 10000 });
-    await page.click(".conn-name");
-    await page.waitForSelector(".tree-row", { timeout: 5000 });
-    await page.click(".tree-toggle");
-    await page.click(".btn-run");
-    await page.waitForSelector(".grid", { timeout: 5000 });
-    await page.waitForTimeout(500);
+    // Open the demo datasource → introspect tables.
+    await page.waitForSelector(".bud-src.ds", { timeout: 10000 });
+    await page.click(".bud-src.ds");
+    await page.waitForSelector(".bud-table", { timeout: 6000 });
+
+    // Open a table; capture the grid skeleton during the (mocked) load.
+    await page.click(".bud-table");
+    await page.waitForTimeout(110);
+    await page.screenshot({ path: "screenshot-skeleton.png" });
+
+    // Populated grid + toolbar.
+    await page.waitForSelector(".bud-grid:not(.bud-grid-skel)", { timeout: 6000 });
+    await page.waitForTimeout(350);
+    await page.screenshot({ path: "screenshot.png" });
+
+    // Table-actions dropdown menu.
+    await page.click(".bud-bc-menu");
+    await page.waitForSelector(".bud-menu", { timeout: 3000 });
+    await page.waitForTimeout(120);
+    await page.screenshot({ path: "screenshot-menu.png" });
+
+    console.log("wrote screenshot-skeleton.png, screenshot.png, screenshot-menu.png");
   } catch (e) {
-    console.log("interaction skipped: " + e.message);
+    console.log("interaction error: " + e.message);
+    await page.screenshot({ path: "screenshot.png" });
   }
-  await page.screenshot({ path: out });
-  console.log("wrote " + out);
 } finally {
   await browser.close();
 }

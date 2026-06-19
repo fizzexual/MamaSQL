@@ -55,6 +55,10 @@ pub fn run() {
             commands::insert_row,
             commands::drop_table,
             commands::create_table,
+            commands::add_column,
+            commands::drop_column,
+            commands::rename_column,
+            commands::rename_table,
             commands::create_local_database,
             commands::scan_local_databases,
         ])

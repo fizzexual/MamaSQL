@@ -34,6 +34,14 @@ export const tauriBackend: Backend = {
   dropTable: (connectionId, table) => invoke<void>("drop_table", { connectionId, table }),
   createTable: (connectionId, name, columns) =>
     invoke<void>("create_table", { connectionId, name, columns }),
+  addColumn: (connectionId, table, column) =>
+    invoke<void>("add_column", { connectionId, table, column }),
+  dropColumn: (connectionId, table, column) =>
+    invoke<void>("drop_column", { connectionId, table, column }),
+  renameColumn: (connectionId, table, from, to) =>
+    invoke<void>("rename_column", { connectionId, table, from, to }),
+  renameTable: (connectionId, from, to) =>
+    invoke<void>("rename_table", { connectionId, from, to }),
   createLocalDatabase: (name) => invoke<ConnectionConfig>("create_local_database", { name }),
   scanLocalDatabases: () => invoke<ConnectionConfig[]>("scan_local_databases"),
 };

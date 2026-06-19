@@ -20,12 +20,52 @@ const PILL_COLORS: [string, string][] = [
   ["#2a1240", "#d8b4fe"],
 ];
 
+/** Shimmer placeholder shown while a table's rows are loading. */
+function GridSkeleton() {
+  const rows = Array.from({ length: 12 });
+  const cols = Array.from({ length: 5 });
+  return (
+    <div className="bud-grid-wrap">
+      <table className="bud-grid bud-grid-skel">
+        <thead>
+          <tr>
+            <th className="bud-checkcol" />
+            <th className="bud-rownum">#</th>
+            {cols.map((_, i) => (
+              <th key={i}>
+                <span className="sk sk-th" />
+              </th>
+            ))}
+            <th className="bud-addcol" />
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((_, r) => (
+            <tr key={r}>
+              <td className="bud-checkcol" />
+              <td className="bud-rownum">{r + 1}</td>
+              {cols.map((_, c) => (
+                <td key={c}>
+                  <span className="sk sk-cell" style={{ width: `${45 + ((r * 7 + c * 23) % 45)}%` }} />
+                </td>
+              ))}
+              <td />
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function DataGrid() {
   const result = useStore((s) => s.result);
   const editTable = useStore((s) => s.editTable);
+  const loadingResult = useStore((s) => s.loadingResult);
   const editCell = useStore((s) => s.editCell);
   const deleteRowAt = useStore((s) => s.deleteRowAt);
   const addRow = useStore((s) => s.addRow);
+  const addColumn = useStore((s) => s.addColumn);
   const columns = useStore((s) => (editTable ? s.schema.columnsByTable[editTable.table] : undefined));
   const [editing, setEditing] = useState<{ row: number; col: number } | null>(null);
   const [draft, setDraft] = useState("");
@@ -51,7 +91,9 @@ export function DataGrid() {
     return set;
   }, [result]);
 
+  if (loadingResult) return <GridSkeleton />;
   if (!result || !editTable) return null;
+  const table = editTable.table;
 
   const colInfo = (name: string): ColumnInfo =>
     columns?.find((c) => c.name === name) ?? { name, dataType: "TEXT", nullable: true, isPrimaryKey: false };
@@ -78,12 +120,22 @@ export function DataGrid() {
     void addRow(cols, vals);
     setNewRow(null);
   };
+  const addColumnPrompt = () => {
+    const name = window.prompt("New column name");
+    if (!name?.trim()) return;
+    const dataType = window.prompt("Column type (TEXT, INTEGER, REAL, DATE, …)", "TEXT")?.trim() || "TEXT";
+    void addColumn(table, { name: name.trim(), dataType, nullable: true, primaryKey: false });
+  };
   const pill = (v: unknown) => {
     const s = String(v);
     let h = 0;
     for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) >>> 0;
     const [bg, fg] = PILL_COLORS[h % PILL_COLORS.length];
-    return <span className="bud-pill" style={{ background: bg, color: fg }}>{s}</span>;
+    return (
+      <span className="bud-pill" style={{ background: bg, color: fg }}>
+        {s}
+      </span>
+    );
   };
 
   return (
@@ -91,7 +143,9 @@ export function DataGrid() {
       <table className="bud-grid">
         <thead>
           <tr>
-            <th className="bud-checkcol"><input type="checkbox" /></th>
+            <th className="bud-checkcol">
+              <input type="checkbox" />
+            </th>
             <th className="bud-rownum">#</th>
             {result.columns.map((c, i) => (
               <th key={i}>
@@ -99,6 +153,7 @@ export function DataGrid() {
                 <span className="bud-th-name">{c.name}</span>
                 <button
                   className="bud-th-menu"
+                  title="Edit column"
                   onClick={(e) => {
                     const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
                     setColEditor({ column: colInfo(c.name), x: r.left - 280, y: r.bottom });
@@ -108,13 +163,21 @@ export function DataGrid() {
                 </button>
               </th>
             ))}
-            <th className="bud-addcol"><button title="Add column">＋</button></th>
+            <th className="bud-addcol">
+              <button title="Add column" onClick={addColumnPrompt}>
+                ＋
+              </button>
+            </th>
           </tr>
         </thead>
         <tbody>
           {newRow && (
             <tr className="bud-newrow">
-              <td className="bud-checkcol"><button className="bud-rowx" onClick={() => setNewRow(null)}>✕</button></td>
+              <td className="bud-checkcol">
+                <button className="bud-rowx" onClick={() => setNewRow(null)}>
+                  ✕
+                </button>
+              </td>
               <td className="bud-rownum">＋</td>
               {result.columns.map((c, i) => (
                 <td key={i}>
@@ -177,14 +240,19 @@ export function DataGrid() {
           ))}
           <tr className="bud-addrow">
             <td className="bud-checkcol">
-              <button onClick={() => setNewRow(result.columns.map(() => ""))} title="Add row">＋</button>
+              <button onClick={() => setNewRow(result.columns.map(() => ""))} title="Add row">
+                ＋
+              </button>
             </td>
-            <td className="bud-rownum bud-kbd"><kbd>⌘</kbd><kbd>↵</kbd></td>
+            <td className="bud-rownum bud-kbd">
+              <kbd>⌘</kbd>
+              <kbd>↵</kbd>
+            </td>
             <td colSpan={result.columns.length + 1} />
           </tr>
         </tbody>
       </table>
-      {colEditor && <ColumnEditor anchor={colEditor} onClose={() => setColEditor(null)} />}
+      {colEditor && <ColumnEditor anchor={colEditor} table={table} onClose={() => setColEditor(null)} />}
     </div>
   );
 }
