@@ -4,16 +4,18 @@
 connect to any database, browse and manage schemas, write and run SQL in a first-class
 editor, edit data inline, and (soon) work with results in a spreadsheet-and-charts surface.
 
-> Status: **early development.** Milestone 1 → **Plan 1 (Rust/SQLite backend)** and
-> **Plan 2 (React UI)** are built and the app runs. **24 tests green** (13 Rust + 11 TS),
-> strict `tsc` + Vite bundle clean. Remaining M1 polish: CodeMirror editor + autocomplete;
-> then **Plan 3** adds the Postgres & MySQL drivers.
+> Status: **Milestone 1 functionally complete** — a polished, multi-engine SQL client.
+> **Three engines (SQLite · Postgres · MySQL/MariaDB)** behind one `Driver` trait, each
+> verified against a live database. **27 tests** (16 Rust — including live Postgres 17 +
+> MariaDB 12.3 integration — and 11 TypeScript); strict `tsc` + Vite bundle clean.
+> Next: **M2** (inline table editing).
 
 ## Stack
 
 - **Backend:** Rust + [Tauri](https://tauri.app), with [sqlx](https://github.com/launchbadge/sqlx)
   as a unified async driver for Postgres, MySQL/MariaDB, and SQLite.
-- **Frontend:** React + TypeScript (Vite), CodeMirror 6 editor, Glide Data Grid, Zustand.
+- **Frontend:** React + TypeScript (Vite), CodeMirror 6 editor, a virtualized results
+  grid (Glide Data Grid arrives with M2 editing), Zustand.
 
 ## Develop
 
