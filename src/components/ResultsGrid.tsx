@@ -2,6 +2,14 @@ import { useMemo, useState } from "react";
 import { download, toCsv, toJson } from "../lib/csv";
 import { useStore } from "../state/store";
 
+function typeIcon(t: string): string {
+  const u = t.toUpperCase();
+  if (/INT|SERIAL|NUM|DEC|REAL|FLOAT|DOUBLE|BIGINT/.test(u)) return "123";
+  if (/DATE|TIME/.test(u)) return "🕑";
+  if (/BOOL/.test(u)) return "☑";
+  return "T";
+}
+
 export function ResultsGrid() {
   const result = useStore((s) => s.result);
   const error = useStore((s) => s.error);
@@ -117,6 +125,7 @@ export function ResultsGrid() {
               <th className="rownum">#</th>
               {result.columns.map((c, i) => (
                 <th key={i} onClick={() => sortBy(i)} title={`${c.name} (${c.dataType})`}>
+                  <span className="th-icon">{typeIcon(c.dataType)}</span>
                   <span className="th-name">
                     {c.name}
                     {i === pkIdx ? " 🔑" : ""}

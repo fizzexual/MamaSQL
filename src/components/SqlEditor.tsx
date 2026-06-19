@@ -1,4 +1,5 @@
 import { basicSetup } from "codemirror";
+import { oneDark } from "@codemirror/theme-one-dark";
 import { SQLite, sql } from "@codemirror/lang-sql";
 import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap } from "@codemirror/view";
@@ -42,6 +43,7 @@ export function SqlEditor() {
         extensions: [
           runKey,
           basicSetup,
+          oneDark,
           schemaComp.of(sql({ dialect: SQLite, schema: buildSchema() })),
           EditorView.lineWrapping,
           EditorView.updateListener.of((u) => {
