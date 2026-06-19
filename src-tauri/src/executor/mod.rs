@@ -33,6 +33,52 @@ fn to_hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
 
+/// Convert one Postgres row into JSON values, mapping by type. NULL -> null;
+/// unmapped types fall back to a `(typename)` placeholder string.
+pub fn pg_row_to_values(row: &sqlx::postgres::PgRow) -> AppResult<Vec<serde_json::Value>> {
+    let mut out = Vec::with_capacity(row.len());
+    for i in 0..row.len() {
+        let raw = row
+            .try_get_raw(i)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        if raw.is_null() {
+            out.push(serde_json::Value::Null);
+            continue;
+        }
+        let t = raw.type_info().name().to_uppercase();
+        let value = match t.as_str() {
+            "INT2" => row.try_get::<i16, _>(i).map(|x| serde_json::json!(x as i64)),
+            "INT4" => row.try_get::<i32, _>(i).map(|x| serde_json::json!(x as i64)),
+            "INT8" => row.try_get::<i64, _>(i).map(|x| serde_json::json!(x)),
+            "FLOAT4" => row.try_get::<f32, _>(i).map(|x| serde_json::json!(x as f64)),
+            "FLOAT8" => row.try_get::<f64, _>(i).map(|x| serde_json::json!(x)),
+            "NUMERIC" => row
+                .try_get::<sqlx::types::BigDecimal, _>(i)
+                .map(|x| serde_json::json!(x.to_string())),
+            "BOOL" => row.try_get::<bool, _>(i).map(|x| serde_json::json!(x)),
+            "TIMESTAMP" => row
+                .try_get::<chrono::NaiveDateTime, _>(i)
+                .map(|x| serde_json::json!(x.to_string())),
+            "TIMESTAMPTZ" => row
+                .try_get::<chrono::DateTime<chrono::Utc>, _>(i)
+                .map(|x| serde_json::json!(x.to_rfc3339())),
+            "DATE" => row
+                .try_get::<chrono::NaiveDate, _>(i)
+                .map(|x| serde_json::json!(x.to_string())),
+            "TIME" => row
+                .try_get::<chrono::NaiveTime, _>(i)
+                .map(|x| serde_json::json!(x.to_string())),
+            "UUID" => row
+                .try_get::<uuid::Uuid, _>(i)
+                .map(|x| serde_json::json!(x.to_string())),
+            "JSON" | "JSONB" => row.try_get::<serde_json::Value, _>(i),
+            _ => row.try_get::<String, _>(i).map(|x| serde_json::json!(x)),
+        };
+        out.push(value.unwrap_or_else(|_| serde_json::json!(format!("({})", t.to_lowercase()))));
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::drivers::{sqlite::SqliteDriver, Driver};

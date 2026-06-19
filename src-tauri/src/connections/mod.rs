@@ -20,12 +20,15 @@ impl ConnectionRegistry {
 
     /// Open a connection for `cfg` and register it under `cfg.id`. v1 supports
     /// SQLite; Postgres/MySQL land in Plan 3 (same trait).
-    pub async fn open(&self, cfg: &ConnectionConfig, _password: Option<&str>) -> AppResult<()> {
+    pub async fn open(&self, cfg: &ConnectionConfig, password: Option<&str>) -> AppResult<()> {
         let driver: Arc<dyn Driver> = match cfg.engine {
             Engine::Sqlite => Arc::new(SqliteDriver::connect(cfg).await?),
-            Engine::Postgres | Engine::MySql => {
+            Engine::Postgres => {
+                Arc::new(crate::drivers::postgres::PgDriver::connect(cfg, password).await?)
+            }
+            Engine::MySql => {
                 return Err(AppError::Internal(
-                    "engine not yet supported (see Plan 3)".into(),
+                    "MySQL/MariaDB coming in Plan 3 (in progress)".into(),
                 ))
             }
         };

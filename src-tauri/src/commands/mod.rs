@@ -52,10 +52,12 @@ pub async fn test_connection(cfg: ConnectionConfig, password: Option<String>) ->
     use crate::types::Engine;
     match cfg.engine {
         Engine::Sqlite => crate::drivers::sqlite::SqliteDriver::test(&cfg).await,
-        _ => {
-            let _ = password;
-            Err(AppError::Internal("engine not yet supported (Plan 3)".into()))
+        Engine::Postgres => {
+            crate::drivers::postgres::PgDriver::test(&cfg, password.as_deref()).await
         }
+        Engine::MySql => Err(AppError::Internal(
+            "MySQL/MariaDB coming in Plan 3 (in progress)".into(),
+        )),
     }
 }
 
