@@ -11,6 +11,14 @@ editor, edit data inline, and (soon) work with results in a spreadsheet-and-char
 > MariaDB 12.3 integration & an edit round-trip — and 11 TypeScript); strict `tsc` + Vite
 > bundle clean.
 
+## Download
+
+Grab the latest **standalone Windows executable** from the
+[**Releases** page](https://github.com/fizzexual/MamaSQL/releases) — download
+`MamaSQL.exe` and run it. No installer, no wizard, nothing else to download.
+*(CI rebuilds it on every push to `main`; it uses the WebView2 runtime that ships
+with Windows 10 & 11.)*
+
 ## Stack
 
 - **Backend:** Rust + [Tauri](https://tauri.app), with [sqlx](https://github.com/launchbadge/sqlx)
