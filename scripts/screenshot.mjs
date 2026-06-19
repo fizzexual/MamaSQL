@@ -23,28 +23,13 @@ try {
     }
   }
   try {
-    // Open the demo datasource → introspect tables.
-    await page.waitForSelector(".bud-src.ds", { timeout: 10000 });
-    await page.click(".bud-src.ds");
-    await page.waitForSelector(".bud-table", { timeout: 6000 });
-
-    // Open a table; capture the grid skeleton during the (mocked) load.
-    await page.click(".bud-table");
-    await page.waitForTimeout(110);
-    await page.screenshot({ path: "screenshot-skeleton.png" });
-
-    // Populated grid + toolbar.
-    await page.waitForSelector(".bud-grid:not(.bud-grid-skel)", { timeout: 6000 });
-    await page.waitForTimeout(350);
+    // The builder auto-opens the first connection + table, so the canvas
+    // populates without interaction.
+    await page.waitForSelector(".bld", { timeout: 10000 });
+    await page.waitForSelector(".bld-formblock", { timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(700);
     await page.screenshot({ path: "screenshot.png" });
-
-    // Open the row inspector (form-based row editor).
-    await page.click(".rn-expand");
-    await page.waitForSelector(".bud-inspector", { timeout: 3000 });
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: "screenshot-inspector.png" });
-
-    console.log("wrote screenshot-skeleton.png, screenshot.png, screenshot-inspector.png");
+    console.log("wrote screenshot.png");
   } catch (e) {
     console.log("interaction error: " + e.message);
     await page.screenshot({ path: "screenshot.png" });
