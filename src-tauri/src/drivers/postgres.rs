@@ -222,6 +222,23 @@ mod tests {
         let cols = d.list_columns("mamasql_t").await.unwrap();
         assert!(cols.iter().find(|c| c.name == "id").unwrap().is_primary_key);
 
+        // Editing round-trip: UPDATE via the editing builder (string-literal PK
+        // '1' must coerce against the INT column), then confirm it took.
+        let upd = crate::editing::build_update(
+            Engine::Postgres,
+            "mamasql_t",
+            "name",
+            &serde_json::json!("renamed"),
+            "id",
+            &serde_json::json!(1),
+        );
+        d.execute(&upd).await.unwrap();
+        let r2 = d
+            .execute("SELECT name FROM mamasql_t WHERE id = 1")
+            .await
+            .unwrap();
+        assert_eq!(r2.rows[0][0], serde_json::json!("renamed"));
+
         d.execute("DROP TABLE mamasql_t").await.unwrap();
     }
 }

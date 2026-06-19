@@ -9,6 +9,7 @@ mod store;
 mod secrets;
 mod connections;
 mod commands;
+mod editing;
 
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
@@ -49,6 +50,9 @@ pub fn run() {
             commands::list_tables,
             commands::list_columns,
             commands::recent_history,
+            commands::update_cell,
+            commands::delete_row,
+            commands::insert_row,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

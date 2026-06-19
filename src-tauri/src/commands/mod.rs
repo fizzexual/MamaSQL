@@ -3,7 +3,7 @@ use crate::error::{AppError, AppResult};
 use crate::schema;
 use crate::secrets;
 use crate::store::{HistoryEntry, Store};
-use crate::types::{ColumnInfo, ConnectionConfig, QueryResult, TableInfo};
+use crate::types::{ColumnInfo, ConnectionConfig, Engine, QueryResult, TableInfo};
 use tauri::State;
 
 /// Shared application state, managed by Tauri and injected into commands.
@@ -49,7 +49,6 @@ pub async fn delete_connection(state: State<'_, AppState>, id: String) -> AppRes
 
 #[tauri::command]
 pub async fn test_connection(cfg: ConnectionConfig, password: Option<String>) -> AppResult<()> {
-    use crate::types::Engine;
     match cfg.engine {
         Engine::Sqlite => crate::drivers::sqlite::SqliteDriver::test(&cfg).await,
         Engine::Postgres => {
@@ -116,6 +115,63 @@ pub async fn recent_history(
     limit: i64,
 ) -> AppResult<Vec<HistoryEntry>> {
     state.store.recent_history(limit).await
+}
+
+async fn engine_of(store: &Store, connection_id: &str) -> AppResult<Engine> {
+    store
+        .list_connections()
+        .await?
+        .into_iter()
+        .find(|c| c.id == connection_id)
+        .map(|c| c.engine)
+        .ok_or_else(|| AppError::NotFound(format!("no saved connection: {connection_id}")))
+}
+
+#[tauri::command]
+pub async fn update_cell(
+    state: State<'_, AppState>,
+    connection_id: String,
+    table: String,
+    pk_column: String,
+    pk_value: serde_json::Value,
+    column: String,
+    value: serde_json::Value,
+) -> AppResult<()> {
+    let engine = engine_of(&state.store, &connection_id).await?;
+    let driver = state.registry.get(&connection_id).await?;
+    let sql = crate::editing::build_update(engine, &table, &column, &value, &pk_column, &pk_value);
+    driver.execute(&sql).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn delete_row(
+    state: State<'_, AppState>,
+    connection_id: String,
+    table: String,
+    pk_column: String,
+    pk_value: serde_json::Value,
+) -> AppResult<()> {
+    let engine = engine_of(&state.store, &connection_id).await?;
+    let driver = state.registry.get(&connection_id).await?;
+    let sql = crate::editing::build_delete(engine, &table, &pk_column, &pk_value);
+    driver.execute(&sql).await?;
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn insert_row(
+    state: State<'_, AppState>,
+    connection_id: String,
+    table: String,
+    columns: Vec<String>,
+    values: Vec<serde_json::Value>,
+) -> AppResult<()> {
+    let engine = engine_of(&state.store, &connection_id).await?;
+    let driver = state.registry.get(&connection_id).await?;
+    let sql = crate::editing::build_insert(engine, &table, &columns, &values);
+    driver.execute(&sql).await?;
+    Ok(())
 }
 
 #[cfg(test)]
