@@ -144,6 +144,16 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .editor-area:focus { outline: none; }
 
+/* CodeMirror editor */
+.editor-cm { flex: 1; min-height: 0; overflow: hidden; }
+.editor-cm .cm-editor { height: 100%; }
+.editor-cm .cm-scroller { font-family: var(--mono); font-size: 13.5px; line-height: 1.6; padding-top: 4px; }
+.editor-cm .cm-focused { outline: none; }
+.editor-cm .cm-gutters { background: var(--panel-2); border-right: 1px solid var(--border); color: var(--faint); }
+.editor-cm .cm-activeLine { background: rgba(8, 145, 178, 0.05); }
+.editor-cm .cm-activeLineGutter { background: rgba(8, 145, 178, 0.10); }
+.editor-cm .cm-tooltip-autocomplete { font-family: var(--mono); font-size: 12.5px; }
+
 /* ---------- Results ---------- */
 .results {
   background: var(--panel); border: 1px solid var(--border); border-radius: 10px;

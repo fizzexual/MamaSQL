@@ -1,33 +1,86 @@
-import type { KeyboardEvent } from "react";
+import { basicSetup } from "codemirror";
+import { SQLite, sql } from "@codemirror/lang-sql";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
+import { EditorView, keymap } from "@codemirror/view";
+import { useEffect, useRef } from "react";
 import { useStore } from "../state/store";
 
-// M1: a plain textarea editor. Task 6 upgrades this to CodeMirror 6 with
-// SQL highlighting + schema-aware autocomplete, behind the same store binding.
-export function SqlEditor() {
-  const sql = useStore((s) => s.sql);
-  const setSql = useStore((s) => s.setSql);
-  const run = useStore((s) => s.run);
+// Build a { table: [columns] } map from the store for schema-aware completion.
+function buildSchema(): Record<string, string[]> {
+  const { schema } = useStore.getState();
+  const out: Record<string, string[]> = {};
+  for (const t of schema.tables) {
+    out[t.name] = (schema.columnsByTable[t.name] ?? []).map((c) => c.name);
+  }
+  return out;
+}
 
-  const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
-      e.preventDefault();
-      run();
-    }
-  };
+export function SqlEditor() {
+  const host = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!host.current) return;
+    const schemaComp = new Compartment();
+
+    // Ctrl/Cmd+Enter runs the query (highest precedence so it wins).
+    const runKey = Prec.highest(
+      keymap.of([
+        {
+          key: "Mod-Enter",
+          run: () => {
+            void useStore.getState().run();
+            return true;
+          },
+        },
+      ]),
+    );
+
+    const view = new EditorView({
+      parent: host.current,
+      state: EditorState.create({
+        doc: useStore.getState().sql,
+        extensions: [
+          runKey,
+          basicSetup,
+          schemaComp.of(sql({ dialect: SQLite, schema: buildSchema() })),
+          EditorView.lineWrapping,
+          EditorView.updateListener.of((u) => {
+            if (u.docChanged) {
+              const value = u.state.doc.toString();
+              if (value !== useStore.getState().sql) useStore.getState().setSql(value);
+            }
+          }),
+        ],
+      }),
+    });
+
+    // Keep the editor in sync with external store changes (table clicks, history).
+    const unsub = useStore.subscribe((state, prev) => {
+      if (state.sql !== prev.sql) {
+        const current = view.state.doc.toString();
+        if (state.sql !== current) {
+          view.dispatch({ changes: { from: 0, to: current.length, insert: state.sql } });
+        }
+      }
+      if (state.schema !== prev.schema) {
+        view.dispatch({
+          effects: schemaComp.reconfigure(sql({ dialect: SQLite, schema: buildSchema() })),
+        });
+      }
+    });
+
+    return () => {
+      unsub();
+      view.destroy();
+    };
+  }, []);
 
   return (
     <div className="editor">
       <div className="editor-tabbar">
         <span className="tab active">Query 1</span>
       </div>
-      <textarea
-        className="editor-area"
-        value={sql}
-        spellCheck={false}
-        onChange={(e) => setSql(e.target.value)}
-        onKeyDown={onKeyDown}
-        placeholder="Write SQL — press Ctrl/Cmd+Enter to run"
-      />
+      <div className="editor-cm" ref={host} />
     </div>
   );
 }
