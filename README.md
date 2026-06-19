@@ -4,8 +4,10 @@
 connect to any database, browse and manage schemas, write and run SQL in a first-class
 editor, edit data inline, and (soon) work with results in a spreadsheet-and-charts surface.
 
-> Status: **early development.** Milestone 1 → **Plan 1 (backend core, SQLite) is complete** —
-> 13 tests green and the app boots end-to-end. Up next: **Plan 2** (the React UI).
+> Status: **early development.** Milestone 1 → **Plan 1 (Rust/SQLite backend)** and
+> **Plan 2 (React UI)** are built and the app runs. **24 tests green** (13 Rust + 11 TS),
+> strict `tsc` + Vite bundle clean. Remaining M1 polish: CodeMirror editor + autocomplete;
+> then **Plan 3** adds the Postgres & MySQL drivers.
 
 ## Stack
 
