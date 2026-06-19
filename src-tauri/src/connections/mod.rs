@@ -27,9 +27,7 @@ impl ConnectionRegistry {
                 Arc::new(crate::drivers::postgres::PgDriver::connect(cfg, password).await?)
             }
             Engine::MySql => {
-                return Err(AppError::Internal(
-                    "MySQL/MariaDB coming in Plan 3 (in progress)".into(),
-                ))
+                Arc::new(crate::drivers::mysql::MySqlDriver::connect(cfg, password).await?)
             }
         };
         self.live.write().await.insert(cfg.id.clone(), driver);

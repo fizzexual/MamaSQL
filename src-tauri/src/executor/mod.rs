@@ -79,6 +79,47 @@ pub fn pg_row_to_values(row: &sqlx::postgres::PgRow) -> AppResult<Vec<serde_json
     Ok(out)
 }
 
+/// Convert one MySQL/MariaDB row into JSON values, mapping by type.
+pub fn mysql_row_to_values(row: &sqlx::mysql::MySqlRow) -> AppResult<Vec<serde_json::Value>> {
+    let mut out = Vec::with_capacity(row.len());
+    for i in 0..row.len() {
+        let raw = row
+            .try_get_raw(i)
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        if raw.is_null() {
+            out.push(serde_json::Value::Null);
+            continue;
+        }
+        let t = raw.type_info().name().to_uppercase();
+        let value = match t.as_str() {
+            "TINYINT" => row.try_get::<i8, _>(i).map(|x| serde_json::json!(x as i64)),
+            "SMALLINT" | "YEAR" => row.try_get::<i16, _>(i).map(|x| serde_json::json!(x as i64)),
+            "INT" | "MEDIUMINT" | "INTEGER" => {
+                row.try_get::<i32, _>(i).map(|x| serde_json::json!(x as i64))
+            }
+            "BIGINT" => row.try_get::<i64, _>(i).map(|x| serde_json::json!(x)),
+            "FLOAT" => row.try_get::<f32, _>(i).map(|x| serde_json::json!(x as f64)),
+            "DOUBLE" => row.try_get::<f64, _>(i).map(|x| serde_json::json!(x)),
+            "DECIMAL" | "NEWDECIMAL" => row
+                .try_get::<sqlx::types::BigDecimal, _>(i)
+                .map(|x| serde_json::json!(x.to_string())),
+            "DATETIME" | "TIMESTAMP" => row
+                .try_get::<chrono::NaiveDateTime, _>(i)
+                .map(|x| serde_json::json!(x.to_string())),
+            "DATE" => row
+                .try_get::<chrono::NaiveDate, _>(i)
+                .map(|x| serde_json::json!(x.to_string())),
+            "TIME" => row
+                .try_get::<chrono::NaiveTime, _>(i)
+                .map(|x| serde_json::json!(x.to_string())),
+            "JSON" => row.try_get::<serde_json::Value, _>(i),
+            _ => row.try_get::<String, _>(i).map(|x| serde_json::json!(x)),
+        };
+        out.push(value.unwrap_or_else(|_| serde_json::json!(format!("({})", t.to_lowercase()))));
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests {
     use crate::drivers::{sqlite::SqliteDriver, Driver};

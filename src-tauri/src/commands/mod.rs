@@ -55,9 +55,9 @@ pub async fn test_connection(cfg: ConnectionConfig, password: Option<String>) ->
         Engine::Postgres => {
             crate::drivers::postgres::PgDriver::test(&cfg, password.as_deref()).await
         }
-        Engine::MySql => Err(AppError::Internal(
-            "MySQL/MariaDB coming in Plan 3 (in progress)".into(),
-        )),
+        Engine::MySql => {
+            crate::drivers::mysql::MySqlDriver::test(&cfg, password.as_deref()).await
+        }
     }
 }
 
