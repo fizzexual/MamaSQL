@@ -1,26 +1,40 @@
 :root {
-  --bg: #0d0d10;
-  --panel: #161619;
-  --panel-2: #1d1d22;
-  --border: #2a2a31;
-  --border-strong: #3a3a44;
-  --text: #e6e6ea;
-  --muted: #9a9aa4;
-  --faint: #6a6a75;
-  --accent: #4f7cff;
-  --accent-soft: rgba(79, 124, 255, 0.16);
-  --header: #0a0a0c;
-  --header-text: #e6e6ea;
+  --bg: #0a0a0d;
+  --bg-2: #0e0e12;
+  --panel: #131318;
+  --panel-2: #1a1a20;
+  --panel-3: #212129;
+  --border: #24242c;
+  --border-strong: #34343f;
+  --text: #ecedf2;
+  --muted: #9b9ba8;
+  --faint: #6a6a78;
+  --accent: #6d83ff;
+  --accent-2: #9b6dff;
+  --accent-grad: linear-gradient(135deg, #6d83ff, #9b6dff);
+  --accent-soft: rgba(109, 131, 255, 0.14);
+  --accent-glow: rgba(109, 131, 255, 0.4);
+  --header: #0a0a0d;
+  --header-text: #ecedf2;
   --danger: #f0616d;
   --ok: #34d399;
-  --input-bg: #202026;
+  --input-bg: #1c1c22;
+  --r-sm: 6px;
+  --r: 9px;
+  --r-lg: 13px;
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.35);
+  --elev-2: 0 10px 30px rgba(0, 0, 0, 0.5);
+  --elev-3: 0 20px 56px rgba(0, 0, 0, 0.62);
   --mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, monospace;
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
-body { font-family: var(--sans); color: var(--text); background: var(--bg); font-size: 13px; }
+body {
+  font-family: var(--sans); color: var(--text); background: var(--bg); font-size: 13px;
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
 button { font-family: inherit; cursor: pointer; }
 input, select, textarea { color: var(--text); background: var(--input-bg); }
 ul { list-style: none; margin: 0; padding: 0; }
@@ -503,3 +517,116 @@ ul { list-style: none; margin: 0; padding: 0; }
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .bud-hist-time { font-size: 11px; color: var(--faint); }
+
+/* ============================================================
+   Premium polish — depth, motion, gradient accents, refinement
+   ============================================================ */
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2b2b35; border-radius: 8px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-thumb:hover { background: #3c3c49; border-radius: 8px; border: 3px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+button, .bud-src, .bud-table, .bud-tool, .bud-tab, .bud-naction, .icon-btn,
+.bud-hist-item, .detected-add, .bud-menu button, .bud-bc-table {
+  transition: background-color .15s ease, color .15s ease, border-color .15s ease,
+    box-shadow .15s ease, transform .12s ease, opacity .15s ease, filter .15s ease;
+}
+
+/* App backdrop: subtle overhead glow for depth */
+.bud-app {
+  background:
+    radial-gradient(1100px 460px at 50% -180px, rgba(109, 131, 255, 0.07), transparent 70%),
+    var(--bg);
+}
+
+/* ---- Top nav ---- */
+.bud-topnav {
+  background: linear-gradient(180deg, #15151b 0%, #100f15 100%);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02);
+  padding: 0 14px;
+}
+.bud-brand {
+  background: var(--accent-grad); -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; font-weight: 800; letter-spacing: 0.2px; font-size: 14px;
+}
+.bud-tabs button.bud-tab { padding: 6px 13px; border-radius: 8px; color: var(--muted); font-weight: 500; }
+.bud-tabs button.bud-tab:hover { color: var(--text); background: rgba(255, 255, 255, 0.045); }
+.bud-tabs button.bud-tab.active {
+  color: #fff; background: var(--accent-soft); box-shadow: inset 0 0 0 1px rgba(109, 131, 255, 0.28);
+}
+.bud-topnav-center { color: var(--muted); font-weight: 500; letter-spacing: 0.2px; }
+.bud-naction { border-radius: 8px; }
+.bud-naction:hover:not(:disabled) { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+.bud-avatar { background: var(--accent-grad); box-shadow: 0 2px 12px rgba(109, 131, 255, 0.4); }
+
+/* ---- Sources sidebar ---- */
+.bud-sources { background: var(--bg-2); }
+.bud-sources-head { font-weight: 700; letter-spacing: 0.2px; color: var(--text); }
+.bud-src:hover { background: rgba(255, 255, 255, 0.045); }
+.bud-table { position: relative; border-radius: 8px; }
+.bud-table:hover { background: rgba(255, 255, 255, 0.045); color: var(--text); }
+.bud-table.active { background: var(--accent-soft); color: #fff; box-shadow: inset 2px 0 0 var(--accent); }
+.detected-add { background: var(--accent-grad); border: none; box-shadow: 0 2px 9px rgba(109, 131, 255, 0.3); }
+.detected-add:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.bud-detected-head { color: var(--faint); }
+
+/* ---- Breadcrumb + toolbar ---- */
+.bud-breadcrumb { padding: 13px 18px 10px; }
+.bud-bc-table { background: var(--panel-2); border: 1px solid var(--border-strong); border-radius: 9px; box-shadow: var(--elev-1); }
+.bud-toolbar { padding: 0 14px 10px; gap: 3px; }
+.bud-tool { border-radius: 8px; font-weight: 500; }
+.bud-tool:hover:not(:disabled) { color: var(--text); background: rgba(255, 255, 255, 0.05); }
+.bud-tool:active:not(:disabled) { transform: translateY(1px); }
+
+/* ---- Data grid ---- */
+.bud-grid th, .bud-grid td { border-right: 1px solid rgba(255, 255, 255, 0.045); border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+.bud-grid thead th {
+  background: linear-gradient(180deg, #1d1d24, #161620);
+  border-bottom: 1px solid var(--border-strong);
+  padding: 9px 12px; font-weight: 600; letter-spacing: 0.2px;
+}
+.bud-th-ic {
+  display: inline-grid; place-items: center; min-width: 19px; height: 16px; padding: 0 4px;
+  border-radius: 5px; background: var(--accent-soft); color: var(--accent);
+  font-size: 9.5px; font-weight: 700; margin-right: 8px; opacity: 1; vertical-align: middle;
+}
+.bud-grid tbody td { padding: 7px 12px; }
+.bud-grid tbody tr:hover td { background: rgba(109, 131, 255, 0.05); }
+.bud-grid tbody tr:hover .bud-rownum { color: var(--accent); }
+.bud-grid tbody tr:hover .bud-checkcol { box-shadow: inset 2px 0 0 var(--accent); }
+.bud-checkcol, .bud-rownum { background: var(--bg-2); }
+.bud-addcol { background: linear-gradient(180deg, #1d1d24, #161620); }
+.bud-pill { border: 1px solid rgba(255, 255, 255, 0.06); border-radius: 8px; padding: 2px 10px; font-weight: 600; letter-spacing: 0.2px; }
+
+/* ---- Inputs + primary buttons ---- */
+.bud-ce-name:focus, .bud-src-filter:focus, .bud-cell-input:focus,
+.bud-ce-default input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.bud-coleditor { background: var(--panel-2); border: 1px solid var(--border-strong); border-radius: 13px; box-shadow: var(--elev-3); }
+.bud-ce-save { background: var(--accent-grad); box-shadow: 0 4px 14px rgba(109, 131, 255, 0.35); border-radius: 8px; font-weight: 600; }
+.bud-ce-save:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-1px); }
+.bud-ce-save:disabled { opacity: 0.5; }
+.bud-ce-cancel { border-radius: 8px; }
+.bud-ce-cancel:hover { border-color: var(--border-strong); background: var(--panel-3); }
+
+/* ---- Menus ---- */
+.bud-menu { border-radius: 11px; box-shadow: var(--elev-2); border: 1px solid var(--border-strong); }
+.bud-menu button { border-radius: 7px; }
+
+/* ---- Skeleton: subtler premium shimmer ---- */
+.sk {
+  background: rgba(255, 255, 255, 0.035); border-radius: 6px;
+  background-image: linear-gradient(90deg, transparent 0, rgba(255, 255, 255, 0.06) 50px, transparent 100px);
+  background-size: 220px 100%;
+}
+
+/* ---- History items ---- */
+.bud-hist-item { border-radius: 10px; box-shadow: var(--elev-1); }
+.bud-hist-item:hover { border-color: var(--accent); box-shadow: 0 6px 18px rgba(109, 131, 255, 0.18); transform: translateY(-1px); }
+
+/* ---- Error banner ---- */
+.bud-error {
+  margin: 8px 16px 0; border: 1px solid rgba(240, 97, 109, 0.3);
+  background: rgba(240, 97, 109, 0.1); border-radius: 9px;
+}

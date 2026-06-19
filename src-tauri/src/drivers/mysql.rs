@@ -25,6 +25,19 @@ fn options(cfg: &ConnectionConfig, password: Option<&str>) -> MySqlConnectOption
     o
 }
 
+/// information_schema text columns can come back as utf8 strings OR as binary
+/// (varbinary/blob) depending on MySQL/MariaDB version + collation. Decode
+/// defensively so introspection never panics (a panic would hang the command).
+fn try_get_text(row: &sqlx::mysql::MySqlRow, col: &str) -> String {
+    if let Ok(s) = row.try_get::<String, _>(col) {
+        return s;
+    }
+    if let Ok(b) = row.try_get::<Vec<u8>, _>(col) {
+        return String::from_utf8_lossy(&b).into_owned();
+    }
+    String::new()
+}
+
 impl MySqlDriver {
     pub async fn connect(cfg: &ConnectionConfig, password: Option<&str>) -> AppResult<Self> {
         let pool = MySqlPoolOptions::new()
@@ -105,13 +118,10 @@ impl Driver for MySqlDriver {
         Ok(rows
             .iter()
             .map(|r| {
-                let kind = if r.get::<String, _>("table_type") == "VIEW" {
-                    "view"
-                } else {
-                    "table"
-                };
+                let table_type: String = try_get_text(r, "table_type");
+                let kind = if table_type == "VIEW" { "view" } else { "table" };
                 TableInfo {
-                    name: r.get::<String, _>("table_name"),
+                    name: try_get_text(r, "table_name"),
                     kind: kind.to_string(),
                     schema: None,
                 }
@@ -131,11 +141,11 @@ impl Driver for MySqlDriver {
         Ok(rows
             .iter()
             .map(|r| {
-                let name: String = r.get("column_name");
+                let name = try_get_text(r, "column_name");
                 ColumnInfo {
-                    is_primary_key: r.get::<String, _>("column_key") == "PRI",
-                    nullable: r.get::<String, _>("is_nullable") == "YES",
-                    data_type: r.get::<String, _>("data_type"),
+                    is_primary_key: try_get_text(r, "column_key") == "PRI",
+                    nullable: try_get_text(r, "is_nullable") == "YES",
+                    data_type: try_get_text(r, "data_type"),
                     name,
                 }
             })

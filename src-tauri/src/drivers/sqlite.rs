@@ -100,8 +100,8 @@ impl Driver for SqliteDriver {
         Ok(rows
             .iter()
             .map(|r| TableInfo {
-                name: r.get::<String, _>("name"),
-                kind: r.get::<String, _>("type"),
+                name: r.try_get::<String, _>("name").unwrap_or_default(),
+                kind: r.try_get::<String, _>("type").unwrap_or_else(|_| "table".into()),
                 schema: None,
             })
             .collect())
@@ -118,10 +118,10 @@ impl Driver for SqliteDriver {
         Ok(rows
             .iter()
             .map(|r| ColumnInfo {
-                name: r.get::<String, _>("name"),
-                data_type: r.get::<String, _>("type"),
-                nullable: r.get::<i64, _>("notnull") == 0,
-                is_primary_key: r.get::<i64, _>("pk") > 0,
+                name: r.try_get::<String, _>("name").unwrap_or_default(),
+                data_type: r.try_get::<String, _>("type").unwrap_or_default(),
+                nullable: r.try_get::<i64, _>("notnull").unwrap_or(0) == 0,
+                is_primary_key: r.try_get::<i64, _>("pk").unwrap_or(0) > 0,
             })
             .collect())
     }

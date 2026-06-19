@@ -106,15 +106,12 @@ impl Driver for PgDriver {
         Ok(rows
             .iter()
             .map(|r| {
-                let kind = if r.get::<String, _>("table_type") == "VIEW" {
-                    "view"
-                } else {
-                    "table"
-                };
+                let table_type: String = r.try_get("table_type").unwrap_or_default();
+                let kind = if table_type == "VIEW" { "view" } else { "table" };
                 TableInfo {
-                    name: r.get::<String, _>("table_name"),
+                    name: r.try_get("table_name").unwrap_or_default(),
                     kind: kind.to_string(),
-                    schema: Some(r.get::<String, _>("table_schema")),
+                    schema: r.try_get("table_schema").ok(),
                 }
             })
             .collect())
@@ -133,7 +130,7 @@ impl Driver for PgDriver {
         .await?;
         let pks: HashSet<String> = pk_rows
             .iter()
-            .map(|r| r.get::<String, _>("column_name"))
+            .filter_map(|r| r.try_get::<String, _>("column_name").ok())
             .collect();
 
         let rows = sqlx::query(
@@ -147,11 +144,16 @@ impl Driver for PgDriver {
         Ok(rows
             .iter()
             .map(|r| {
-                let name: String = r.get("column_name");
+                let name: String = r.try_get("column_name").unwrap_or_default();
                 ColumnInfo {
                     is_primary_key: pks.contains(&name),
-                    nullable: r.get::<String, _>("is_nullable") == "YES",
-                    data_type: r.get::<String, _>("data_type"),
+                    nullable: r
+                        .try_get::<String, _>("is_nullable")
+                        .map(|v| v == "YES")
+                        .unwrap_or(true),
+                    data_type: r
+                        .try_get::<String, _>("data_type")
+                        .unwrap_or_else(|_| "unknown".into()),
                     name,
                 }
             })

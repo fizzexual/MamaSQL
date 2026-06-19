@@ -137,15 +137,23 @@ export const useStore = create<AppStore>((set, get) => ({
   openTableData: async (table) => {
     const id = get().activeConnectionId;
     if (!id) return;
-    set({ view: "data", loadingResult: true, error: null });
-    await get().expandTable(table);
-    const cols = get().schema.columnsByTable[table] ?? [];
-    const pkColumn = cols.find((c) => c.isPrimaryKey)?.name ?? null;
     const sql = `SELECT * FROM ${table} LIMIT 200;`;
-    set({ sql, editTable: { table, pkColumn } });
+    set({ view: "data", loadingResult: true, error: null, sql, editTable: { table, pkColumn: null } });
     try {
-      const result = await backend.runQuery(id, sql);
-      set({ result, loadingResult: false });
+      // Column introspection is best-effort — it must never block the data load.
+      try {
+        await get().expandTable(table);
+      } catch {
+        /* fall back to the columns the query itself returns */
+      }
+      const cols = get().schema.columnsByTable[table] ?? [];
+      const pkColumn = cols.find((c) => c.isPrimaryKey)?.name ?? null;
+      let result = await backend.runQuery(id, sql);
+      // Empty tables yield no columns from the row set — show the schema's columns.
+      if (result.columns.length === 0 && cols.length > 0) {
+        result = { ...result, columns: cols.map((c) => ({ name: c.name, dataType: c.dataType })) };
+      }
+      set({ result, editTable: { table, pkColumn }, loadingResult: false });
       await get().loadHistory();
     } catch (e) {
       set({ error: normalizeError(e), result: null, loadingResult: false });
