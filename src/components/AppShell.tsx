@@ -1,7 +1,7 @@
 import { ConnectionSidebar } from "./ConnectionSidebar";
 import { Header } from "./Header";
 import { HistoryPanel } from "./HistoryPanel";
-import { ResultsGrid } from "./ResultsGrid";
+import { ResultsPanel } from "./ResultsPanel";
 import { SchemaTree } from "./SchemaTree";
 import { SqlEditor } from "./SqlEditor";
 import { StatusBar } from "./StatusBar";
@@ -17,7 +17,7 @@ export function AppShell() {
         </aside>
         <main className="workspace">
           <SqlEditor />
-          <ResultsGrid />
+          <ResultsPanel />
         </main>
         <aside className="rightbar">
           <HistoryPanel />
