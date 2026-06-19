@@ -27,6 +27,10 @@ Prerequisites: **Node 18+**, **Rust** (stable `x86_64-pc-windows-msvc`), and the
 npm install                  # JS dependencies
 npm run tauri dev            # run the app (Vite + Rust)
 cd src-tauri && cargo test   # backend test suite
+
+# Package a standalone executable:
+npm run tauri build -- --no-bundle   # → src-tauri/target/release/mamasql.exe
+npm run tauri build                  # full installer (NSIS / MSI)
 ```
 
 ## Roadmap
