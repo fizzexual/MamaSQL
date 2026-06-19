@@ -37,3 +37,7 @@ Thumbs.db
 
 # Local data
 *.local
+
+# Screenshot helper output
+/screenshot.png
+/_shot.*
