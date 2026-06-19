@@ -4,13 +4,25 @@
 connect to any database, browse and manage schemas, write and run SQL in a first-class
 editor, edit data inline, and (soon) work with results in a spreadsheet-and-charts surface.
 
-> Status: **early development.** Milestone 1 (the foundation) is designed and being built.
+> Status: **early development.** Milestone 1 → **Plan 1 (backend core, SQLite) is complete** —
+> 13 tests green and the app boots end-to-end. Up next: **Plan 2** (the React UI).
 
 ## Stack
 
 - **Backend:** Rust + [Tauri](https://tauri.app), with [sqlx](https://github.com/launchbadge/sqlx)
   as a unified async driver for Postgres, MySQL/MariaDB, and SQLite.
 - **Frontend:** React + TypeScript (Vite), CodeMirror 6 editor, Glide Data Grid, Zustand.
+
+## Develop
+
+Prerequisites: **Node 18+**, **Rust** (stable `x86_64-pc-windows-msvc`), and the
+**MSVC C++ Build Tools** (Windows). WebView2 ships with Windows 10/11.
+
+```bash
+npm install                  # JS dependencies
+npm run tauri dev            # run the app (Vite + Rust)
+cd src-tauri && cargo test   # backend test suite
+```
 
 ## Roadmap
 
