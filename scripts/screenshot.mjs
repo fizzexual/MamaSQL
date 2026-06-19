@@ -26,8 +26,8 @@ try {
     // The builder auto-opens the first connection + table, so the canvas
     // populates without interaction.
     await page.waitForSelector(".bld", { timeout: 10000 });
-    await page.waitForSelector(".bld-formblock", { timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(700);
+    await page.waitForSelector(".bld-sheet", { timeout: 8000 }).catch(() => {});
+    await page.waitForTimeout(800);
     await page.screenshot({ path: "screenshot.png" });
     console.log("wrote screenshot.png");
   } catch (e) {

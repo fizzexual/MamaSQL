@@ -1,6 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { getBackend } from "../../ipc/backend";
+import type { QueryResult } from "../../ipc/types";
+import { download, fromCsv, toCsv } from "../../lib/csv";
+import { fieldKind } from "../bud/fieldInput";
+import { RowInspector } from "../bud/RowInspector";
 import { useStore } from "../../state/store";
-import { FieldInput, fieldKind } from "../bud/fieldInput";
+
+const backend = getBackend();
 
 function typeIcon(t: string): string {
   const u = t.toUpperCase();
@@ -18,29 +24,48 @@ const PILL: [string, string][] = [
   ["#fce7f3", "#be185d"],
 ];
 
+type Tab = "data" | "sql" | "structure" | "history";
+
 export function Builder() {
   const connections = useStore((s) => s.connections);
   const activeId = useStore((s) => s.activeConnectionId);
   const tables = useStore((s) => s.schema.tables);
+  const columnsByTable = useStore((s) => s.schema.columnsByTable);
   const editTable = useStore((s) => s.editTable);
   const result = useStore((s) => s.result);
   const loadingResult = useStore((s) => s.loadingResult);
-  const openTableData = useStore((s) => s.openTableData);
-  const openAndIntrospect = useStore((s) => s.openAndIntrospect);
-  const editCell = useStore((s) => s.editCell);
+  const inspectorRow = useStore((s) => s.inspectorRow);
+  const history = useStore((s) => s.history);
+  const detected = useStore((s) => s.detected);
+  const error = useStore((s) => s.error);
+
   const loadConnections = useStore((s) => s.loadConnections);
   const scanLocal = useStore((s) => s.scanLocal);
+  const openAndIntrospect = useStore((s) => s.openAndIntrospect);
+  const openTableData = useStore((s) => s.openTableData);
+  const editCell = useStore((s) => s.editCell);
+  const addRow = useStore((s) => s.addRow);
+  const addColumn = useStore((s) => s.addColumn);
+  const dropTable = useStore((s) => s.dropTable);
+  const renameTable = useStore((s) => s.renameTable);
+  const refresh = useStore((s) => s.refresh);
+  const importCsv = useStore((s) => s.importCsv);
+  const addDetected = useStore((s) => s.addDetected);
+  const createLocalDatabase = useStore((s) => s.createLocalDatabase);
+  const openInspector = useStore((s) => s.openInspector);
+  const loadHistory = useStore((s) => s.loadHistory);
+  const setStoreSql = useStore((s) => s.setSql);
 
-  const [tab, setTab] = useState<"data" | "design" | "automation" | "settings">("design");
-  const [propsTab, setPropsTab] = useState<"settings" | "styles" | "conditions">("settings");
-  const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
-  const [formType, setFormType] = useState<"create" | "update" | "view">("view");
-  const [title, setTitle] = useState("Edit row");
-  const [hidden, setHidden] = useState<Set<string>>(new Set());
-  const [selectedRow, setSelectedRow] = useState(0);
+  const [tab, setTab] = useState<Tab>("data");
+  const [editing, setEditing] = useState<{ row: number; col: number } | null>(null);
+  const [draft, setDraft] = useState("");
+  const [newRow, setNewRow] = useState<string[] | null>(null);
+  const [sqlText, setSqlText] = useState("SELECT 1;");
+  const [sqlResult, setSqlResult] = useState<QueryResult | null>(null);
+  const [sqlRunning, setSqlRunning] = useState(false);
+  const [sqlError, setSqlError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
-  // Bootstrap: load saved connections, then open the first connection + table so
-  // the canvas is populated with real data on first paint.
   useEffect(() => {
     loadConnections();
     scanLocal();
@@ -51,20 +76,77 @@ export function Builder() {
   useEffect(() => {
     if (activeId && !editTable && tables.length > 0) void openTableData(tables[0].name);
   }, [activeId, editTable, tables, openTableData]);
-  useEffect(() => setSelectedRow(0), [editTable?.table]);
+  useEffect(() => {
+    if (editTable) setSqlText(`SELECT * FROM ${editTable.table} LIMIT 100;`);
+  }, [editTable?.table]);
+  useEffect(() => {
+    if (tab === "history") void loadHistory();
+  }, [tab, loadHistory]);
 
+  const appName = connections.find((c) => c.id === activeId)?.name ?? "MamaSQL";
+  const tableName = editTable?.table ?? "";
+  const cols = editTable ? columnsByTable[editTable.table] ?? [] : [];
+  const newDetections = detected.filter((d) => !connections.some((c) => c.id === d.id));
+  const pkColName = editTable?.pkColumn ?? null;
+  const pkIdx = result && pkColName ? result.columns.findIndex((c) => c.name === pkColName) : -1;
   const samplesByCol = useMemo(
     () => (result ? result.columns.map((_, ci) => result.rows.map((r) => r[ci])) : []),
     [result],
   );
-  const pkCol = editTable?.pkColumn ?? null;
-  const pkIdx = result && pkCol ? result.columns.findIndex((c) => c.name === pkCol) : -1;
-  const row = result && result.rows[selectedRow] ? result.rows[selectedRow] : null;
-  const appName = connections.find((c) => c.id === activeId)?.name ?? "MamaSQL";
-  const tableName = editTable?.table ?? "table";
-  const editable = formType !== "view" && pkIdx >= 0;
 
-  const pillFor = (v: unknown) => {
+  const startEdit = (r: number, c: number) => {
+    if (!result || pkIdx < 0 || c === pkIdx) return;
+    setEditing({ row: r, col: c });
+    setDraft(result.rows[r][c] == null ? "" : String(result.rows[r][c]));
+  };
+  const commitEdit = () => {
+    if (editing) void editCell(editing.row, editing.col, draft);
+    setEditing(null);
+  };
+  const saveNewRow = () => {
+    if (!newRow || !result) return;
+    const cs: string[] = [];
+    const vs: unknown[] = [];
+    result.columns.forEach((c, i) => {
+      if (newRow[i] !== "") {
+        cs.push(c.name);
+        vs.push(newRow[i]);
+      }
+    });
+    void addRow(cs, vs);
+    setNewRow(null);
+  };
+  const addColumnPrompt = () => {
+    const n = window.prompt("New column name");
+    if (!n?.trim()) return;
+    const t = window.prompt("Type (TEXT, INTEGER, REAL, DATE…)", "TEXT")?.trim() || "TEXT";
+    void addColumn(tableName, { name: n.trim(), dataType: t, nullable: true, primaryKey: false });
+  };
+  const onImport = async (e: ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (!f || !editTable) return;
+    const { headers, rows } = fromCsv(await f.text());
+    if (headers.length && rows.length) await importCsv(editTable.table, headers, rows);
+  };
+  const runSql = async () => {
+    if (!activeId) return;
+    setSqlRunning(true);
+    setSqlError(null);
+    try {
+      const r = await backend.runQuery(activeId, sqlText);
+      setSqlResult(r);
+      setStoreSql(sqlText);
+      void loadHistory();
+    } catch (e) {
+      const m = e && typeof e === "object" && "message" in e ? String((e as { message?: string }).message) : String(e);
+      setSqlError(m);
+      setSqlResult(null);
+    }
+    setSqlRunning(false);
+  };
+
+  const pill = (v: unknown) => {
     const s = String(v);
     let h = 0;
     for (let k = 0; k < s.length; k++) h = (h * 31 + s.charCodeAt(k)) >>> 0;
@@ -75,47 +157,54 @@ export function Builder() {
       </span>
     );
   };
+  const renderCell = (cell: unknown, ci: number) =>
+    cell == null ? (
+      <span className="bld-null">null</span>
+    ) : result && fieldKind(result.columns[ci], samplesByCol[ci] ?? []) === "select" ? (
+      pill(cell)
+    ) : (
+      String(cell)
+    );
 
   return (
     <div className="bld">
       {/* ---------- Top bar ---------- */}
       <header className="bld-top">
         <div className="bld-top-l">
-          <button className="bld-back" title="Back">
-            ‹
-          </button>
+          <span className="bld-logo2">◆ MamaSQL</span>
           <nav className="bld-toptabs">
-            {(["data", "design", "automation", "settings"] as const).map((t) => (
+            {(["data", "sql", "structure", "history"] as const).map((t) => (
               <button key={t} className={tab === t ? "active" : ""} onClick={() => setTab(t)}>
-                {t[0].toUpperCase() + t.slice(1)}
+                {t === "sql" ? "SQL" : t[0].toUpperCase() + t.slice(1)}
               </button>
             ))}
           </nav>
         </div>
         <div className="bld-top-c">{appName}</div>
         <div className="bld-top-r">
-          <span className="bld-ava">R</span>
-          <button className="bld-naction">
-            <span>◍</span> Users
+          <button className="bld-naction" onClick={() => void refresh()} title="Refresh data">
+            <span>⟳</span> Refresh
           </button>
-          <button className="bld-naction">
-            <span>▷</span> Preview
-          </button>
-          <button className="bld-publish">
-            <span className="bld-bb">◆</span> Publish <span className="caret">▾</span>
-          </button>
+          <span className="bld-ava">M</span>
         </div>
       </header>
 
       <div className="bld-body">
-        {/* ---------- Left: Screens + Components ---------- */}
+        {/* ---------- Left: tables + columns ---------- */}
         <aside className="bld-left">
           <div className="bld-pane">
             <div className="bld-pane-head">
-              <span>Screens</span>
+              <span>Tables</span>
               <div className="bld-pane-actions">
-                <button title="Search">⌕</button>
-                <button title="Add">＋</button>
+                <button
+                  title="New local database"
+                  onClick={() => {
+                    const n = window.prompt("New local database name", "scratch");
+                    if (n) void createLocalDatabase(n);
+                  }}
+                >
+                  ＋
+                </button>
               </div>
             </div>
             <div className="bld-pane-body">
@@ -126,274 +215,343 @@ export function Builder() {
                   className={`bld-screen ${editTable?.table === t.name ? "active" : ""}`}
                   onClick={() => openTableData(t.name)}
                 >
-                  <span className="bld-screen-ic">▦</span>/{t.name}
+                  <span className="bld-screen-ic">{t.kind === "view" ? "◫" : "▦"}</span>
+                  {t.name}
                 </button>
               ))}
+              {newDetections.length > 0 && (
+                <div className="bld-detected">
+                  <div className="bld-detected-head">Found locally</div>
+                  {newDetections.map((d) => (
+                    <div className="bld-detrow" key={d.id}>
+                      <span className={`dot ${d.engine}`} />
+                      <span className="bld-detname">{d.name}</span>
+                      <button className="bld-detadd" onClick={() => addDetected(d)}>
+                        Add
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <div className="bld-pane grow">
             <div className="bld-pane-head">
-              <span>Components</span>
-              <div className="bld-pane-actions">
-                <button title="Add">＋</button>
-              </div>
+              <span>Columns</span>
             </div>
             <div className="bld-pane-body">
-              <div className="bld-comp">
-                <span className="bld-comp-ic">▦</span>Screen
-              </div>
-              <div className="bld-comp lvl1">
-                <span className="bld-comp-ic">≡</span>Navigation
-              </div>
-              <div className="bld-comp lvl1">
-                <span className="bld-comp-ic">T</span>Table heading
-              </div>
-              <div className="bld-comp lvl1">
-                <span className="bld-comp-ic">▦</span>
-                {tableName} - Table
-              </div>
-              <div className="bld-comp lvl1">
-                <span className="bld-comp-arrow">▸</span>
-                <span className="bld-comp-ic">▤</span>New row side panel
-              </div>
-              <div className="bld-comp lvl1">
-                <span className="bld-comp-arrow">▾</span>
-                <span className="bld-comp-ic">▤</span>Edit row side panel
-              </div>
-              <div className="bld-comp lvl2 active">
-                <span className="bld-comp-ic">≣</span>Edit row form block
-              </div>
+              {cols.length === 0 && <div className="bld-muted">Select a table</div>}
+              {cols.map((c) => (
+                <div className="bld-col" key={c.name}>
+                  <span className="bld-col-ic">{typeIcon(c.dataType)}</span>
+                  <span className="bld-col-name">{c.name}</span>
+                  {c.isPrimaryKey && <span className="bld-col-pk">PK</span>}
+                  <span className="bld-col-type">{c.dataType.toLowerCase()}</span>
+                </div>
+              ))}
             </div>
           </div>
         </aside>
 
         {/* ---------- Center: canvas ---------- */}
         <main className="bld-canvas-wrap">
-          <div className="bld-canvas-bar">
-            <button title="Undo">↺</button>
-            <button title="Redo">↻</button>
-            <div className="spacer" />
-            <div className="bld-devices">
-              {(["desktop", "tablet", "mobile"] as const).map((d) => (
-                <button key={d} className={device === d ? "active" : ""} onClick={() => setDevice(d)} title={d}>
-                  {d === "desktop" ? "🖥" : d === "tablet" ? "▭" : "▯"}
-                </button>
-              ))}
-            </div>
-          </div>
+          <div className="bld-canvas">
+            <div className="bld-sheet">
+              {tab === "data" && (
+                <>
+                  <div className="bld-sheet-bar">
+                    <div className="bld-sheet-title">
+                      <span className="bld-th-ic" style={{ marginRight: 8 }}>
+                        ▦
+                      </span>
+                      {tableName || "No table"}
+                    </div>
+                    <div className="bld-sheet-tools">
+                      <button onClick={() => void refresh()}>⟳ Refresh</button>
+                      <button onClick={() => fileRef.current?.click()}>⤓ Import</button>
+                      <button disabled={!result} onClick={() => result && download(`${tableName}.csv`, toCsv(result))}>
+                        ⤒ Export
+                      </button>
+                      <button onClick={addColumnPrompt}>＋ Column</button>
+                      <input ref={fileRef} type="file" accept=".csv,text/csv" hidden onChange={onImport} />
+                    </div>
+                  </div>
+                  {error && <div className="bld-err">⚠ {error.message ?? error.kind}</div>}
+                  <div className="bld-table-wrap">
+                    {loadingResult ? (
+                      <div className="bld-muted pad">Loading…</div>
+                    ) : result && result.columns.length > 0 ? (
+                      <table className="bld-table editable">
+                        <thead>
+                          <tr>
+                            <th className="bld-th-check">#</th>
+                            {result.columns.map((c) => (
+                              <th key={c.name}>
+                                <span className="bld-th-ic">{typeIcon(c.dataType)}</span>
+                                {c.name}
+                              </th>
+                            ))}
+                            <th className="bld-addcol">
+                              <button title="Add column" onClick={addColumnPrompt}>
+                                ＋
+                              </button>
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {newRow && (
+                            <tr className="bld-new">
+                              <td className="bld-th-check">
+                                <button onClick={() => setNewRow(null)}>✕</button>
+                              </td>
+                              {result.columns.map((c, i) => (
+                                <td key={i}>
+                                  <input
+                                    className="bld-cell-input"
+                                    placeholder={c.name}
+                                    value={newRow[i]}
+                                    onChange={(e) =>
+                                      setNewRow((nr) => (nr ? nr.map((v, j) => (j === i ? e.target.value : v)) : nr))
+                                    }
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") saveNewRow();
+                                      if (e.key === "Escape") setNewRow(null);
+                                    }}
+                                  />
+                                </td>
+                              ))}
+                              <td />
+                            </tr>
+                          )}
+                          {result.rows.map((r, ri) => (
+                            <tr key={ri} className={ri === inspectorRow ? "sel" : ""}>
+                              <td className="bld-th-check bld-rn">
+                                <span className="bld-rn-num">{ri + 1}</span>
+                                <button className="bld-rn-exp" title="Edit row" onClick={() => openInspector(ri)}>
+                                  ⤢
+                                </button>
+                              </td>
+                              {r.map((cell, ci) => (
+                                <td key={ci} onDoubleClick={() => startEdit(ri, ci)}>
+                                  {editing && editing.row === ri && editing.col === ci ? (
+                                    <input
+                                      className="bld-cell-input"
+                                      autoFocus
+                                      value={draft}
+                                      onChange={(e) => setDraft(e.target.value)}
+                                      onBlur={commitEdit}
+                                      onKeyDown={(e) => {
+                                        if (e.key === "Enter") commitEdit();
+                                        if (e.key === "Escape") setEditing(null);
+                                      }}
+                                    />
+                                  ) : (
+                                    renderCell(cell, ci)
+                                  )}
+                                </td>
+                              ))}
+                              <td />
+                            </tr>
+                          ))}
+                          <tr className="bld-addrow">
+                            <td className="bld-th-check">
+                              <button title="Add row" onClick={() => setNewRow(result.columns.map(() => ""))}>
+                                ＋
+                              </button>
+                            </td>
+                            <td colSpan={result.columns.length + 1} />
+                          </tr>
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="bld-muted pad">{tableName ? "Empty table" : "Pick a table on the left"}</div>
+                    )}
+                  </div>
+                </>
+              )}
 
-          <div className={`bld-canvas dev-${device}`}>
-            <div className="bld-app">
-              <div className="bld-app-head">
-                <span className="bld-logo">◆</span>
-                <span className="bld-app-name">{appName}</span>
-              </div>
-              <div className="bld-app-nav">{tableName}</div>
+              {tab === "sql" && (
+                <div className="bld-sql">
+                  <div className="bld-sheet-bar">
+                    <div className="bld-sheet-title">SQL query</div>
+                    <div className="bld-sheet-tools">
+                      <button className="bld-run" onClick={runSql} disabled={sqlRunning || !activeId}>
+                        ▶ {sqlRunning ? "Running…" : "Run"}
+                      </button>
+                    </div>
+                  </div>
+                  <textarea
+                    className="bld-sqltext"
+                    value={sqlText}
+                    spellCheck={false}
+                    onChange={(e) => setSqlText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") void runSql();
+                    }}
+                  />
+                  {sqlError && <div className="bld-err">⚠ {sqlError}</div>}
+                  <div className="bld-table-wrap">
+                    {sqlResult && sqlResult.columns.length > 0 ? (
+                      <table className="bld-table">
+                        <thead>
+                          <tr>
+                            {sqlResult.columns.map((c) => (
+                              <th key={c.name}>
+                                <span className="bld-th-ic">{typeIcon(c.dataType)}</span>
+                                {c.name}
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {sqlResult.rows.map((r, ri) => (
+                            <tr key={ri}>
+                              {r.map((cell, ci) => (
+                                <td key={ci}>{cell == null ? <span className="bld-null">null</span> : String(cell)}</td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    ) : (
+                      <div className="bld-muted pad">
+                        {sqlResult ? `${sqlResult.rowsAffected} row(s) affected` : "Run a query to see results"}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
-              <div className="bld-app-body">
-                <h2 className="bld-h2">{tableName}</h2>
-
-                {/* Data table */}
-                <div className="bld-table-wrap">
-                  {result && result.columns.length > 0 ? (
+              {tab === "structure" && (
+                <div className="bld-structure">
+                  <div className="bld-sheet-bar">
+                    <div className="bld-sheet-title">Structure — {tableName}</div>
+                    <div className="bld-sheet-tools">
+                      <button onClick={addColumnPrompt}>＋ Column</button>
+                    </div>
+                  </div>
+                  <div className="bld-table-wrap">
                     <table className="bld-table">
                       <thead>
                         <tr>
-                          <th className="bld-th-check">
-                            <input type="checkbox" />
-                          </th>
-                          {result.columns.map((c) => (
-                            <th key={c.name}>
-                              <span className="bld-th-ic">{typeIcon(c.dataType)}</span>
-                              {c.name}
-                            </th>
-                          ))}
+                          <th>Column</th>
+                          <th>Type</th>
+                          <th>Nullable</th>
+                          <th>Key</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {result.rows.slice(0, 8).map((r, ri) => (
-                          <tr key={ri} className={ri === selectedRow ? "sel" : ""} onClick={() => setSelectedRow(ri)}>
-                            <td className="bld-th-check">
-                              <input type="checkbox" readOnly checked={ri === selectedRow} />
+                        {cols.map((c) => (
+                          <tr key={c.name}>
+                            <td>
+                              <span className="bld-th-ic">{typeIcon(c.dataType)}</span>
+                              {c.name}
                             </td>
-                            {r.map((cell, ci) => (
-                              <td key={ci}>
-                                {cell == null ? (
-                                  <span className="bld-null">null</span>
-                                ) : fieldKind(result.columns[ci], samplesByCol[ci] ?? []) === "select" ? (
-                                  pillFor(cell)
-                                ) : (
-                                  String(cell)
-                                )}
-                              </td>
-                            ))}
+                            <td>{c.dataType}</td>
+                            <td>{c.nullable ? "YES" : "NO"}</td>
+                            <td>{c.isPrimaryKey ? pill("PRIMARY") : ""}</td>
                           </tr>
                         ))}
+                        {cols.length === 0 && (
+                          <tr>
+                            <td colSpan={4} className="bld-muted">
+                              Select a table to see its structure
+                            </td>
+                          </tr>
+                        )}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              )}
+
+              {tab === "history" && (
+                <div className="bld-history2">
+                  <div className="bld-sheet-bar">
+                    <div className="bld-sheet-title">Query history</div>
+                  </div>
+                  {history.length === 0 ? (
+                    <div className="bld-muted pad">No queries yet</div>
                   ) : (
-                    <div className="bld-muted pad">{loadingResult ? "Loading…" : "No data"}</div>
+                    <div className="bld-histlist">
+                      {history.map((h) => (
+                        <button
+                          key={h.id}
+                          className="bld-histitem"
+                          onClick={() => {
+                            setSqlText(h.sql);
+                            setTab("sql");
+                          }}
+                        >
+                          <span className="bld-histsql">{h.sql}</span>
+                          <span className="bld-histtime">{new Date(h.ranAt).toLocaleString()}</span>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-
-                {/* Form block */}
-                <div className="bld-formblock">
-                  <div className="bld-formblock-tag">≣ Edit row form block</div>
-                  <h3 className="bld-form-title">{title}</h3>
-                  {result?.columns.map((col, ci) => {
-                    if (hidden.has(col.name)) return null;
-                    return (
-                      <div className="bld-field" key={col.name}>
-                        <label className="bld-field-label">{col.name}</label>
-                        <FieldInput
-                          className="bld-input"
-                          kind={fieldKind(col, samplesByCol[ci] ?? [])}
-                          value={row ? row[ci] : ""}
-                          disabled={!editable || ci === pkIdx}
-                          samples={samplesByCol[ci] ?? []}
-                          onChange={(v) => {
-                            if (editable && ci !== pkIdx) void editCell(selectedRow, ci, v);
-                          }}
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </main>
 
-        {/* ---------- Right: properties ---------- */}
-        <aside className="bld-props">
-          <div className="bld-props-head">
-            <span className="bld-props-ic">≣</span> Edit row form block
-          </div>
-          <div className="bld-props-tabs">
-            {(["settings", "styles", "conditions"] as const).map((t) => (
-              <button key={t} className={propsTab === t ? "active" : ""} onClick={() => setPropsTab(t)}>
-                {t[0].toUpperCase() + t.slice(1)}
+        {/* ---------- Right: row editor / table info ---------- */}
+        {inspectorRow != null ? (
+          <RowInspector key={inspectorRow} />
+        ) : (
+          <aside className="bld-props">
+            <div className="bld-props-head">
+              <span className="bld-props-ic">▦</span> {tableName || "No table"}
+            </div>
+            <div className="bld-props-body">
+              <div className="bld-sec">Table</div>
+              <div className="bld-inforow">
+                <span>Connection</span>
+                <b>{appName}</b>
+              </div>
+              <div className="bld-inforow">
+                <span>Rows loaded</span>
+                <b>{result?.rows.length ?? 0}</b>
+              </div>
+              <div className="bld-inforow">
+                <span>Columns</span>
+                <b>{cols.length}</b>
+              </div>
+              <div className="bld-inforow">
+                <span>Primary key</span>
+                <b>{editTable?.pkColumn ?? "—"}</b>
+              </div>
+
+              <div className="bld-sec">Actions</div>
+              <button className="bld-act" onClick={() => void refresh()}>
+                ⟳ Refresh
               </button>
-            ))}
-          </div>
-
-          {propsTab === "settings" ? (
-            <div className="bld-props-body">
-              <div className="bld-sec">General</div>
-              <div className="bld-note">
-                <span className="bld-note-ic">ⓘ</span>
-                <div>
-                  <strong>Form block</strong>
-                  <p>Form blocks are only compatible with internal or SQL tables.</p>
-                </div>
-              </div>
-              <div className="bld-row">
-                <span className="bld-row-label">Data</span>
-                <select
-                  className="bld-prop-input"
-                  value={editTable?.table ?? ""}
-                  onChange={(e) => openTableData(e.target.value)}
-                >
-                  {tables.map((t) => (
-                    <option key={t.name} value={t.name}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="bld-row top">
-                <span className="bld-row-label">Type</span>
-                <div className="bld-radios">
-                  {(["create", "update", "view"] as const).map((t) => (
-                    <label key={t} className="bld-radio">
-                      <input type="radio" checked={formType === t} onChange={() => setFormType(t)} />
-                      <span className="bld-radio-dot" />
-                      {t[0].toUpperCase() + t.slice(1)}
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              <div className="bld-sec collapse">
-                Row ID <span className="bld-sec-x">—</span>
-              </div>
-              <a className="bld-link" href="#" onClick={(e) => e.preventDefault()}>
-                How to pass a row ID using bindings
-              </a>
-              <div className="bld-row">
-                <span className="bld-row-label">Row ID</span>
-                <div className="bld-bind">
-                  <input className="bld-prop-input" readOnly value={pkIdx >= 0 && row ? String(row[pkIdx]) : "{{ State.ID }}"} />
-                  <span className="bld-bind-ic">⚡</span>
-                </div>
-              </div>
-              <div className="bld-row">
-                <span className="bld-row-label">No rows found</span>
-                <div className="bld-bind">
-                  <input className="bld-prop-input" defaultValue="We couldn't find a row to display" />
-                  <span className="bld-bind-ic">⚡</span>
-                </div>
-              </div>
-
-              <div className="bld-sec collapse">
-                Details <span className="bld-sec-x">—</span>
-              </div>
-              <div className="bld-row">
-                <span className="bld-row-label">Title</span>
-                <div className="bld-bind">
-                  <input className="bld-prop-input" value={title} onChange={(e) => setTitle(e.target.value)} />
-                  <span className="bld-bind-ic">⚡</span>
-                </div>
-              </div>
-              <div className="bld-row">
-                <span className="bld-row-label">Description</span>
-                <div className="bld-bind">
-                  <input className="bld-prop-input" placeholder="" />
-                  <span className="bld-bind-ic">⚡</span>
-                </div>
-              </div>
-
-              <div className="bld-row">
-                <span className="bld-row-label">Fields</span>
-                <input
-                  type="checkbox"
-                  className="bld-allfields"
-                  checked={hidden.size === 0}
-                  onChange={(e) => setHidden(e.target.checked ? new Set() : new Set(result?.columns.map((c) => c.name)))}
-                />
-                <span className="bud-switch" />
-              </div>
-              <div className="bld-fieldlist">
-                {result?.columns.map((col) => (
-                  <div className="bld-fielditem" key={col.name}>
-                    <span className="bld-grip">⠿</span>
-                    <span className="bld-gear">⚙</span>
-                    <span className="bld-fieldname">{col.name}</span>
-                    <label className="bld-fieldtoggle">
-                      <input
-                        type="checkbox"
-                        checked={!hidden.has(col.name)}
-                        onChange={(e) =>
-                          setHidden((h) => {
-                            const n = new Set(h);
-                            if (e.target.checked) n.delete(col.name);
-                            else n.add(col.name);
-                            return n;
-                          })
-                        }
-                      />
-                      <span className="bud-switch" />
-                    </label>
-                  </div>
-                ))}
-              </div>
+              <button
+                className="bld-act"
+                disabled={!editTable}
+                onClick={() => {
+                  if (!editTable) return;
+                  const n = window.prompt("Rename table to", editTable.table);
+                  if (n?.trim() && n.trim() !== editTable.table) void renameTable(editTable.table, n.trim());
+                }}
+              >
+                ✎ Rename table…
+              </button>
+              <button
+                className="bld-act danger"
+                disabled={!editTable}
+                onClick={() => {
+                  if (!editTable) return;
+                  if (window.confirm(`Drop table "${editTable.table}"? This permanently deletes it.`))
+                    void dropTable(editTable.table);
+                }}
+              >
+                🗑 Drop table…
+              </button>
+              <div className="bld-hint">Tip: click the ⤢ on a row to edit it as a form.</div>
             </div>
-          ) : (
-            <div className="bld-props-body">
-              <div className="bld-muted pad">No {propsTab} options for this block.</div>
-            </div>
-          )}
-        </aside>
+          </aside>
+        )}
       </div>
     </div>
   );
