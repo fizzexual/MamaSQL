@@ -40,6 +40,7 @@ export interface AppStore {
   addRow: (columns: string[], values: unknown[]) => Promise<void>;
   dropTable: (table: string) => Promise<void>;
   createTable: (name: string, columns: ColumnDef[]) => Promise<void>;
+  createLocalDatabase: (name: string) => Promise<void>;
 }
 
 const backend = getBackend();
@@ -201,6 +202,16 @@ export const useStore = create<AppStore>((set, get) => ({
       await backend.createTable(id, name, columns);
       const tables = await backend.listTables(id);
       set({ schema: { tables, columnsByTable: {} } });
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  createLocalDatabase: async (name) => {
+    try {
+      const cfg = await backend.createLocalDatabase(name);
+      await get().loadConnections();
+      await get().openAndIntrospect(cfg.id);
     } catch (e) {
       set({ error: normalizeError(e) });
     }

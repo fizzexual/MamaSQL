@@ -87,6 +87,7 @@ ul { list-style: none; margin: 0; padding: 0; }
 }
 .icon-btn:hover { background: var(--panel-2); color: var(--text); }
 .icon-btn.danger:hover { color: var(--danger); }
+.head-actions { display: flex; gap: 2px; }
 
 /* ---------- Connections ---------- */
 .conn-list { padding: 6px; overflow: auto; }

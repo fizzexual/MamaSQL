@@ -8,6 +8,7 @@ export function ConnectionSidebar() {
   const loadConnections = useStore((s) => s.loadConnections);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const deleteConnection = useStore((s) => s.deleteConnection);
+  const createLocalDatabase = useStore((s) => s.createLocalDatabase);
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
@@ -18,9 +19,21 @@ export function ConnectionSidebar() {
     <section className="panel">
       <div className="panel-head">
         <span>Connections</span>
-        <button className="icon-btn" title="New connection" onClick={() => setAdding((v) => !v)}>
-          ＋
-        </button>
+        <span className="head-actions">
+          <button
+            className="icon-btn"
+            title="New local SQLite database (one click)"
+            onClick={() => {
+              const n = window.prompt("New local database name", "scratch");
+              if (n) void createLocalDatabase(n);
+            }}
+          >
+            🗄
+          </button>
+          <button className="icon-btn" title="New connection" onClick={() => setAdding((v) => !v)}>
+            ＋
+          </button>
+        </span>
       </div>
       <ul className="conn-list">
         {connections.map((c) => (

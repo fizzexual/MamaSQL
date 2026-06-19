@@ -33,6 +33,7 @@ export interface Backend {
   insertRow(connectionId: string, table: string, columns: string[], values: unknown[]): Promise<void>;
   dropTable(connectionId: string, table: string): Promise<void>;
   createTable(connectionId: string, name: string, columns: ColumnDef[]): Promise<void>;
+  createLocalDatabase(name: string): Promise<ConnectionConfig>;
 }
 
 /** True when running inside the Tauri webview (vs a plain browser). */

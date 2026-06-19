@@ -203,6 +203,46 @@ pub async fn create_table(
     Ok(())
 }
 
+/// One-click local engine: create a fresh SQLite database file in the app data
+/// dir and save it as a connection.
+#[tauri::command]
+pub async fn create_local_database(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    name: String,
+) -> AppResult<ConnectionConfig> {
+    use tauri::Manager;
+    let dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| AppError::Internal(e.to_string()))?
+        .join("databases");
+    std::fs::create_dir_all(&dir).map_err(|e| AppError::Internal(e.to_string()))?;
+    let safe: String = name
+        .chars()
+        .filter(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
+        .collect();
+    let stem = if safe.is_empty() { "database".to_string() } else { safe };
+    let path = dir
+        .join(format!("{stem}.sqlite"))
+        .to_str()
+        .ok_or_else(|| AppError::Internal("invalid path".into()))?
+        .to_string();
+    let cfg = ConnectionConfig {
+        id: format!("local-{stem}"),
+        name: if name.trim().is_empty() { "Local DB".into() } else { name },
+        engine: Engine::Sqlite,
+        host: None,
+        port: None,
+        database: path,
+        username: None,
+    };
+    // Creates the file (mode=rwc) and verifies it opens.
+    crate::drivers::sqlite::SqliteDriver::test(&cfg).await?;
+    state.store.upsert_connection(&cfg).await?;
+    Ok(cfg)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

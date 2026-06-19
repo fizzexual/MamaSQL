@@ -34,4 +34,5 @@ export const tauriBackend: Backend = {
   dropTable: (connectionId, table) => invoke<void>("drop_table", { connectionId, table }),
   createTable: (connectionId, name, columns) =>
     invoke<void>("create_table", { connectionId, name, columns }),
+  createLocalDatabase: (name) => invoke<ConnectionConfig>("create_local_database", { name }),
 };

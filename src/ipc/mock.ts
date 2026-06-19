@@ -197,6 +197,21 @@ class MockBackend implements Backend {
       rows: [],
     };
   }
+
+  async createLocalDatabase(name: string): Promise<ConnectionConfig> {
+    const safe = name.toLowerCase().replace(/[^a-z0-9_-]/g, "") || "database";
+    const cfg: ConnectionConfig = {
+      id: `local-${safe}`,
+      name: name.trim() || "Local DB",
+      engine: "sqlite",
+      database: `${safe}.sqlite`,
+      host: null,
+      port: null,
+      username: null,
+    };
+    this.connections.set(cfg.id, cfg);
+    return cfg;
+  }
 }
 
 export const mockBackend: Backend = new MockBackend();
