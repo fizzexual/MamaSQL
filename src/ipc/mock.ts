@@ -144,4 +144,4 @@ class MockBackend implements Backend {
   }
 }
 
-export const mockBackend = new MockBackend();
+export const mockBackend: Backend = new MockBackend();
