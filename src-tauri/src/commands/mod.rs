@@ -243,6 +243,49 @@ pub async fn create_local_database(
     Ok(cfg)
 }
 
+async fn port_open(host: &str, port: u16) -> bool {
+    matches!(
+        tokio::time::timeout(
+            std::time::Duration::from_millis(450),
+            tokio::net::TcpStream::connect((host, port)),
+        )
+        .await,
+        Ok(Ok(_))
+    )
+}
+
+/// Auto-discovery: probe well-known local database ports and return
+/// ready-to-add connection configs for whatever is listening.
+#[tauri::command]
+pub async fn scan_local_databases() -> AppResult<Vec<ConnectionConfig>> {
+    let candidates: [(Engine, u16, &str, &str); 4] = [
+        (Engine::Postgres, 5432, "postgres", "postgres"),
+        (Engine::MySql, 3306, "mysql", "root"),
+        (Engine::Postgres, 5433, "postgres", "postgres"),
+        (Engine::MySql, 3307, "mysql", "root"),
+    ];
+    let mut found = Vec::new();
+    for (engine, port, db, user) in candidates {
+        if port_open("127.0.0.1", port).await {
+            let label = match engine {
+                Engine::Postgres => "Postgres",
+                Engine::MySql => "MySQL/MariaDB",
+                Engine::Sqlite => "SQLite",
+            };
+            found.push(ConnectionConfig {
+                id: format!("detected-{port}"),
+                name: format!("{label} on localhost:{port}"),
+                engine,
+                host: Some("localhost".into()),
+                port: Some(port),
+                database: db.into(),
+                username: Some(user.into()),
+            });
+        }
+    }
+    Ok(found)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

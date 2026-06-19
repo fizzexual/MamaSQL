@@ -56,6 +56,7 @@ pub fn run() {
             commands::drop_table,
             commands::create_table,
             commands::create_local_database,
+            commands::scan_local_databases,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -34,6 +34,7 @@ export interface Backend {
   dropTable(connectionId: string, table: string): Promise<void>;
   createTable(connectionId: string, name: string, columns: ColumnDef[]): Promise<void>;
   createLocalDatabase(name: string): Promise<ConnectionConfig>;
+  scanLocalDatabases(): Promise<ConnectionConfig[]>;
 }
 
 /** True when running inside the Tauri webview (vs a plain browser). */

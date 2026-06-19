@@ -91,6 +91,15 @@ ul { list-style: none; margin: 0; padding: 0; }
 .icon-btn.danger:hover { color: var(--danger); }
 .head-actions { display: flex; gap: 2px; }
 
+/* Auto-detected local databases */
+.detected { border-top: 1px solid var(--border); padding: 8px 8px 10px; }
+.detected-head { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); padding: 2px 4px 6px; }
+.detected-item { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 7px; }
+.detected-item:hover { background: var(--panel-2); }
+.detected-name { flex: 1; font-size: 12.5px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.detected-add { background: var(--accent); color: #fff; border: none; border-radius: 6px; padding: 4px 13px; font-size: 12px; font-weight: 600; }
+.detected-add:hover { filter: brightness(1.12); }
+
 /* ---------- Connections ---------- */
 .conn-list { padding: 6px; overflow: auto; }
 .conn { display: flex; align-items: center; border-radius: 7px; }

@@ -212,6 +212,13 @@ class MockBackend implements Backend {
     this.connections.set(cfg.id, cfg);
     return cfg;
   }
+
+  async scanLocalDatabases(): Promise<ConnectionConfig[]> {
+    return [
+      { id: "detected-5432", name: "Postgres on localhost:5432", engine: "postgres", host: "localhost", port: 5432, database: "postgres", username: "postgres" },
+      { id: "detected-3306", name: "MySQL/MariaDB on localhost:3306", engine: "mysql", host: "localhost", port: 3306, database: "mysql", username: "root" },
+    ];
+  }
 }
 
 export const mockBackend: Backend = new MockBackend();

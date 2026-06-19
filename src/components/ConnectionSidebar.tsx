@@ -9,11 +9,17 @@ export function ConnectionSidebar() {
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const deleteConnection = useStore((s) => s.deleteConnection);
   const createLocalDatabase = useStore((s) => s.createLocalDatabase);
+  const detected = useStore((s) => s.detected);
+  const scanLocal = useStore((s) => s.scanLocal);
+  const addDetected = useStore((s) => s.addDetected);
   const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     loadConnections();
-  }, [loadConnections]);
+    scanLocal();
+  }, [loadConnections, scanLocal]);
+
+  const newDetections = detected.filter((d) => !connections.some((c) => c.id === d.id));
 
   return (
     <section className="panel">
@@ -52,6 +58,20 @@ export function ConnectionSidebar() {
           </li>
         ))}
       </ul>
+      {newDetections.length > 0 && (
+        <div className="detected">
+          <div className="detected-head">🔎 Found locally</div>
+          {newDetections.map((d) => (
+            <div className="detected-item" key={d.id}>
+              <span className={`dot ${d.engine}`} />
+              <span className="detected-name">{d.name}</span>
+              <button className="detected-add" onClick={() => addDetected(d)}>
+                Add
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
       {adding && <ConnectionForm onDone={() => setAdding(false)} />}
     </section>
   );

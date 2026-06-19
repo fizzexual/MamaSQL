@@ -25,6 +25,7 @@ export interface AppStore {
   running: boolean;
   history: HistoryEntry[];
   editTable: { table: string; pkColumn: string | null } | null;
+  detected: ConnectionConfig[];
 
   loadConnections: () => Promise<void>;
   saveConnection: (cfg: ConnectionConfig, password?: string | null) => Promise<void>;
@@ -41,6 +42,8 @@ export interface AppStore {
   dropTable: (table: string) => Promise<void>;
   createTable: (name: string, columns: ColumnDef[]) => Promise<void>;
   createLocalDatabase: (name: string) => Promise<void>;
+  scanLocal: () => Promise<void>;
+  addDetected: (cfg: ConnectionConfig) => Promise<void>;
 }
 
 const backend = getBackend();
@@ -55,6 +58,7 @@ export const useStore = create<AppStore>((set, get) => ({
   running: false,
   history: [],
   editTable: null,
+  detected: [],
 
   loadConnections: async () => {
     set({ connections: await backend.listConnections() });
@@ -210,6 +214,24 @@ export const useStore = create<AppStore>((set, get) => ({
   createLocalDatabase: async (name) => {
     try {
       const cfg = await backend.createLocalDatabase(name);
+      await get().loadConnections();
+      await get().openAndIntrospect(cfg.id);
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  scanLocal: async () => {
+    try {
+      set({ detected: await backend.scanLocalDatabases() });
+    } catch {
+      set({ detected: [] });
+    }
+  },
+
+  addDetected: async (cfg) => {
+    try {
+      await backend.saveConnection(cfg, null);
       await get().loadConnections();
       await get().openAndIntrospect(cfg.id);
     } catch (e) {

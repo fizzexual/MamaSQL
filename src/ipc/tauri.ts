@@ -35,4 +35,5 @@ export const tauriBackend: Backend = {
   createTable: (connectionId, name, columns) =>
     invoke<void>("create_table", { connectionId, name, columns }),
   createLocalDatabase: (name) => invoke<ConnectionConfig>("create_local_database", { name }),
+  scanLocalDatabases: () => invoke<ConnectionConfig[]>("scan_local_databases"),
 };
