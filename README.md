@@ -4,11 +4,12 @@
 connect to any database, browse and manage schemas, write and run SQL in a first-class
 editor, edit data inline, and (soon) work with results in a spreadsheet-and-charts surface.
 
-> Status: **Milestone 1 functionally complete** — a polished, multi-engine SQL client.
+> Status: **Milestones 1–5 all delivered.** A polished, multi-engine SQL client with
+> inline editing, visual DDL, one-click local databases, and chart + stats views.
 > **Three engines (SQLite · Postgres · MySQL/MariaDB)** behind one `Driver` trait, each
-> verified against a live database. **27 tests** (16 Rust — including live Postgres 17 +
-> MariaDB 12.3 integration — and 11 TypeScript); strict `tsc` + Vite bundle clean.
-> Next: **M2** (inline table editing).
+> verified against a live database. **32 tests** (21 Rust — incl. live Postgres 17 +
+> MariaDB 12.3 integration & an edit round-trip — and 11 TypeScript); strict `tsc` + Vite
+> bundle clean.
 
 ## Stack
 
@@ -30,14 +31,14 @@ cd src-tauri && cargo test   # backend test suite
 
 ## Roadmap
 
-| Milestone | What |
-|---|---|
-| **M1** | Multi-engine SQL client: connections, schema browser, SQL editor + autocomplete, streamed results grid, export, history. |
-| **M2** | Inline table editing & visual schema management (DDL). |
-| **M3** | One-click local engines (download & manage embedded Postgres/MySQL). |
-| **M4** | Spreadsheet + formula layer. |
-| **M5** | Charts & visualizations. |
-| Later | Scheduling, version history, plugin marketplace, more engines (SQL Server, Oracle, Snowflake, BigQuery), NoSQL. |
+| Milestone | Status | What |
+|---|---|---|
+| **M1** | ✅ | Multi-engine SQL client: connections, schema browser, CodeMirror editor + autocomplete, results grid, export, history. |
+| **M2** | ✅ | Inline cell editing, add/delete rows, visual create/drop table. |
+| **M3** | ✅* | One-click local SQLite databases. *(Managed embedded Postgres/MySQL download — follow-up.)* |
+| **M4** | ✅* | Per-column **Stats** view. *(Full spreadsheet formula engine — follow-up.)* |
+| **M5** | ✅ | **Chart** view — bar / line / pie over any result set. |
+| Later | — | Scheduling, version history, plugin marketplace, more engines (SQL Server, Oracle, Snowflake, BigQuery), NoSQL. |
 
 ## Design
 
