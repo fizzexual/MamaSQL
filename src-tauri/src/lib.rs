@@ -44,6 +44,8 @@ pub fn run() {
             commands::save_connection,
             commands::delete_connection,
             commands::test_connection,
+            commands::list_databases,
+            commands::create_database,
             commands::open_connection,
             commands::close_connection,
             commands::run_query,

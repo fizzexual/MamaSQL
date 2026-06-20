@@ -12,10 +12,15 @@ pub struct MySqlDriver {
 }
 
 fn options(cfg: &ConnectionConfig, password: Option<&str>) -> MySqlConnectOptions {
+    server_options(cfg, password).database(&cfg.database)
+}
+
+/// Connect to the server without selecting a database (for listing/creating
+/// databases before one has been chosen).
+fn server_options(cfg: &ConnectionConfig, password: Option<&str>) -> MySqlConnectOptions {
     let mut o = MySqlConnectOptions::new()
         .host(cfg.host.as_deref().unwrap_or("localhost"))
-        .port(cfg.port.unwrap_or(3306))
-        .database(&cfg.database);
+        .port(cfg.port.unwrap_or(3306));
     if let Some(u) = cfg.username.as_deref() {
         o = o.username(u);
     }
@@ -23,6 +28,12 @@ fn options(cfg: &ConnectionConfig, password: Option<&str>) -> MySqlConnectOption
         o = o.password(p);
     }
     o
+}
+
+/// Keep only identifier-safe characters so a database name can be interpolated
+/// into DDL without injection risk.
+fn sanitize_ident(name: &str) -> String {
+    name.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect()
 }
 
 /// information_schema text columns can come back as utf8 strings OR as binary
@@ -53,6 +64,35 @@ impl MySqlDriver {
             .connect_with(options(cfg, password))
             .await?;
         sqlx::query("SELECT 1").execute(&pool).await?;
+        pool.close().await;
+        Ok(())
+    }
+
+    /// Connect at the server level and return every database name.
+    pub async fn list_databases(cfg: &ConnectionConfig, password: Option<&str>) -> AppResult<Vec<String>> {
+        let pool = MySqlPoolOptions::new()
+            .max_connections(1)
+            .connect_with(server_options(cfg, password))
+            .await?;
+        let rows = sqlx::query("SHOW DATABASES").fetch_all(&pool).await?;
+        pool.close().await;
+        Ok(rows.iter().map(|r| try_get_text(r, "Database")).collect())
+    }
+
+    pub async fn create_database(
+        cfg: &ConnectionConfig,
+        password: Option<&str>,
+        name: &str,
+    ) -> AppResult<()> {
+        let ident = sanitize_ident(name);
+        if ident.is_empty() {
+            return Err(crate::error::AppError::Internal("invalid database name".into()));
+        }
+        let pool = MySqlPoolOptions::new()
+            .max_connections(1)
+            .connect_with(server_options(cfg, password))
+            .await?;
+        sqlx::query(&format!("CREATE DATABASE `{ident}`")).execute(&pool).await?;
         pool.close().await;
         Ok(())
     }

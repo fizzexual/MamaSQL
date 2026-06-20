@@ -60,6 +60,39 @@ pub async fn test_connection(cfg: ConnectionConfig, password: Option<String>) ->
     }
 }
 
+/// List the databases available on a server (without a database selected yet).
+/// Doubles as a reachability/credentials check for the Add-source flow.
+#[tauri::command]
+pub async fn list_databases(cfg: ConnectionConfig, password: Option<String>) -> AppResult<Vec<String>> {
+    match cfg.engine {
+        Engine::Sqlite => Ok(vec![]),
+        Engine::Postgres => {
+            crate::drivers::postgres::PgDriver::list_databases(&cfg, password.as_deref()).await
+        }
+        Engine::MySql => {
+            crate::drivers::mysql::MySqlDriver::list_databases(&cfg, password.as_deref()).await
+        }
+    }
+}
+
+/// Create a new database on the server.
+#[tauri::command]
+pub async fn create_database(
+    cfg: ConnectionConfig,
+    password: Option<String>,
+    name: String,
+) -> AppResult<()> {
+    match cfg.engine {
+        Engine::Sqlite => Err(AppError::Internal("SQLite has no server databases".into())),
+        Engine::Postgres => {
+            crate::drivers::postgres::PgDriver::create_database(&cfg, password.as_deref(), &name).await
+        }
+        Engine::MySql => {
+            crate::drivers::mysql::MySqlDriver::create_database(&cfg, password.as_deref(), &name).await
+        }
+    }
+}
+
 #[tauri::command]
 pub async fn open_connection(state: State<'_, AppState>, id: String) -> AppResult<()> {
     let conns = state.store.list_connections().await?;

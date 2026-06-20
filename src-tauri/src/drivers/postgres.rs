@@ -13,10 +13,19 @@ pub struct PgDriver {
 }
 
 fn options(cfg: &ConnectionConfig, password: Option<&str>) -> PgConnectOptions {
+    base_options(cfg, password).database(&cfg.database)
+}
+
+/// Postgres requires connecting to *some* database; use the standard `postgres`
+/// maintenance database for server-level operations (listing/creating databases).
+fn maintenance_options(cfg: &ConnectionConfig, password: Option<&str>) -> PgConnectOptions {
+    base_options(cfg, password).database("postgres")
+}
+
+fn base_options(cfg: &ConnectionConfig, password: Option<&str>) -> PgConnectOptions {
     let mut o = PgConnectOptions::new()
         .host(cfg.host.as_deref().unwrap_or("localhost"))
-        .port(cfg.port.unwrap_or(5432))
-        .database(&cfg.database);
+        .port(cfg.port.unwrap_or(5432));
     if let Some(u) = cfg.username.as_deref() {
         o = o.username(u);
     }
@@ -24,6 +33,10 @@ fn options(cfg: &ConnectionConfig, password: Option<&str>) -> PgConnectOptions {
         o = o.password(p);
     }
     o
+}
+
+fn sanitize_ident(name: &str) -> String {
+    name.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect()
 }
 
 impl PgDriver {
@@ -41,6 +54,39 @@ impl PgDriver {
             .connect_with(options(cfg, password))
             .await?;
         sqlx::query("SELECT 1").execute(&pool).await?;
+        pool.close().await;
+        Ok(())
+    }
+
+    /// Connect to the maintenance database and list every non-template database.
+    pub async fn list_databases(cfg: &ConnectionConfig, password: Option<&str>) -> AppResult<Vec<String>> {
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect_with(maintenance_options(cfg, password))
+            .await?;
+        let rows = sqlx::query(
+            "SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname",
+        )
+        .fetch_all(&pool)
+        .await?;
+        pool.close().await;
+        Ok(rows.iter().filter_map(|r| r.try_get::<String, _>("datname").ok()).collect())
+    }
+
+    pub async fn create_database(
+        cfg: &ConnectionConfig,
+        password: Option<&str>,
+        name: &str,
+    ) -> AppResult<()> {
+        let ident = sanitize_ident(name);
+        if ident.is_empty() {
+            return Err(crate::error::AppError::Internal("invalid database name".into()));
+        }
+        let pool = PgPoolOptions::new()
+            .max_connections(1)
+            .connect_with(maintenance_options(cfg, password))
+            .await?;
+        sqlx::query(&format!("CREATE DATABASE \"{ident}\"")).execute(&pool).await?;
         pool.close().await;
         Ok(())
     }
