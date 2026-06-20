@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { promptDialog } from "../../state/dialog";
 import type { ColumnInfo } from "../../ipc/types";
 import { useStore } from "../../state/store";
@@ -76,6 +76,7 @@ export function DataGrid() {
   const [draft, setDraft] = useState("");
   const [newRow, setNewRow] = useState<string[] | null>(null);
   const [colEditor, setColEditor] = useState<ColumnEditorAnchor | null>(null);
+  const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
 
   const pkCol = editTable?.pkColumn ?? null;
   const pkIdx = useMemo(
@@ -96,6 +97,27 @@ export function DataGrid() {
     return set;
   }, [result]);
 
+  // Display order of original row indices, honoring the active column sort.
+  const order = useMemo(() => {
+    const idx = result ? result.rows.map((_, i) => i) : [];
+    if (!result || !sort) return idx;
+    const { col, dir } = sort;
+    return idx.sort((a, b) => {
+      const x = result.rows[a][col];
+      const y = result.rows[b][col];
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      const nx = Number(x);
+      const ny = Number(y);
+      const bothNum = x !== "" && y !== "" && !Number.isNaN(nx) && !Number.isNaN(ny);
+      const cmp = bothNum ? nx - ny : String(x).localeCompare(String(y));
+      return cmp * dir;
+    });
+  }, [result, sort]);
+
+  useEffect(() => setSort(null), [editTable?.table]);
+
   if (loadingResult) return <GridSkeleton />;
   if (!result || !editTable) return null;
   const table = editTable.table;
@@ -103,6 +125,9 @@ export function DataGrid() {
 
   const colInfo = (name: string): ColumnInfo =>
     columns?.find((c) => c.name === name) ?? { name, dataType: "TEXT", nullable: true, isPrimaryKey: false };
+
+  const toggleSort = (col: number) =>
+    setSort((s) => (!s || s.col !== col ? { col, dir: 1 } : s.dir === 1 ? { col, dir: -1 } : null));
 
   const startEdit = (row: number, col: number) => {
     if (!pkCol || col === pkIdx) return;
@@ -156,9 +181,12 @@ export function DataGrid() {
             </th>
             <th className="bud-rownum" />
             {result.columns.map((c, i) => (
-              <th key={i}>
-                <span className="bud-th-ic">{typeIcon(c.dataType)}</span>
-                <span className="bud-th-name">{c.name}</span>
+              <th key={i} className={sort?.col === i ? "sorted" : ""}>
+                <button className="bud-th-sort" title={`Sort by ${c.name}`} onClick={() => toggleSort(i)}>
+                  <span className="bud-th-ic">{typeIcon(c.dataType)}</span>
+                  <span className="bud-th-name">{c.name}</span>
+                  {sort?.col === i && <span className="bud-th-arrow">{sort.dir === 1 ? "↑" : "↓"}</span>}
+                </button>
                 <button
                   className="bud-th-menu"
                   title="Edit column"
@@ -204,51 +232,59 @@ export function DataGrid() {
               <td />
             </tr>
           )}
-          {result.rows.map((row, ri) => (
-            <tr
-              key={ri}
-              className={`${ri === inspectorRow ? "row-open" : ""} ${selection.includes(ri) ? "selected" : ""}`}
-            >
-              <td className="bud-checkcol">
-                <input
-                  type="checkbox"
-                  className="bud-rowcheck"
-                  checked={selection.includes(ri)}
-                  onChange={() => toggleRow(ri)}
-                />
-              </td>
-              <td className="bud-rownum">
-                <span className="rn-num">{ri + 1}</span>
-                <button className="rn-expand" title="Edit row in panel" onClick={() => openInspector(ri)}>
-                  ⤢
-                </button>
-              </td>
-              {row.map((cell, ci) => (
-                <td key={ci} className={cell == null ? "bud-null" : ""} onDoubleClick={() => startEdit(ri, ci)}>
-                  {editing && editing.row === ri && editing.col === ci ? (
-                    <input
-                      className="bud-cell-input"
-                      autoFocus
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onBlur={commitEdit}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") commitEdit();
-                        if (e.key === "Escape") setEditing(null);
-                      }}
-                    />
-                  ) : cell == null ? (
-                    ""
-                  ) : optionCols.has(ci) ? (
-                    pill(cell)
-                  ) : (
-                    String(cell)
-                  )}
+          {order.map((ri, pos) => {
+            const row = result.rows[ri];
+            return (
+              <tr
+                key={ri}
+                className={`${ri === inspectorRow ? "row-open" : ""} ${selection.includes(ri) ? "selected" : ""}`}
+              >
+                <td className="bud-checkcol">
+                  <input
+                    type="checkbox"
+                    className="bud-rowcheck"
+                    checked={selection.includes(ri)}
+                    onChange={() => toggleRow(ri)}
+                  />
                 </td>
-              ))}
-              <td />
-            </tr>
-          ))}
+                <td className="bud-rownum">
+                  <span className="rn-num">{pos + 1}</span>
+                  <button className="rn-expand" title="Edit row in panel" onClick={() => openInspector(ri)}>
+                    ⤢
+                  </button>
+                </td>
+                {row.map((cell, ci) => (
+                  <td
+                    key={ci}
+                    className={cell == null ? "bud-null" : ""}
+                    title={cell == null ? "" : String(cell)}
+                    onDoubleClick={() => startEdit(ri, ci)}
+                  >
+                    {editing && editing.row === ri && editing.col === ci ? (
+                      <input
+                        className="bud-cell-input"
+                        autoFocus
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onBlur={commitEdit}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") commitEdit();
+                          if (e.key === "Escape") setEditing(null);
+                        }}
+                      />
+                    ) : cell == null ? (
+                      ""
+                    ) : optionCols.has(ci) ? (
+                      pill(cell)
+                    ) : (
+                      String(cell)
+                    )}
+                  </td>
+                ))}
+                <td />
+              </tr>
+            );
+          })}
           <tr className="bud-addrow">
             <td className="bud-checkcol">
               <button onClick={() => setNewRow(result.columns.map(() => ""))} title="Add row">

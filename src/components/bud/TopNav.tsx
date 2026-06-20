@@ -37,10 +37,7 @@ export function TopNav({ onAddServer }: { onAddServer: () => void }) {
     <div className="bud-topnav">
       <div className="bud-topnav-left">
         <div className="bud-brand">
-          <span className="bud-brand-mark">
-            <IconDatabase size={16} stroke={2} />
-          </span>
-          MamaSQL
+          MAMA<span className="bud-brand-accent">SQL</span>
         </div>
         <span className="bud-topnav-sep" />
         <nav className="bud-tabs">
