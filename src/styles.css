@@ -1,24 +1,24 @@
 :root {
-  --bg: #ffffff;
-  --bg-2: #fafafa;
-  --panel: #ffffff;
-  --panel-2: #f4f4f6;
-  --panel-3: #ececef;
-  --border: #ececef;
-  --border-strong: #e0e0e4;
-  --text: #18181b;
-  --muted: #71717a;
-  --faint: #a1a1aa;
-  --accent: #4f46e5;
-  --accent-2: #7c5cf5;
-  --accent-grad: linear-gradient(135deg, #4f46e5, #7c5cf5);
-  --accent-soft: rgba(79, 70, 229, 0.1);
-  --accent-glow: rgba(79, 70, 229, 0.3);
-  --header: #ffffff;
-  --header-text: #18181b;
-  --danger: #dc2626;
-  --ok: #16a34a;
-  --input-bg: #ffffff;
+  --bg: #0e0e11;
+  --bg-2: #131316;
+  --panel: #18181c;
+  --panel-2: #1f1f24;
+  --panel-3: #26262d;
+  --border: #2a2a31;
+  --border-strong: #3a3a44;
+  --text: #e8e8ec;
+  --muted: #9a9aa4;
+  --faint: #6a6a75;
+  --accent: #4f6bff;
+  --accent-2: #6d83ff;
+  --accent-grad: linear-gradient(135deg, #4f6bff, #6d83ff);
+  --accent-soft: rgba(79, 107, 255, 0.16);
+  --accent-glow: rgba(79, 107, 255, 0.4);
+  --header: #0a0a0c;
+  --header-text: #e8e8ec;
+  --danger: #f0616d;
+  --ok: #34d399;
+  --input-bg: #202026;
   --r-sm: 6px;
   --r: 9px;
   --r-lg: 13px;
@@ -1013,3 +1013,62 @@ select.bld-prop-input { appearance: none; -webkit-appearance: none; padding-righ
 .insp-seg button.active { color: #4f46e5; }
 .insp-save { box-shadow: 0 2px 8px rgba(79,70,229,0.28); }
 .insp-bool-val { color: #71717a; }
+
+/* ============================================================
+   Exact Budibase data view (dark) + Add Server
+   ============================================================ */
+::-webkit-scrollbar-thumb { background: #2e2e36; }
+::-webkit-scrollbar-thumb:hover { background: #3a3a44; }
+.bud-switch { background: #3a3a44; }
+
+.bud-app { background: #0e0e11; }
+.bud-body { background: #0e0e11; }
+
+/* top bar — flat Budibase tabs */
+.bud-topnav { background: #0e0e11; border-bottom: 1px solid #1f1f24; box-shadow: none; }
+.bud-topnav-left { gap: 10px; }
+.bud-back { color: #9a9aa4; font-size: 22px; }
+.bud-tabs { gap: 0; }
+.bud-tabs .bud-tab { padding: 14px 12px; font-size: 14px; color: #9a9aa4; border-radius: 0; background: none; box-shadow: none; cursor: pointer; }
+.bud-tabs .bud-tab:hover { color: #fff; background: none; }
+.bud-tabs .bud-tab.active { color: #fff; background: none; box-shadow: inset 0 -2px 0 #fff; font-weight: 500; }
+.bud-topnav-center { color: #e8e8ec; font-weight: 600; font-size: 14px; }
+.bud-topnav-right { gap: 12px; }
+.bud-avatar { background: #e1635f; box-shadow: none; }
+.bud-naction { color: #c8c8d0; }
+.bud-naction:hover { color: #fff; background: none; }
+.bud-publish { background: #fff; color: #16161a; border: none; font-weight: 600; }
+.bud-publish:hover { filter: brightness(0.94); border: none; }
+.bud-publish .caret { color: #6a6a75; }
+
+/* Add Server button */
+.bud-addserver { display: flex; align-items: center; gap: 6px; background: var(--accent); color: #fff; border: none; border-radius: 7px; padding: 6px 13px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.bud-addserver:hover { filter: brightness(1.1); }
+.bud-addserver .bud-ic { opacity: 1; }
+
+/* breadcrumb / create view */
+.bud-create-view { background: var(--accent); }
+.bud-create-view:hover { filter: brightness(1.1); }
+
+/* sources */
+.bud-sources { background: #131316; }
+.bud-src.static { color: #9a9aa4; }
+.bud-src.static:hover { background: rgba(255,255,255,0.04); }
+
+/* server modal */
+.bud-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 70; }
+.bud-modal { position: fixed; z-index: 71; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 470px; max-width: 92vw; background: #1b1b20; border: 1px solid var(--border-strong); border-radius: 12px; box-shadow: 0 24px 70px rgba(0,0,0,0.6); display: flex; flex-direction: column; }
+.bud-modal-head { padding: 16px 18px; font-weight: 700; font-size: 15px; border-bottom: 1px solid var(--border); }
+.bud-modal-body { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.bud-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--muted); }
+.bud-field > span { font-weight: 500; }
+.bud-field input, .bud-field select { background: var(--input-bg); border: 1px solid var(--border-strong); border-radius: 7px; padding: 8px 10px; color: var(--text); font-size: 13px; font-family: inherit; }
+.bud-field input:focus, .bud-field select:focus { outline: none; border-color: var(--accent); }
+.bud-field-row { display: flex; gap: 10px; }
+.bud-field-row .bud-field { flex: 1; }
+.bud-field.port { max-width: 120px; }
+.bud-modal-err { color: var(--danger); font-size: 12.5px; font-family: var(--mono); }
+.bud-modal-actions { display: flex; justify-content: flex-end; gap: 8px; padding: 14px 18px; border-top: 1px solid var(--border); }
+.bud-modal-cancel { background: var(--input-bg); border: 1px solid var(--border-strong); color: var(--text); border-radius: 7px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
+.bud-modal-save { background: var(--accent); border: none; color: #fff; border-radius: 7px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.bud-modal-save:disabled { opacity: 0.6; }

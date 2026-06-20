@@ -1,5 +1,5 @@
-import { Workspace } from "./components/mantine/Workspace";
+import { AppShell } from "./components/AppShell";
 
 export default function App() {
-  return <Workspace />;
+  return <AppShell />;
 }

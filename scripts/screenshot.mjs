@@ -25,15 +25,26 @@ try {
   try {
     // The builder auto-opens the first connection + table, so the canvas
     // populates without interaction.
-    await page.waitForSelector("table", { timeout: 12000 }).catch(() => {});
-    await page.waitForTimeout(900);
+    // Open the datasource -> first table to populate the grid.
+    await page.waitForSelector(".bud-src.ds", { timeout: 12000 });
+    await page.click(".bud-src.ds");
+    await page.waitForSelector(".bud-table", { timeout: 6000 });
+    await page.click(".bud-table");
+    await page.waitForSelector(".bud-grid", { timeout: 6000 });
+    await page.waitForTimeout(700);
+    // Open a column editor popover (matches the reference).
+    await page.hover(".bud-grid thead th:nth-child(4)").catch(() => {});
+    await page.click(".bud-grid thead th:nth-child(4) .bud-th-menu").catch(() => {});
+    await page.waitForTimeout(300);
     await page.screenshot({ path: "screenshot.png" });
 
-    // Click the first data row to open the row form in the aside.
-    await page.click("table tbody tr").catch(() => {});
-    await page.waitForTimeout(450);
-    await page.screenshot({ path: "screenshot-form.png" });
-    console.log("wrote screenshot.png, screenshot-form.png");
+    // Add Server modal.
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.click(".bud-addserver").catch(() => {});
+    await page.waitForSelector(".bud-modal", { timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: "screenshot-server.png" });
+    console.log("wrote screenshot.png, screenshot-server.png");
   } catch (e) {
     console.log("interaction error: " + e.message);
     await page.screenshot({ path: "screenshot.png" });
