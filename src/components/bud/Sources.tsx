@@ -67,6 +67,8 @@ export function Sources({
   const connections = useStore((s) => s.connections);
   const loadConnections = useStore((s) => s.loadConnections);
   const scanLocal = useStore((s) => s.scanLocal);
+  const [filter, setFilter] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     loadConnections();
@@ -78,7 +80,11 @@ export function Sources({
       <div className="bud-sources-head">
         <span>Sources</span>
         <div className="bud-sources-actions">
-          <button className="icon-btn" title="Search">
+          <button
+            className={`icon-btn ${searchOpen ? "active" : ""}`}
+            title="Search tables"
+            onClick={() => setSearchOpen((v) => !v)}
+          >
             <IconSearch size={15} stroke={1.7} />
           </button>
           <button className="icon-btn" title="Add server" onClick={onAddServer}>
@@ -86,6 +92,17 @@ export function Sources({
           </button>
         </div>
       </div>
+      {searchOpen && (
+        <div className="bud-src-search">
+          <IconSearch size={14} stroke={1.7} />
+          <input autoFocus placeholder="Filter tables…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          {filter && (
+            <button className="bud-src-search-x" title="Clear" onClick={() => setFilter("")}>
+              <IconX size={13} stroke={1.9} />
+            </button>
+          )}
+        </div>
+      )}
       <div className="bud-sources-list">
         <CategoryGroup title="SYSTEM">
           <div className="bud-src static">
@@ -111,7 +128,7 @@ export function Sources({
           }
         >
           {connections.map((c) => (
-            <Datasource key={c.id} conn={c} onEditServer={onEditServer} />
+            <Datasource key={c.id} conn={c} onEditServer={onEditServer} filter={filter} />
           ))}
         </CategoryGroup>
       </div>
@@ -119,7 +136,15 @@ export function Sources({
   );
 }
 
-function Datasource({ conn, onEditServer }: { conn: ConnectionConfig; onEditServer: (conn: ConnectionConfig) => void }) {
+function Datasource({
+  conn,
+  onEditServer,
+  filter,
+}: {
+  conn: ConnectionConfig;
+  onEditServer: (conn: ConnectionConfig) => void;
+  filter: string;
+}) {
   const [open, setOpen] = useState(true);
   const [ctx, setCtx] = useState<CtxAnchor | null>(null);
   const activeId = useStore((s) => s.activeConnectionId);
@@ -131,6 +156,9 @@ function Datasource({ conn, onEditServer }: { conn: ConnectionConfig; onEditServ
   const createTable = useStore((s) => s.createTable);
   const setTopView = useStore((s) => s.setTopView);
   const isActive = activeId === conn.id;
+  const shownTables = filter
+    ? tables.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()))
+    : tables;
 
   const toggle = async () => {
     if (!isActive) await openAndIntrospect(conn.id);
@@ -206,14 +234,14 @@ function Datasource({ conn, onEditServer }: { conn: ConnectionConfig; onEditServ
         </span>
         <span className="bud-src-name">{conn.name}</span>
       </div>
-      {isActive && open && (
+      {isActive && (open || !!filter) && (
         <div className="bud-ds-tables">
           {loadingTables ? (
             <div className="bud-ds-empty">Loading…</div>
-          ) : tables.length === 0 ? (
-            <div className="bud-ds-empty">No tables</div>
+          ) : shownTables.length === 0 ? (
+            <div className="bud-ds-empty">{filter ? "No match" : "No tables"}</div>
           ) : (
-            tables.map((t) => <TableRow key={t.name} table={t.name} connectionId={conn.id} />)
+            shownTables.map((t) => <TableRow key={t.name} table={t.name} connectionId={conn.id} />)
           )}
         </div>
       )}

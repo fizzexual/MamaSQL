@@ -13,7 +13,7 @@ export function AppShell() {
   const topView = useStore((s) => s.topView);
   return (
     <div className="bud-app">
-      <TopNav />
+      <TopNav onAddServer={() => setServerModal("new")} />
       <div className="bud-body">
         <Sources onAddServer={() => setServerModal("new")} onEditServer={(c) => setServerModal(c)} />
         {topView === "data" ? <DataView /> : <WorkspacePanel view={topView} />}

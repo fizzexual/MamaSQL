@@ -32,17 +32,20 @@ try {
     await page.click(".bud-table");
     await page.waitForSelector(".bud-grid", { timeout: 6000 });
     await page.waitForTimeout(600);
-    // Check the header select-all to show the custom checkboxes.
-    await page.click(".bud-grid thead input[type='checkbox']").catch(() => {});
+    // Header: open the connection switcher.
+    await page.click(".bud-connsw").catch(() => {});
     await page.waitForTimeout(250);
     await page.screenshot({ path: "screenshot.png" });
+    await page.click(".bud-menu-backdrop").catch(() => {});
+    await page.waitForTimeout(150);
 
-    // Open a column editor popover (shows reduced rounding).
-    await page.hover(".bud-grid thead th:nth-child(4)").catch(() => {});
-    await page.click(".bud-grid thead th:nth-child(4) .bud-th-menu").catch(() => {});
+    // Sidebar: open search and filter.
+    await page.click(".bud-sources-actions .icon-btn").catch(() => {});
+    await page.waitForSelector(".bud-src-search input", { timeout: 3000 }).catch(() => {});
+    await page.fill(".bud-src-search input", "cust").catch(() => {});
     await page.waitForTimeout(300);
-    await page.screenshot({ path: "screenshot-coleditor.png" });
-    console.log("wrote screenshot.png, screenshot-coleditor.png");
+    await page.screenshot({ path: "screenshot-sidebar.png" });
+    console.log("wrote screenshot.png, screenshot-sidebar.png");
   } catch (e) {
     console.log("interaction error: " + e.message);
     await page.screenshot({ path: "screenshot.png" });

@@ -1417,3 +1417,56 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
   height: 2px;
   background: #fff;
 }
+
+/* ============================================================
+   Better header + sidebar
+   ============================================================ */
+.bud-topnav-left { display: flex; align-items: center; gap: 12px; }
+.bud-brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; color: var(--text); letter-spacing: 0.2px; white-space: nowrap; }
+.bud-brand-mark { display: grid; place-items: center; width: 25px; height: 25px; border-radius: 6px; background: var(--accent); color: #fff; box-shadow: 0 2px 8px rgba(79,107,255,0.4); }
+.bud-topnav-sep { width: 1px; height: 22px; background: var(--border); flex: none; }
+
+.bud-topnav-center { position: relative; display: flex; justify-content: center; align-items: center; }
+.bud-connsw {
+  display: flex; align-items: center; gap: 8px; max-width: 300px;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 7px; padding: 6px 11px; font-size: 13px; cursor: pointer;
+  -webkit-app-region: no-drag; transition: background .12s ease, border-color .12s ease;
+}
+.bud-connsw:hover, .bud-connsw.open { border-color: var(--border-strong); background: var(--panel-3); }
+.bud-connsw-ic { display: flex; color: var(--accent); flex: none; }
+.bud-connsw-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bud-connsw-name.muted { color: var(--muted); font-weight: 500; }
+.bud-connsw-caret { color: var(--faint); flex: none; }
+.bud-connsw-menu {
+  position: absolute; top: 42px; left: 50%; transform: translateX(-50%); z-index: 61; min-width: 244px;
+  background: var(--panel); border: 1px solid var(--border-strong); border-radius: 8px;
+  box-shadow: 0 16px 44px rgba(0,0,0,0.55); padding: 6px;
+}
+.bud-connsw-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--faint); font-weight: 700; padding: 5px 8px 6px; }
+.bud-connsw-empty { padding: 8px; color: var(--faint); font-size: 12.5px; }
+.bud-connsw-item { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; background: none; border: none; color: var(--text); font: inherit; font-size: 13px; padding: 8px 9px; border-radius: 6px; cursor: pointer; }
+.bud-connsw-item:hover { background: var(--panel-2); }
+.bud-connsw-item.active { background: var(--accent-soft); color: #fff; }
+.bud-connsw-item svg { color: var(--accent); flex: none; }
+.bud-connsw-iname { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bud-connsw-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); flex: none; }
+.bud-connsw-div { height: 1px; background: var(--border); margin: 5px 4px; }
+.bud-connsw-add { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: none; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; padding: 8px 9px; border-radius: 6px; cursor: pointer; }
+.bud-connsw-add:hover { background: var(--accent-soft); }
+
+.bud-topnav-right { display: flex; align-items: center; gap: 12px; }
+
+/* sidebar search */
+.bud-src-search { display: flex; align-items: center; gap: 7px; margin: 0 10px 8px; padding: 6px 9px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); }
+.bud-src-search:focus-within { border-color: var(--accent); }
+.bud-src-search svg { flex: none; }
+.bud-src-search input { flex: 1; min-width: 0; background: none; border: none; color: var(--text); font-size: 12.5px; outline: none; padding: 0; }
+.bud-src-search input::placeholder { color: var(--faint); }
+.bud-src-search-x { background: none; border: none; color: var(--faint); cursor: pointer; display: flex; padding: 0; }
+.bud-src-search-x:hover { color: var(--text); }
+.icon-btn.active { color: var(--accent); background: var(--accent-soft); }
+
+/* sidebar polish */
+.bud-sources-head { padding: 13px 12px 10px; font-weight: 700; font-size: 13.5px; }
+.bud-table.active { box-shadow: inset 2px 0 0 var(--accent); }
