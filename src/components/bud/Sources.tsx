@@ -124,6 +124,7 @@ function Datasource({ conn, onEditServer }: { conn: ConnectionConfig; onEditServ
   const [ctx, setCtx] = useState<CtxAnchor | null>(null);
   const activeId = useStore((s) => s.activeConnectionId);
   const tables = useStore((s) => s.schema.tables);
+  const loadingTables = useStore((s) => s.loadingTables);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const deleteConnection = useStore((s) => s.deleteConnection);
   const saveConnection = useStore((s) => s.saveConnection);
@@ -207,10 +208,13 @@ function Datasource({ conn, onEditServer }: { conn: ConnectionConfig; onEditServ
       </div>
       {isActive && open && (
         <div className="bud-ds-tables">
-          {tables.length === 0 && <div className="bud-ds-empty">No tables</div>}
-          {tables.map((t) => (
-            <TableRow key={t.name} table={t.name} connectionId={conn.id} />
-          ))}
+          {loadingTables ? (
+            <div className="bud-ds-empty">Loading…</div>
+          ) : tables.length === 0 ? (
+            <div className="bud-ds-empty">No tables</div>
+          ) : (
+            tables.map((t) => <TableRow key={t.name} table={t.name} connectionId={conn.id} />)
+          )}
         </div>
       )}
       {ctx && <ContextMenu anchor={ctx} onClose={() => setCtx(null)} />}

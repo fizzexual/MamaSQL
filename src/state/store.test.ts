@@ -44,4 +44,23 @@ describe("store", () => {
     await useStore.getState().run();
     expect(useStore.getState().error?.kind).toBe("notConnected");
   });
+
+  it("switching sources clears the previous source's tables and open table", async () => {
+    await useStore.getState().loadConnections();
+    const ids = useStore.getState().connections.map((c) => c.id);
+    expect(ids.length).toBeGreaterThan(1);
+
+    // Open the first source and a table inside it.
+    await useStore.getState().openAndIntrospect(ids[0]);
+    const firstTable = useStore.getState().schema.tables[0].name;
+    await useStore.getState().openTableData(firstTable);
+    expect(useStore.getState().editTable).not.toBeNull();
+    expect(useStore.getState().result).not.toBeNull();
+
+    // Switch to a different source: the prior source's tables/open table must not bleed through.
+    await useStore.getState().openAndIntrospect(ids[1]);
+    expect(useStore.getState().editTable).toBeNull();
+    expect(useStore.getState().result).toBeNull();
+    expect(useStore.getState().schema.tables.map((t) => t.name)).not.toContain(firstTable);
+  });
 });

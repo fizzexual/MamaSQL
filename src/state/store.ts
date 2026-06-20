@@ -152,7 +152,20 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   openAndIntrospect: async (id) => {
-    set({ activeConnectionId: id, loadingTables: true, error: null });
+    // Reset everything tied to the previous source so its tables/data don't
+    // bleed through while the new source introspects (or if it errors).
+    set({
+      activeConnectionId: id,
+      loadingTables: true,
+      error: null,
+      schema: { tables: [], columnsByTable: {} },
+      editTable: null,
+      result: null,
+      view: "data",
+      activeViewId: null,
+      selection: [],
+      inspectorRow: null,
+    });
     try {
       await backend.openConnection(id);
       const tables = await backend.listTables(id);
