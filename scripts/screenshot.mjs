@@ -31,20 +31,18 @@ try {
     await page.waitForSelector(".bud-table", { timeout: 6000 });
     await page.click(".bud-table");
     await page.waitForSelector(".bud-grid", { timeout: 6000 });
-    await page.waitForTimeout(700);
-    // Open a column editor popover (matches the reference).
+    await page.waitForTimeout(600);
+    // Check the header select-all to show the custom checkboxes.
+    await page.click(".bud-grid thead input[type='checkbox']").catch(() => {});
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: "screenshot.png" });
+
+    // Open a column editor popover (shows reduced rounding).
     await page.hover(".bud-grid thead th:nth-child(4)").catch(() => {});
     await page.click(".bud-grid thead th:nth-child(4) .bud-th-menu").catch(() => {});
     await page.waitForTimeout(300);
-    await page.screenshot({ path: "screenshot.png" });
-
-    // Add Server modal.
-    await page.keyboard.press("Escape").catch(() => {});
-    await page.click(".bud-addserver").catch(() => {});
-    await page.waitForSelector(".bud-modal", { timeout: 3000 }).catch(() => {});
-    await page.waitForTimeout(250);
-    await page.screenshot({ path: "screenshot-server.png" });
-    console.log("wrote screenshot.png, screenshot-server.png");
+    await page.screenshot({ path: "screenshot-coleditor.png" });
+    console.log("wrote screenshot.png, screenshot-coleditor.png");
   } catch (e) {
     console.log("interaction error: " + e.message);
     await page.screenshot({ path: "screenshot.png" });

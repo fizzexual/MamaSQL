@@ -1334,3 +1334,86 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 }
 .bud-db-new:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
 .bud-db-new:disabled { opacity: 0.5; cursor: default; }
+
+/* ============================================================
+   Custom checkboxes + reduced rounding
+   ============================================================ */
+/* sharper corners — controls + chrome */
+.bud-app button,
+.bud-app input:not([type="checkbox"]),
+.bud-app select,
+.bud-app textarea,
+.bud-app [class*="-btn"],
+.bud-app .bud-bc-table,
+.bud-app .bud-tool,
+.bud-app .bud-tab,
+.bud-app .bud-tag,
+.bud-app .bud-error,
+.bud-app .bud-conn-status,
+.bud-app [class*="card"],
+.bud-app [class*="panel"] { border-radius: 4px !important; }
+
+/* overlays a touch softer */
+.bud-app [class*="modal"],
+.bud-app [class*="dialog"],
+.bud-app [class*="popover"],
+.bud-app [class*="menu"],
+.bud-app .bud-coleditor { border-radius: 6px !important; }
+
+/* pills / chips / badges — minimal */
+.bud-app .bud-pill,
+.bud-app .bud-th-ic,
+.bud-app .bud-sel-badge,
+.bud-app [class*="badge"],
+.bud-app [class*="chip"] { border-radius: 3px !important; }
+
+/* keep these shaped */
+.bud-avatar { border-radius: 50% !important; }
+.bud-switch { border-radius: 999px !important; }
+.bud-switch::after { border-radius: 50% !important; }
+
+/* custom checkboxes (replace OS default) */
+.bud-app input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  padding: 0;
+  flex: none;
+  vertical-align: middle;
+  display: inline-block;
+  position: relative;
+  border: 1.5px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--input-bg);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+.bud-app input[type="checkbox"]:hover { border-color: var(--accent); }
+.bud-app input[type="checkbox"]:checked,
+.bud-app input[type="checkbox"]:indeterminate {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.bud-app input[type="checkbox"]:checked::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  box-sizing: border-box;
+}
+.bud-app input[type="checkbox"]:indeterminate::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 7px;
+  height: 2px;
+  background: #fff;
+}
