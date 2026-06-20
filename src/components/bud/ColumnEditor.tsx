@@ -1,4 +1,6 @@
+import { IconBoltFilled, IconChevronDown, IconMenu2 } from "@tabler/icons-react";
 import { useState } from "react";
+import { confirmDialog } from "../../state/dialog";
 import type { ColumnInfo } from "../../ipc/types";
 import { useStore } from "../../state/store";
 
@@ -51,7 +53,12 @@ export function ColumnEditor({
 
   const del = async () => {
     if (
-      window.confirm(`Delete column "${column.name}"? This drops the column and all of its data.`)
+      await confirmDialog({
+        title: "Delete column",
+        message: `Delete "${column.name}"? This drops the column and all of its data.`,
+        confirmLabel: "Delete",
+        danger: true,
+      })
     ) {
       setBusy(true);
       await dropColumn(table, column.name);
@@ -73,10 +80,12 @@ export function ColumnEditor({
             if (e.key === "Escape") onClose();
           }}
         />
-        <div className="bud-ce-type">
-          <span className="bud-ce-type-ic">≡</span>
+        <div className="bud-ce-type" title={column.dataType}>
+          <span className="bud-ce-type-ic">
+            <IconMenu2 size={15} stroke={1.7} />
+          </span>
           <span className="bud-ce-type-label">{guessType(column.dataType)}</span>
-          <span className="bud-ce-type-raw">{column.dataType}</span>
+          <IconChevronDown size={15} stroke={1.7} className="bud-ce-type-caret" />
         </div>
         <div className="bud-ce-section">
           Formatting <span className="bud-info">ⓘ</span>
@@ -94,7 +103,7 @@ export function ColumnEditor({
         <div className="bud-ce-section">Default value</div>
         <div className="bud-ce-default">
           <input placeholder="None" />
-          <span className="bud-ce-bind">⚡</span>
+          <IconBoltFilled size={15} className="bud-ce-bind" />
         </div>
         <div className="bud-ce-actions">
           <button

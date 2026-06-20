@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { promptDialog } from "../../state/dialog";
 import type { ColumnInfo } from "../../ipc/types";
 import { useStore } from "../../state/store";
 import { ColumnEditor, type ColumnEditorAnchor } from "./ColumnEditor";
@@ -6,8 +7,8 @@ import { ColumnEditor, type ColumnEditorAnchor } from "./ColumnEditor";
 function typeIcon(t: string): string {
   const u = t.toUpperCase();
   if (/INT|SERIAL|NUM|DEC|REAL|FLOAT|DOUBLE|BIGINT/.test(u)) return "123";
-  if (/DATE|TIME/.test(u)) return "🕑";
-  if (/BOOL/.test(u)) return "☑";
+  if (/DATE|TIME/.test(u)) return "◷";
+  if (/BOOL/.test(u)) return "✓";
   return "T";
 }
 
@@ -30,7 +31,7 @@ function GridSkeleton() {
         <thead>
           <tr>
             <th className="bud-checkcol" />
-            <th className="bud-rownum">#</th>
+            <th className="bud-rownum" />
             {cols.map((_, i) => (
               <th key={i}>
                 <span className="sk sk-th" />
@@ -63,11 +64,13 @@ export function DataGrid() {
   const editTable = useStore((s) => s.editTable);
   const loadingResult = useStore((s) => s.loadingResult);
   const editCell = useStore((s) => s.editCell);
-  const deleteRowAt = useStore((s) => s.deleteRowAt);
   const addRow = useStore((s) => s.addRow);
   const addColumn = useStore((s) => s.addColumn);
   const openInspector = useStore((s) => s.openInspector);
   const inspectorRow = useStore((s) => s.inspectorRow);
+  const selection = useStore((s) => s.selection);
+  const toggleRow = useStore((s) => s.toggleRow);
+  const selectAllRows = useStore((s) => s.selectAllRows);
   const columns = useStore((s) => (editTable ? s.schema.columnsByTable[editTable.table] : undefined));
   const [editing, setEditing] = useState<{ row: number; col: number } | null>(null);
   const [draft, setDraft] = useState("");
@@ -96,6 +99,7 @@ export function DataGrid() {
   if (loadingResult) return <GridSkeleton />;
   if (!result || !editTable) return null;
   const table = editTable.table;
+  const allSelected = result.rows.length > 0 && selection.length === result.rows.length;
 
   const colInfo = (name: string): ColumnInfo =>
     columns?.find((c) => c.name === name) ?? { name, dataType: "TEXT", nullable: true, isPrimaryKey: false };
@@ -122,10 +126,12 @@ export function DataGrid() {
     void addRow(cols, vals);
     setNewRow(null);
   };
-  const addColumnPrompt = () => {
-    const name = window.prompt("New column name");
+  const addColumnPrompt = async () => {
+    const name = await promptDialog({ title: "New column", label: "Column name", placeholder: "e.g. created_at" });
     if (!name?.trim()) return;
-    const dataType = window.prompt("Column type (TEXT, INTEGER, REAL, DATE, …)", "TEXT")?.trim() || "TEXT";
+    const dataType =
+      (await promptDialog({ title: "Column type", label: "Type (TEXT, INTEGER, REAL, DATE, …)", defaultValue: "TEXT" }))?.trim() ||
+      "TEXT";
     void addColumn(table, { name: name.trim(), dataType, nullable: true, primaryKey: false });
   };
   const pill = (v: unknown) => {
@@ -146,9 +152,9 @@ export function DataGrid() {
         <thead>
           <tr>
             <th className="bud-checkcol">
-              <input type="checkbox" />
+              <input type="checkbox" checked={allSelected} onChange={selectAllRows} aria-label="Select all rows" />
             </th>
-            <th className="bud-rownum">#</th>
+            <th className="bud-rownum" />
             {result.columns.map((c, i) => (
               <th key={i}>
                 <span className="bud-th-ic">{typeIcon(c.dataType)}</span>
@@ -199,19 +205,17 @@ export function DataGrid() {
             </tr>
           )}
           {result.rows.map((row, ri) => (
-            <tr key={ri} className={ri === inspectorRow ? "row-open" : ""}>
+            <tr
+              key={ri}
+              className={`${ri === inspectorRow ? "row-open" : ""} ${selection.includes(ri) ? "selected" : ""}`}
+            >
               <td className="bud-checkcol">
-                <input type="checkbox" className="bud-rowcheck" />
-                <button
-                  className="bud-rowx"
-                  title={pkIdx < 0 ? "Need a primary key to delete" : "Delete row"}
-                  disabled={pkIdx < 0}
-                  onClick={() => {
-                    if (window.confirm("Delete this row?")) void deleteRowAt(ri);
-                  }}
-                >
-                  ✕
-                </button>
+                <input
+                  type="checkbox"
+                  className="bud-rowcheck"
+                  checked={selection.includes(ri)}
+                  onChange={() => toggleRow(ri)}
+                />
               </td>
               <td className="bud-rownum">
                 <span className="rn-num">{ri + 1}</span>

@@ -15,6 +15,47 @@ interface SchemaState {
   columnsByTable: Record<string, ColumnInfo[]>;
 }
 
+export type TopView = "data" | "design" | "automation" | "settings";
+export type FilterOp = "=" | "!=" | "contains" | ">" | "<";
+export interface ViewFilter {
+  column: string;
+  op: FilterOp;
+  value: string;
+}
+export interface ViewDef {
+  id: string;
+  connectionId: string;
+  table: string;
+  name: string;
+  filter: ViewFilter | null;
+}
+
+/** Apply a saved view's single-condition filter to a row set (client-side). */
+function applyViewFilter(rows: unknown[][], columns: { name: string }[], filter: ViewFilter | null): unknown[][] {
+  if (!filter) return rows;
+  const idx = columns.findIndex((c) => c.name === filter.column);
+  if (idx < 0) return rows;
+  const target = filter.value;
+  const targetNum = Number.parseFloat(target);
+  return rows.filter((r) => {
+    const s = r[idx] == null ? "" : String(r[idx]);
+    switch (filter.op) {
+      case "=":
+        return s === target;
+      case "!=":
+        return s !== target;
+      case "contains":
+        return s.toLowerCase().includes(target.toLowerCase());
+      case ">":
+        return Number.parseFloat(s) > targetNum;
+      case "<":
+        return Number.parseFloat(s) < targetNum;
+      default:
+        return true;
+    }
+  });
+}
+
 export interface AppStore {
   connections: ConnectionConfig[];
   activeConnectionId: string | null;
@@ -30,6 +71,10 @@ export interface AppStore {
   loadingResult: boolean;
   view: "data" | "sql" | "history";
   inspectorRow: number | null;
+  topView: TopView;
+  views: ViewDef[];
+  activeViewId: string | null;
+  selection: number[];
 
   loadConnections: () => Promise<void>;
   saveConnection: (cfg: ConnectionConfig, password?: string | null) => Promise<void>;
@@ -58,6 +103,15 @@ export interface AppStore {
   importCsv: (table: string, headers: string[], rows: string[][]) => Promise<void>;
   openInspector: (rowIndex: number) => void;
   closeInspector: () => void;
+  setTopView: (v: TopView) => void;
+  addView: (table: string, name: string, filter: ViewFilter | null) => void;
+  deleteView: (id: string) => void;
+  openView: (view: ViewDef) => Promise<void>;
+  toggleRow: (i: number) => void;
+  selectAllRows: () => void;
+  clearSelection: () => void;
+  deleteSelected: () => Promise<void>;
+  duplicateSelected: () => Promise<void>;
 }
 
 const backend = getBackend();
@@ -77,6 +131,10 @@ export const useStore = create<AppStore>((set, get) => ({
   loadingResult: false,
   view: "data",
   inspectorRow: null,
+  topView: "data",
+  views: [],
+  activeViewId: null,
+  selection: [],
 
   loadConnections: async () => {
     set({ connections: await backend.listConnections() });
@@ -142,7 +200,17 @@ export const useStore = create<AppStore>((set, get) => ({
     const id = get().activeConnectionId;
     if (!id) return;
     const sql = `SELECT * FROM ${table} LIMIT 200;`;
-    set({ view: "data", loadingResult: true, error: null, sql, editTable: { table, pkColumn: null }, inspectorRow: null });
+    set({
+      view: "data",
+      topView: "data",
+      loadingResult: true,
+      error: null,
+      sql,
+      editTable: { table, pkColumn: null },
+      inspectorRow: null,
+      activeViewId: null,
+      selection: [],
+    });
     try {
       // Column introspection is best-effort — it must never block the data load.
       try {
@@ -358,6 +426,127 @@ export const useStore = create<AppStore>((set, get) => ({
 
   openInspector: (rowIndex) => set({ inspectorRow: rowIndex }),
   closeInspector: () => set({ inspectorRow: null }),
+
+  setTopView: (v) => set({ topView: v }),
+
+  addView: (table, name, filter) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    const view: ViewDef = {
+      id: `view-${id}-${table}-${get().views.length + 1}-${name.replace(/\s+/g, "_")}`,
+      connectionId: id,
+      table,
+      name,
+      filter,
+    };
+    set((s) => ({ views: [...s.views, view] }));
+    void get().openView(view);
+  },
+
+  deleteView: (id) => {
+    set((s) => ({
+      views: s.views.filter((v) => v.id !== id),
+      activeViewId: s.activeViewId === id ? null : s.activeViewId,
+    }));
+  },
+
+  openView: async (view) => {
+    const id = get().activeConnectionId;
+    if (!id || id !== view.connectionId) return;
+    const sql = `SELECT * FROM ${view.table} LIMIT 200;`;
+    set({
+      view: "data",
+      topView: "data",
+      loadingResult: true,
+      error: null,
+      sql,
+      editTable: { table: view.table, pkColumn: null },
+      inspectorRow: null,
+      activeViewId: view.id,
+      selection: [],
+    });
+    try {
+      try {
+        await get().expandTable(view.table);
+      } catch {
+        /* fall back to query columns */
+      }
+      const cols = get().schema.columnsByTable[view.table] ?? [];
+      const pkColumn = cols.find((c) => c.isPrimaryKey)?.name ?? null;
+      let result = await backend.runQuery(id, sql);
+      if (result.columns.length === 0 && cols.length > 0) {
+        result = { ...result, columns: cols.map((c) => ({ name: c.name, dataType: c.dataType })) };
+      }
+      result = { ...result, rows: applyViewFilter(result.rows, result.columns, view.filter) };
+      set({ result, editTable: { table: view.table, pkColumn }, loadingResult: false });
+      await get().loadHistory();
+    } catch (e) {
+      set({ error: normalizeError(e), result: null, loadingResult: false });
+    }
+  },
+
+  toggleRow: (i) =>
+    set((s) => ({
+      selection: s.selection.includes(i) ? s.selection.filter((x) => x !== i) : [...s.selection, i],
+    })),
+
+  selectAllRows: () =>
+    set((s) => ({
+      selection:
+        s.result && s.selection.length < s.result.rows.length ? s.result.rows.map((_, i) => i) : [],
+    })),
+
+  clearSelection: () => set({ selection: [] }),
+
+  deleteSelected: async () => {
+    const { activeConnectionId, result, editTable, selection } = get();
+    if (!activeConnectionId || !result || !editTable?.pkColumn || selection.length === 0) return;
+    const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
+    if (pkIdx < 0) return;
+    const pks = selection.map((i) => result.rows[i][pkIdx]);
+    try {
+      for (const pk of pks) {
+        await backend.deleteRow(activeConnectionId, editTable.table, editTable.pkColumn, pk);
+      }
+      set({ selection: [] });
+      await get().refresh();
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
+
+  duplicateSelected: async () => {
+    const { activeConnectionId, result, editTable, selection } = get();
+    if (!activeConnectionId || !result || !editTable || selection.length === 0) return;
+    const pkIdx = editTable.pkColumn ? result.columns.findIndex((c) => c.name === editTable.pkColumn) : -1;
+    // Compute the next integer id when the PK looks like an auto-increment integer.
+    let nextId = 0;
+    let intPk = false;
+    if (pkIdx >= 0) {
+      const nums = result.rows.map((r) => Number(r[pkIdx]));
+      if (nums.length > 0 && nums.every((n) => Number.isInteger(n))) {
+        intPk = true;
+        nextId = Math.max(0, ...nums) + 1;
+      }
+    }
+    try {
+      for (const i of [...selection].sort((a, b) => a - b)) {
+        const src = result.rows[i];
+        const columns: string[] = [];
+        const values: unknown[] = [];
+        result.columns.forEach((c, j) => {
+          columns.push(c.name);
+          if (j === pkIdx) values.push(intPk ? nextId++ : `${String(src[j])}-copy`);
+          else values.push(src[j]);
+        });
+        await backend.insertRow(activeConnectionId, editTable.table, columns, values);
+      }
+      set({ selection: [] });
+      await get().refresh();
+    } catch (e) {
+      set({ error: normalizeError(e) });
+    }
+  },
 }));
 
 function normalizeError(e: unknown): AppError {

@@ -1,14 +1,69 @@
-import { useEffect, useState } from "react";
-import type { Engine } from "../../ipc/types";
+import {
+  IconBrandMysql,
+  IconChevronDown,
+  IconChevronRight,
+  IconCopy,
+  IconDatabase,
+  IconDatabaseCog,
+  IconEye,
+  IconFilter,
+  IconFolderOpen,
+  IconPencil,
+  IconPlus,
+  IconRefresh,
+  IconSearch,
+  IconSettings,
+  IconShieldLock,
+  IconTable,
+  IconTablePlus,
+  IconTrash,
+  IconUser,
+  IconX,
+} from "@tabler/icons-react";
+import { type ReactNode, useEffect, useState } from "react";
+import { confirmDialog, promptDialog } from "../../state/dialog";
+import type { ConnectionConfig, Engine } from "../../ipc/types";
 import { useStore } from "../../state/store";
+import { ContextMenu, type CtxAnchor, type MenuItem } from "./ContextMenu";
 
-function engineIcon(engine: Engine): string {
-  if (engine === "postgres") return "🐘";
-  if (engine === "mysql") return "🐬";
-  return "🗄";
+function EngineIcon({ engine }: { engine: Engine }) {
+  if (engine === "mysql") return <IconBrandMysql size={16} stroke={1.7} />;
+  return <IconDatabase size={15} stroke={1.7} />;
 }
 
-export function Sources({ onAddServer }: { onAddServer: () => void }) {
+function connString(c: ConnectionConfig): string {
+  if (c.engine === "sqlite") return `sqlite://${c.database}`;
+  const user = c.username ? `${c.username}@` : "";
+  const host = c.host ?? "localhost";
+  const port = c.port ?? (c.engine === "postgres" ? 5432 : 3306);
+  const scheme = c.engine === "postgres" ? "postgresql" : "mysql";
+  return `${scheme}://${user}${host}:${port}/${c.database}`;
+}
+
+/** A collapsible category section (SYSTEM, DATA SOURCES …). */
+function CategoryGroup({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="bud-cat">
+      <div className="bud-cat-head">
+        <button className="bud-cat-toggle" onClick={() => setOpen((v) => !v)}>
+          {open ? <IconChevronDown size={12} stroke={2.2} /> : <IconChevronRight size={12} stroke={2.2} />}
+          {title}
+        </button>
+        {action}
+      </div>
+      {open && <div className="bud-cat-body">{children}</div>}
+    </div>
+  );
+}
+
+export function Sources({
+  onAddServer,
+  onEditServer,
+}: {
+  onAddServer: () => void;
+  onEditServer: (conn: ConnectionConfig) => void;
+}) {
   const connections = useStore((s) => s.connections);
   const loadConnections = useStore((s) => s.loadConnections);
   const scanLocal = useStore((s) => s.scanLocal);
@@ -24,64 +79,224 @@ export function Sources({ onAddServer }: { onAddServer: () => void }) {
         <span>Sources</span>
         <div className="bud-sources-actions">
           <button className="icon-btn" title="Search">
-            ⌕
+            <IconSearch size={15} stroke={1.7} />
           </button>
           <button className="icon-btn" title="Add server" onClick={onAddServer}>
-            ＋
+            <IconPlus size={16} stroke={1.8} />
           </button>
         </div>
       </div>
       <div className="bud-sources-list">
-        <div className="bud-src static">
-          <span className="bud-src-ic">◍</span> App users
-        </div>
-        <div className="bud-src static">
-          <span className="bud-src-ic">🛡</span> Manage roles
-        </div>
-        {connections.map((c) => (
-          <Datasource key={c.id} id={c.id} name={c.name} engine={c.engine} />
-        ))}
+        <CategoryGroup title="SYSTEM">
+          <div className="bud-src static">
+            <span className="bud-src-ic">
+              <IconUser size={15} stroke={1.7} />
+            </span>{" "}
+            App users
+          </div>
+          <div className="bud-src static">
+            <span className="bud-src-ic">
+              <IconShieldLock size={15} stroke={1.7} />
+            </span>{" "}
+            Manage roles
+          </div>
+        </CategoryGroup>
+
+        <CategoryGroup
+          title="DATA SOURCES"
+          action={
+            <button className="bud-cat-add" title="Add server" onClick={onAddServer}>
+              <IconPlus size={14} stroke={2} />
+            </button>
+          }
+        >
+          {connections.map((c) => (
+            <Datasource key={c.id} conn={c} onEditServer={onEditServer} />
+          ))}
+        </CategoryGroup>
       </div>
     </aside>
   );
 }
 
-function Datasource({ id, name, engine }: { id: string; name: string; engine: Engine }) {
+function Datasource({ conn, onEditServer }: { conn: ConnectionConfig; onEditServer: (conn: ConnectionConfig) => void }) {
   const [open, setOpen] = useState(true);
+  const [ctx, setCtx] = useState<CtxAnchor | null>(null);
   const activeId = useStore((s) => s.activeConnectionId);
   const tables = useStore((s) => s.schema.tables);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
-  const openTableData = useStore((s) => s.openTableData);
-  const editTable = useStore((s) => s.editTable);
-  const isActive = activeId === id;
+  const deleteConnection = useStore((s) => s.deleteConnection);
+  const saveConnection = useStore((s) => s.saveConnection);
+  const createTable = useStore((s) => s.createTable);
+  const setTopView = useStore((s) => s.setTopView);
+  const isActive = activeId === conn.id;
 
   const toggle = async () => {
-    if (!isActive) await openAndIntrospect(id);
+    if (!isActive) await openAndIntrospect(conn.id);
     setOpen((v) => (isActive ? !v : true));
   };
 
+  const newTable = async () => {
+    const name = await promptDialog({ title: "New table", label: "Table name", placeholder: "e.g. invoices" });
+    if (!name?.trim()) return;
+    if (!isActive) await openAndIntrospect(conn.id);
+    await createTable(name.trim(), [{ name: "id", dataType: "INTEGER", nullable: false, primaryKey: true }]);
+    setOpen(true);
+  };
+  const rename = async () => {
+    const name = await promptDialog({ title: "Rename data source", label: "Name", defaultValue: conn.name });
+    if (!name?.trim() || name.trim() === conn.name) return;
+    await saveConnection({ ...conn, name: name.trim() }, null);
+  };
+  const copyString = () => void navigator.clipboard?.writeText(connString(conn)).catch(() => {});
+  const remove = async () => {
+    if (
+      await confirmDialog({
+        title: "Delete data source",
+        message: `Delete "${conn.name}"? This removes the saved connection.`,
+        confirmLabel: "Delete",
+        danger: true,
+      })
+    ) {
+      void deleteConnection(conn.id);
+    }
+  };
+
+  const items: MenuItem[] = [
+    {
+      label: isActive ? "Open (selected)" : "Select / open",
+      icon: (<IconFolderOpen size={15} stroke={1.7} />),
+      disabled: isActive,
+      onClick: () => void openAndIntrospect(conn.id),
+    },
+    { label: "Refresh tables", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: () => void openAndIntrospect(conn.id) },
+    { label: "New table", icon: (<IconTablePlus size={15} stroke={1.7} />), onClick: () => void newTable() },
+    { divider: true },
+    { label: "Rename", icon: (<IconPencil size={15} stroke={1.7} />), onClick: () => void rename() },
+    { label: "Edit connection…", icon: (<IconDatabaseCog size={15} stroke={1.7} />), onClick: () => onEditServer(conn) },
+    {
+      label: "Settings",
+      icon: (<IconSettings size={15} stroke={1.7} />),
+      onClick: () => {
+        void openAndIntrospect(conn.id);
+        setTopView("settings");
+      },
+    },
+    { label: "Copy connection string", icon: (<IconCopy size={15} stroke={1.7} />), onClick: copyString },
+    { divider: true },
+    { label: "Delete data source", icon: (<IconTrash size={15} stroke={1.7} />), danger: true, onClick: remove },
+  ];
+
   return (
     <div className="bud-ds">
-      <div className="bud-src ds" onClick={toggle}>
-        <span className="bud-ds-arrow">{isActive && open ? "▾" : "▸"}</span>
-        <span className="bud-src-ic">{engineIcon(engine)}</span>
-        <span className="bud-src-name">{name}</span>
+      <div
+        className="bud-src ds"
+        onClick={toggle}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setCtx({ x: e.clientX, y: e.clientY, items });
+        }}
+      >
+        <span className="bud-ds-arrow">
+          {isActive && open ? <IconChevronDown size={13} stroke={2} /> : <IconChevronRight size={13} stroke={2} />}
+        </span>
+        <span className="bud-src-ic ds-engine">
+          <EngineIcon engine={conn.engine} />
+        </span>
+        <span className="bud-src-name">{conn.name}</span>
       </div>
       {isActive && open && (
         <div className="bud-ds-tables">
           {tables.length === 0 && <div className="bud-ds-empty">No tables</div>}
           {tables.map((t) => (
-            <div
-              key={t.name}
-              className={`bud-table ${editTable?.table === t.name ? "active" : ""}`}
-              onClick={() => openTableData(t.name)}
-            >
-              <span className="bud-table-ic">{t.kind === "view" ? "◫" : "▦"}</span>
-              {t.name}
-            </div>
+            <TableRow key={t.name} table={t.name} connectionId={conn.id} />
           ))}
         </div>
       )}
+      {ctx && <ContextMenu anchor={ctx} onClose={() => setCtx(null)} />}
     </div>
+  );
+}
+
+function TableRow({ table, connectionId }: { table: string; connectionId: string }) {
+  const [ctx, setCtx] = useState<CtxAnchor | null>(null);
+  const openTableData = useStore((s) => s.openTableData);
+  const openView = useStore((s) => s.openView);
+  const deleteView = useStore((s) => s.deleteView);
+  const reload = useStore((s) => s.reload);
+  const renameTable = useStore((s) => s.renameTable);
+  const dropTable = useStore((s) => s.dropTable);
+  const editTable = useStore((s) => s.editTable);
+  const activeViewId = useStore((s) => s.activeViewId);
+  const views = useStore((s) => s.views);
+  const myViews = views.filter((v) => v.connectionId === connectionId && v.table === table);
+  const tableActive = editTable?.table === table && activeViewId === null;
+
+  const rename = async () => {
+    const name = await promptDialog({ title: "Rename table", label: "Name", defaultValue: table });
+    if (!name?.trim() || name.trim() === table) return;
+    await renameTable(table, name.trim());
+  };
+  const drop = async () => {
+    if (
+      await confirmDialog({
+        title: "Drop table",
+        message: `Drop "${table}"? This permanently deletes the table and all its rows.`,
+        confirmLabel: "Drop",
+        danger: true,
+      })
+    ) {
+      void dropTable(table);
+    }
+  };
+
+  const items: MenuItem[] = [
+    { label: "Open", icon: (<IconFolderOpen size={15} stroke={1.7} />), onClick: () => void openTableData(table) },
+    { label: "View data", icon: (<IconEye size={15} stroke={1.7} />), onClick: () => void openTableData(table) },
+    { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: () => void reload(table) },
+    { divider: true },
+    { label: "Rename table", icon: (<IconPencil size={15} stroke={1.7} />), onClick: () => void rename() },
+    { label: "Drop table", icon: (<IconTrash size={15} stroke={1.7} />), danger: true, onClick: drop },
+  ];
+
+  return (
+    <>
+      <div
+        className={`bud-table ${tableActive ? "active" : ""}`}
+        onClick={() => openTableData(table)}
+        onContextMenu={(e) => {
+          e.preventDefault();
+          setCtx({ x: e.clientX, y: e.clientY, items });
+        }}
+      >
+        <span className="bud-table-ic">
+          <IconTable size={15} stroke={1.7} />
+        </span>
+        {table}
+      </div>
+      {myViews.map((v) => (
+        <div
+          key={v.id}
+          className={`bud-table bud-view ${activeViewId === v.id ? "active" : ""}`}
+          onClick={() => openView(v)}
+        >
+          <span className="bud-table-ic">
+            <IconFilter size={14} stroke={1.7} />
+          </span>
+          <span className="bud-src-name">{v.name}</span>
+          <button
+            className="bud-view-del"
+            title="Delete view"
+            onClick={(e) => {
+              e.stopPropagation();
+              deleteView(v.id);
+            }}
+          >
+            <IconX size={13} stroke={1.8} />
+          </button>
+        </div>
+      ))}
+      {ctx && <ContextMenu anchor={ctx} onClose={() => setCtx(null)} />}
+    </>
   );
 }

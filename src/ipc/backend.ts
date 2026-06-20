@@ -15,6 +15,8 @@ export interface Backend {
   saveConnection(cfg: ConnectionConfig, password?: string | null): Promise<void>;
   deleteConnection(id: string): Promise<void>;
   testConnection(cfg: ConnectionConfig, password?: string | null): Promise<void>;
+  listDatabases(cfg: ConnectionConfig, password?: string | null): Promise<string[]>;
+  createDatabase(cfg: ConnectionConfig, password: string | null, name: string): Promise<void>;
   openConnection(id: string): Promise<void>;
   closeConnection(id: string): Promise<void>;
   runQuery(connectionId: string, sql: string): Promise<QueryResult>;

@@ -16,6 +16,10 @@ export const tauriBackend: Backend = {
   deleteConnection: (id) => invoke<void>("delete_connection", { id }),
   testConnection: (cfg, password = null) =>
     invoke<void>("test_connection", { cfg, password }),
+  listDatabases: (cfg, password = null) =>
+    invoke<string[]>("list_databases", { cfg, password }),
+  createDatabase: (cfg, password, name) =>
+    invoke<void>("create_database", { cfg, password, name }),
   openConnection: (id) => invoke<void>("open_connection", { id }),
   closeConnection: (id) => invoke<void>("close_connection", { id }),
   runQuery: (connectionId, sql) =>

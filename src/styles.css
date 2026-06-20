@@ -1072,3 +1072,265 @@ select.bld-prop-input { appearance: none; -webkit-appearance: none; padding-righ
 .bud-modal-cancel { background: var(--input-bg); border: 1px solid var(--border-strong); color: var(--text); border-radius: 7px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
 .bud-modal-save { background: var(--accent); border: none; color: #fff; border-radius: 7px; padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer; }
 .bud-modal-save:disabled { opacity: 0.6; }
+
+/* ============================================================
+   1:1 reference pass — flat monochrome line icons, no glow
+   ============================================================ */
+
+/* SVG line icons inherit text colour and sit on the text baseline cleanly. */
+.bud-topnav svg, .bud-toolbar svg, .bud-sources svg, .bud-breadcrumb svg,
+.bud-coleditor svg, .icon-btn svg { display: block; flex: none; }
+.bud-tool, .bud-naction, .bud-publish, .bud-back, .bud-src, .bud-table,
+.bud-sources-head .icon-btn, .bud-bc-table { align-items: center; }
+.bud-src-ic, .bud-ds-arrow, .bud-table-ic, .bud-bc-ic, .bud-ce-type-ic,
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; }
+.bud-back { display: inline-flex; align-items: center; }
+
+/* Top nav: rocket on the white Publish, soft-green Preview play */
+.bud-publish svg { color: #16161a; }
+.bud-publish .caret { color: #6a6a75; margin-left: 1px; }
+.bud-preview svg { color: #3ecf8e; }
+.bud-naction svg, .bud-tool svg { opacity: 0.92; }
+
+/* Toolbar icons are muted, brighten with their label on hover */
+.bud-tool { color: var(--muted); gap: 7px; }
+.bud-tool:hover:not(:disabled) svg { opacity: 1; }
+.bud-tool-ic { display: none; }
+
+/* Sources: clean line icons, MySQL kept in its brand blue */
+.bud-src-ic { color: var(--muted); width: 18px; }
+.bud-src-ic.ds-engine { color: #5b93c7; }
+.bud-ds-arrow { color: var(--faint); width: 14px; }
+.bud-table-ic { color: var(--muted); }
+.bud-table.active .bud-table-ic { color: #fff; }
+.icon-btn { color: var(--muted); }
+
+/* Breadcrumb pill */
+.bud-bc-ic { color: var(--muted); }
+.bud-bc-menu { color: var(--faint); margin-left: 2px; cursor: pointer; }
+.bud-bc-table:hover .bud-bc-menu { color: var(--text); }
+
+/* Column-header type marks: plain muted glyphs, not blue chips */
+.bud-grid thead th .bud-th-ic {
+  display: inline-block; min-width: 0; height: auto; padding: 0; margin-right: 9px;
+  border-radius: 0; background: none; color: var(--faint);
+  font-family: var(--mono); font-size: 11px; font-weight: 600; vertical-align: baseline; opacity: 1;
+}
+/* Flat header, flat add-column cap — drop the gradient */
+.bud-grid thead th { background: #17171b; }
+.bud-addcol { background: #17171b; }
+
+/* Column editor: type-row chevron + flat (un-glowed) Save */
+.bud-ce-type-ic { color: var(--muted); }
+.bud-ce-type-caret { color: var(--muted); margin-left: auto; flex: none; }
+.bud-ce-bind { color: #e8b23a; flex: none; }
+.bud-ce-save { background: var(--accent); box-shadow: none; border-radius: 7px; }
+.bud-ce-save:hover:not(:disabled) { filter: brightness(1.08); transform: none; }
+
+/* Create-a-view + breadcrumb pill match the flat data-view blue */
+.bud-create-view { box-shadow: none; }
+.bud-create-view:disabled { opacity: 0.45; cursor: default; filter: none; }
+
+/* ============================================================
+   Functional build — categories, views, SQL runner, panels
+   ============================================================ */
+
+/* Sidebar category groups */
+.bud-cat { margin-bottom: 2px; }
+.bud-cat-head { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px 4px; }
+.bud-cat-toggle {
+  display: inline-flex; align-items: center; gap: 6px; background: none; border: none; color: var(--faint);
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.6px; text-transform: uppercase; cursor: pointer; padding: 2px;
+}
+.bud-cat-toggle:hover { color: var(--muted); }
+.bud-cat-toggle svg { opacity: 0.85; }
+.bud-cat-add { display: inline-flex; background: none; border: none; color: var(--faint); cursor: pointer; padding: 2px; border-radius: 5px; }
+.bud-cat-add:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+.bud-cat-body { display: flex; flex-direction: column; padding: 0 6px; }
+
+/* Saved views nested under a table */
+.bud-view { position: relative; padding-left: 24px; color: var(--muted); }
+.bud-view .bud-table-ic { color: var(--faint); }
+.bud-view .bud-src-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bud-view-del {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none;
+  color: var(--faint); display: inline-flex; opacity: 0; cursor: pointer; padding: 2px; border-radius: 5px;
+}
+.bud-view:hover .bud-view-del { opacity: 1; }
+.bud-view-del:hover { color: var(--danger); }
+
+/* Selection — keep the checkbox clickable on hover (was hidden by the old per-row delete) */
+.bud-rowcheck { accent-color: var(--accent); opacity: 1; cursor: pointer; }
+.bud-grid tbody tr:hover .bud-rowcheck { opacity: 1; }
+.bud-grid tbody tr.selected td { background: var(--accent-soft); }
+.bud-grid tbody tr.selected .bud-checkcol { box-shadow: inset 2px 0 0 var(--accent); }
+.bud-grid tbody tr.selected .bud-rowcheck { opacity: 1; }
+.bud-grid tbody tr.selected:hover .bud-rowcheck { opacity: 1; }
+.bud-grid tbody tr.selected:hover .bud-rowx { opacity: 0; }
+.bud-sel-badge {
+  display: inline-grid; place-items: center; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px;
+  background: var(--accent); color: #fff; font-size: 10px; font-weight: 700; margin-left: 4px;
+}
+.bud-tool.has-sel { color: var(--text); }
+
+/* SQL toggle + runner */
+.bud-breadcrumb .bud-sql-toggle { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.bud-sqlpanel { padding: 14px 18px 18px; }
+.bud-sql-editor-wrap {
+  display: flex; flex-direction: column; min-height: 0; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 11px; overflow: hidden; box-shadow: var(--elev-1);
+}
+.bud-sql-editor {
+  flex: 1; min-height: 0; resize: none; border: none; background: var(--panel); color: var(--text);
+  font-family: var(--mono); font-size: 13.5px; line-height: 1.6; padding: 13px 15px;
+}
+.bud-sql-editor:focus { outline: none; }
+.bud-sql-bar { display: flex; align-items: center; gap: 12px; padding: 9px 12px; border-top: 1px solid var(--border); }
+.bud-sql-run {
+  display: inline-flex; align-items: center; gap: 7px; background: var(--accent); color: #fff; border: none;
+  border-radius: 8px; padding: 7px 15px; font-size: 13px; font-weight: 600;
+}
+.bud-sql-run:hover:not(:disabled) { filter: brightness(1.08); }
+.bud-sql-run:disabled { opacity: 0.5; }
+.bud-sql-run .bud-kbd kbd { background: rgba(255, 255, 255, 0.18); border: none; color: #fff; }
+.bud-sql-meta { color: var(--muted); font-size: 12px; font-family: var(--mono); }
+.bud-sql-results {
+  min-height: 0; overflow: auto; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 11px; box-shadow: var(--elev-1);
+}
+
+/* Menus get aligned icons */
+.bud-menu button svg { flex: none; opacity: 0.85; }
+.bud-menu button:disabled { opacity: 0.4; cursor: default; }
+.bud-menu button:disabled:hover { background: none; }
+
+/* Create-a-view filter row */
+.bud-filter-row { display: flex; gap: 8px; }
+.bud-filter-col, .bud-filter-op, .bud-filter-val {
+  background: var(--input-bg); border: 1px solid var(--border-strong); border-radius: 7px; padding: 8px 10px;
+  color: var(--text); font-size: 13px; font-family: inherit; min-width: 0;
+}
+.bud-filter-col { flex: 1.1; }
+.bud-filter-op { flex: 1.2; }
+.bud-filter-val { flex: 1; }
+.bud-filter-col:focus, .bud-filter-op:focus, .bud-filter-val:focus { outline: none; border-color: var(--accent); }
+select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearance: none; cursor: pointer; }
+
+/* Design / Automation / Settings panels */
+.bud-wp { overflow: auto; }
+.bud-wp-head { padding: 22px 28px 6px; }
+.bud-wp-title { font-size: 22px; font-weight: 700; margin: 0; color: var(--text); letter-spacing: 0.2px; }
+.bud-wp-sub { margin: 7px 0 0; color: var(--muted); font-size: 13.5px; }
+.bud-wp-body { padding: 18px 28px 36px; }
+.bud-wp-toolbar { margin-bottom: 16px; }
+.bud-wp-toolbar .bud-create-view { display: inline-flex; align-items: center; gap: 7px; }
+.bud-wp-cards { display: flex; flex-direction: column; gap: 10px; max-width: 720px; }
+.bud-card {
+  display: flex; align-items: center; gap: 14px; background: var(--panel); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px; box-shadow: var(--elev-1); transition: border-color .15s ease, transform .12s ease;
+}
+.bud-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+.bud-card-ic { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); flex: none; }
+.bud-card-main { flex: 1; min-width: 0; }
+.bud-card-title { font-weight: 600; font-size: 14px; color: var(--text); }
+.bud-card-sub { color: var(--muted); font-size: 12.5px; margin-top: 2px; font-family: var(--mono); }
+.bud-role { background: var(--accent-soft); color: var(--accent-2); }
+.bud-status { font-size: 11.5px; font-weight: 600; padding: 3px 11px; border-radius: 8px; }
+.bud-status.on { background: rgba(52, 211, 153, 0.14); color: var(--ok); }
+.bud-status.off { background: rgba(154, 154, 164, 0.14); color: var(--muted); }
+.bud-settings-card {
+  max-width: 560px; display: flex; flex-direction: column; gap: 12px; background: var(--panel);
+  border: 1px solid var(--border); border-radius: 13px; padding: 18px 20px; box-shadow: var(--elev-1);
+}
+.bud-setting-row { display: flex; align-items: center; gap: 14px; }
+.bud-setting-label { width: 96px; flex: none; color: var(--muted); font-size: 13px; }
+.bud-setting-input { flex: 1; background: var(--input-bg); border: 1px solid var(--border-strong); border-radius: 7px; padding: 8px 11px; color: var(--text); font-size: 13px; }
+.bud-setting-input:read-only { color: var(--muted); }
+.bud-setting-actions { margin-top: 6px; border-top: 1px solid var(--border); padding-top: 14px; }
+.bud-danger-btn {
+  display: inline-flex; align-items: center; gap: 7px; background: none; border: 1px solid var(--border-strong);
+  color: var(--danger); border-radius: 8px; padding: 8px 14px; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.bud-danger-btn:hover { background: rgba(240, 97, 109, 0.1); border-color: rgba(240, 97, 109, 0.4); }
+
+/* Right-click context menu (data sources + tables) */
+.bud-ctx-menu {
+  position: fixed; z-index: 80; min-width: 212px;
+  background: var(--panel-2); border: 1px solid var(--border-strong); border-radius: 11px;
+  box-shadow: var(--elev-2); padding: 5px; display: flex; flex-direction: column;
+  animation: ctx-in .1s ease;
+}
+@keyframes ctx-in { from { opacity: 0; transform: scale(0.97); } to { opacity: 1; transform: none; } }
+.bud-ctx-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  background: none; border: none; color: var(--text); font: inherit; font-size: 13px;
+  padding: 8px 10px; border-radius: 7px; cursor: pointer;
+}
+.bud-ctx-item:hover:not(:disabled) { background: var(--panel-3); }
+.bud-ctx-item:disabled { opacity: 0.45; cursor: default; }
+.bud-ctx-item.danger { color: var(--danger); }
+.bud-ctx-item.danger:hover:not(:disabled) { background: rgba(240, 97, 109, 0.12); }
+.bud-ctx-ic { display: inline-flex; align-items: center; justify-content: center; width: 16px; color: var(--muted); flex: none; }
+.bud-ctx-item.danger .bud-ctx-ic { color: var(--danger); }
+.bud-ctx-sep { height: 1px; background: var(--border); margin: 5px 6px; }
+
+/* Themed confirm / prompt dialogs (replace native window.prompt/confirm) */
+.bud-dialog-backdrop {
+  position: fixed; inset: 0; z-index: 90; background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center; animation: dlg-fade .12s ease;
+}
+@keyframes dlg-fade { from { opacity: 0; } to { opacity: 1; } }
+.bud-dialog {
+  width: 420px; max-width: 92vw; background: #1b1b20; border: 1px solid var(--border-strong);
+  border-radius: 14px; box-shadow: var(--elev-3); padding: 20px 20px 16px;
+  display: flex; flex-direction: column; gap: 12px; animation: dlg-pop .14s ease;
+}
+@keyframes dlg-pop { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+.bud-dialog-title { font-size: 15.5px; font-weight: 700; color: var(--text); }
+.bud-dialog-msg { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.bud-dialog-field { display: flex; flex-direction: column; gap: 6px; }
+.bud-dialog-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+.bud-dialog-input {
+  background: var(--input-bg); border: 1px solid var(--border-strong); border-radius: 8px;
+  padding: 9px 11px; color: var(--text); font-size: 13.5px; font-family: inherit;
+}
+.bud-dialog-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.bud-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 4px; }
+.bud-dialog-cancel {
+  background: var(--input-bg); border: 1px solid var(--border-strong); color: var(--text);
+  border-radius: 8px; padding: 8px 16px; font-size: 13px; cursor: pointer;
+}
+.bud-dialog-cancel:hover { background: var(--panel-3); }
+.bud-dialog-ok {
+  background: var(--accent); border: none; color: #fff; border-radius: 8px;
+  padding: 8px 18px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.bud-dialog-ok:hover { filter: brightness(1.08); }
+.bud-dialog-ok.danger { background: var(--danger); }
+.bud-dialog-ok.danger:hover { filter: brightness(1.05); }
+
+/* Add/Edit data source: test connection + database picker */
+.bud-test-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  background: var(--input-bg); border: 1px solid var(--border-strong); color: var(--text);
+  border-radius: 8px; padding: 9px 12px; font-size: 13px; font-weight: 500; cursor: pointer;
+}
+.bud-test-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.bud-test-btn:disabled { opacity: 0.6; cursor: default; }
+.bud-spin { animation: bud-spin 0.8s linear infinite; }
+@keyframes bud-spin { to { transform: rotate(360deg); } }
+.bud-conn-status {
+  display: flex; align-items: center; gap: 7px; font-size: 12.5px; padding: 8px 11px; border-radius: 8px;
+}
+.bud-conn-status.ok { background: rgba(52, 211, 153, 0.12); color: var(--ok); border: 1px solid rgba(52, 211, 153, 0.25); }
+.bud-conn-status.error { background: rgba(240, 97, 109, 0.1); color: var(--danger); border: 1px solid rgba(240, 97, 109, 0.3); }
+.bud-conn-status svg { flex: none; }
+.bud-db-row { display: flex; gap: 8px; }
+.bud-db-row select, .bud-db-row input { flex: 1; min-width: 0; }
+.bud-db-new {
+  display: inline-flex; align-items: center; gap: 5px; flex: none;
+  background: var(--input-bg); border: 1px solid var(--border-strong); color: var(--text);
+  border-radius: 7px; padding: 0 13px; font-size: 12.5px; font-weight: 500; cursor: pointer;
+}
+.bud-db-new:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.bud-db-new:disabled { opacity: 0.5; cursor: default; }
