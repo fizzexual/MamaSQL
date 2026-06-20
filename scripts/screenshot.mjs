@@ -25,15 +25,13 @@ try {
   try {
     // The builder auto-opens the first connection + table, so the canvas
     // populates without interaction.
-    await page.waitForSelector(".bld", { timeout: 10000 });
-    await page.waitForSelector(".bld-sheet", { timeout: 8000 }).catch(() => {});
-    await page.waitForTimeout(800);
+    await page.waitForSelector("table", { timeout: 12000 }).catch(() => {});
+    await page.waitForTimeout(900);
     await page.screenshot({ path: "screenshot.png" });
 
-    // Open the row form (right inspector).
-    await page.click(".bld-rn-exp").catch(() => {});
-    await page.waitForSelector(".bud-inspector", { timeout: 3000 }).catch(() => {});
-    await page.waitForTimeout(350);
+    // Click the first data row to open the row form in the aside.
+    await page.click("table tbody tr").catch(() => {});
+    await page.waitForTimeout(450);
     await page.screenshot({ path: "screenshot-form.png" });
     console.log("wrote screenshot.png, screenshot-form.png");
   } catch (e) {
