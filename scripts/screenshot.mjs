@@ -29,7 +29,13 @@ try {
     await page.waitForSelector(".bld-sheet", { timeout: 8000 }).catch(() => {});
     await page.waitForTimeout(800);
     await page.screenshot({ path: "screenshot.png" });
-    console.log("wrote screenshot.png");
+
+    // Open the row form (right inspector).
+    await page.click(".bld-rn-exp").catch(() => {});
+    await page.waitForSelector(".bud-inspector", { timeout: 3000 }).catch(() => {});
+    await page.waitForTimeout(350);
+    await page.screenshot({ path: "screenshot-form.png" });
+    console.log("wrote screenshot.png, screenshot-form.png");
   } catch (e) {
     console.log("interaction error: " + e.message);
     await page.screenshot({ path: "screenshot.png" });
