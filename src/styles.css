@@ -1499,3 +1499,224 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 .bud-status-item { display: flex; align-items: center; gap: 5px; }
 .bud-status-item svg { color: var(--faint); }
 .bud-status-item.accent { color: var(--accent); font-weight: 600; }
+
+/* ============================================================
+   Finance-style Dashboard (landing screen)
+   ============================================================ */
+.bud-brand { background: none; border: none; cursor: pointer; padding: 0; }
+
+.dash-app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: 250px 1fr;
+  background: #0a0a0c;
+  color: #f4f4f5;
+  font-family: var(--sans);
+  overflow: hidden;
+}
+
+/* ---- Sidebar ---- */
+.dash-side {
+  display: flex;
+  flex-direction: column;
+  padding: 22px 18px 24px;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  background:
+    radial-gradient(120% 30% at 0% 0%, rgba(236, 72, 153, 0.06), transparent 60%),
+    #0a0a0c;
+}
+.dash-nav { display: flex; flex-direction: column; gap: 3px; flex: 1; }
+.dash-nav-item {
+  display: flex; align-items: center; gap: 13px;
+  width: 100%; padding: 11px 14px;
+  border: 1px solid transparent; border-radius: 13px;
+  background: none; color: #8b8b95;
+  font-size: 14px; font-weight: 500; text-align: left;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+}
+.dash-nav-item svg { color: inherit; opacity: 0.92; flex: none; }
+.dash-nav-item:hover { color: #e8e8ec; background: rgba(255, 255, 255, 0.035); }
+.dash-nav-item.active {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.dash-settings { margin-top: auto; }
+
+/* ---- Main ---- */
+.dash-main {
+  overflow: auto;
+  padding: 28px 32px 32px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.dash-top { display: flex; align-items: center; justify-content: space-between; }
+.dash-top h1 {
+  margin: 0; font-size: 33px; font-weight: 700; letter-spacing: -0.6px;
+  background: linear-gradient(90deg, #ffffff 40%, #b7b7c0);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.dash-viewmore {
+  display: flex; align-items: center; gap: 8px;
+  background: none; border: none; color: #9a9aa4; font-size: 15px; font-weight: 500;
+}
+.dash-viewmore:hover { color: #fff; }
+
+.dash-row { display: grid; gap: 20px; }
+.dash-row-top { grid-template-columns: 1.08fr 1fr 1fr; }
+.dash-row-bottom { grid-template-columns: 1.28fr 1fr; align-items: stretch; }
+.dash-col { display: flex; flex-direction: column; gap: 20px; }
+
+/* ---- Card base ---- */
+.dash-card {
+  position: relative; overflow: hidden;
+  background: #141417;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 22px; padding: 24px;
+}
+.dash-row-top .dash-card { min-height: 286px; display: flex; flex-direction: column; }
+.dash-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.dash-card-head h3 { margin: 0; font-size: 18px; font-weight: 600; color: #fff; }
+.dash-head-titled { display: flex; align-items: center; gap: 11px; }
+.dash-round-ic {
+  display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%;
+  border: 1.5px solid rgba(236, 72, 153, 0.5); color: #f472b6; background: rgba(236, 72, 153, 0.06);
+}
+.dash-round-ic.pink { border: none; color: #fff; background: linear-gradient(140deg, #ff4fa3, #c026d3); }
+.dash-drop {
+  display: flex; align-items: center; gap: 7px;
+  background: #161619; border: 1px solid rgba(255, 255, 255, 0.08); color: #cfcfd6;
+  font-size: 13px; font-weight: 500; padding: 8px 13px; border-radius: 11px;
+}
+.dash-drop:hover { background: #1c1c20; }
+.dash-drop svg { color: #8b8b95; }
+.dash-link { background: none; border: none; color: #cfcfd6; font-size: 14px; font-weight: 500; }
+.dash-link:hover { color: #fff; }
+
+/* ---- AI Finance Manager card ---- */
+.dash-ai-card { background: #0b0b0d; justify-content: space-between; }
+.dash-topo { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+.dash-ai-body, .dash-ai-cta { position: relative; z-index: 1; }
+.dash-ai-body h2 { margin: 0 0 10px; font-size: 23px; font-weight: 700; color: #fff; }
+.dash-ai-body p { margin: 0; max-width: 290px; color: #c9c9d2; font-size: 14.5px; line-height: 1.5; }
+.dash-ai-cta {
+  display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: 20px;
+  background: none; border: none; color: #fff; font-size: 15px; font-weight: 600;
+}
+
+/* ---- Main wallet card ---- */
+.dash-wallet-card { justify-content: space-between; }
+.dash-wallet-head { display: flex; align-items: flex-start; gap: 14px; }
+.dash-wallet-ic {
+  display: grid; place-items: center; width: 46px; height: 46px; flex: none; border-radius: 14px;
+  background: #161619; border: 1.5px solid rgba(236, 72, 153, 0.55); color: #f472b6;
+  box-shadow: 0 0 0 4px rgba(236, 72, 153, 0.05);
+}
+.dash-wallet-id { flex: 1; }
+.dash-wallet-id h3 { margin: 0 0 3px; font-size: 18px; font-weight: 600; color: #fff; }
+.dash-wallet-id span { color: #8b8b95; font-size: 13.5px; }
+.dash-wallet-label { color: #9a9aa4; font-size: 15px; }
+.dash-wallet-row { display: flex; align-items: baseline; gap: 14px; margin-top: 8px; flex-wrap: wrap; }
+.dash-wallet-amt { font-size: 33px; font-weight: 700; color: #fff; letter-spacing: -0.6px; }
+.dash-wallet-trend { display: flex; align-items: center; gap: 4px; color: #8b8bff; font-size: 13.5px; font-weight: 500; }
+
+/* ---- Upgrade card ---- */
+.dash-upgrade-card {
+  border: none; justify-content: space-between;
+  background:
+    radial-gradient(120% 95% at 14% 2%, rgba(217, 36, 159, 0.5), rgba(120, 30, 120, 0.1) 46%, transparent 72%),
+    linear-gradient(158deg, #2a1030 0%, #16101c 56%, #110b15 100%);
+}
+.dash-upgrade-top { display: flex; align-items: center; justify-content: space-between; }
+.dash-upgrade-mark {
+  display: grid; place-items: center; width: 46px; height: 46px; border-radius: 14px; color: #fff;
+  background: linear-gradient(140deg, #ff4fa3, #c026d3); box-shadow: 0 8px 24px rgba(217, 36, 159, 0.45);
+}
+.dash-pro-btn {
+  background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.22); color: #fff;
+  font-size: 14px; font-weight: 600; padding: 10px 18px; border-radius: 12px;
+  box-shadow: 0 0 26px 2px rgba(236, 72, 153, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+.dash-pro-btn:hover { background: rgba(255, 255, 255, 0.16); }
+.dash-upgrade-body h2 { margin: 0 0 9px; max-width: 280px; font-size: 23px; font-weight: 700; color: #fff; line-height: 1.2; }
+.dash-upgrade-body p { margin: 0; color: #cbb8cf; font-size: 14.5px; }
+
+/* ---- Payroll chart ---- */
+.dash-chart-card { display: flex; flex-direction: column; }
+.dash-seg { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+.dash-seg button {
+  background: none; border: none; color: #8b8b95; font-size: 14px; font-weight: 500;
+  padding: 7px 16px; border-radius: 999px;
+}
+.dash-seg button.on { color: #fff; background: linear-gradient(135deg, #ec4899, #d6249f); box-shadow: 0 6px 16px rgba(236, 72, 153, 0.35); }
+
+.dash-chart { display: grid; grid-template-columns: 26px 1fr; gap: 12px; flex: 1; min-height: 222px; }
+.dash-yaxis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: #6a6a74; font-size: 12px; padding-bottom: 2px; }
+.dash-plot { position: relative; }
+.dash-grid { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; }
+.dash-grid i { display: block; height: 0; border-top: 1px dashed rgba(255, 255, 255, 0.07); }
+.dash-bars { position: absolute; inset: 0; display: flex; align-items: flex-end; justify-content: space-between; padding: 0 1%; }
+.dash-bar-col { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.dash-bar {
+  position: relative; width: 56%; max-width: 46px; border-radius: 9px 9px 4px 4px;
+  background: linear-gradient(180deg, rgba(236, 72, 153, 0.5), rgba(157, 34, 184, 0.04));
+}
+.dash-bar.hot {
+  width: 64%; background: linear-gradient(180deg, #e879f9 0%, #ec4899 52%, #fb2576 100%);
+  box-shadow: 0 0 28px rgba(236, 72, 153, 0.55);
+}
+.dash-bar-stem { position: absolute; left: 50%; top: -26px; transform: translateX(-50%); width: 2px; height: 26px; background: linear-gradient(to bottom, #ff8fd0, transparent); }
+.dash-bar-dot { position: absolute; left: 50%; top: -31px; transform: translateX(-50%); width: 11px; height: 11px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 4px rgba(236, 72, 153, 0.25); }
+.dash-tooltip {
+  position: absolute; top: 4%; left: 47%; z-index: 3; min-width: 178px;
+  background: #1c1c20; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 12px 14px;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.5);
+}
+.dash-tooltip::before {
+  content: ""; position: absolute; left: -7px; top: 50%; width: 13px; height: 13px; background: #1c1c20;
+  border-left: 1px solid rgba(255, 255, 255, 0.08); border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  transform: translateY(-50%) rotate(45deg);
+}
+.dash-tt-title { color: #cfcfd6; font-size: 12.5px; margin-bottom: 9px; }
+.dash-tt-row { display: flex; align-items: center; gap: 7px; font-size: 13px; color: #9a9aa4; margin-top: 5px; }
+.dash-tt-row b { color: #fff; font-weight: 600; }
+.dash-tt-row .dot { width: 6px; height: 6px; border-radius: 50%; background: #ec4899; flex: none; }
+.dash-tt-row .lbl { margin-left: auto; }
+.dash-caret {
+  position: absolute; bottom: -1px; left: 71%; width: 0; height: 0;
+  border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid #ec4899;
+  filter: drop-shadow(0 0 6px rgba(236, 72, 153, 0.7));
+}
+.dash-xaxis { display: flex; margin-left: 38px; padding: 12px 1% 0; color: #cfcfd6; font-size: 13px; }
+.dash-xaxis span { flex: 1; text-align: center; }
+
+/* ---- Top Item Sales ---- */
+.dash-items { display: flex; flex-direction: column; gap: 22px; margin-top: 4px; }
+.dash-item { display: grid; grid-template-columns: 92px 1fr 92px; align-items: center; gap: 16px; }
+.dash-item-name { display: flex; flex-direction: column; }
+.dash-item-name span { color: #fff; font-size: 14px; font-weight: 500; }
+.dash-item-name .sub { color: #8b8b95; font-size: 12.5px; font-weight: 400; margin-top: 2px; }
+.dash-item-bar { height: 9px; border-radius: 999px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
+.dash-item-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #a21caf, #ec4899 70%, #fb2576); }
+.dash-item-val { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.dash-item-val .amt { color: #fff; font-size: 14px; font-weight: 600; }
+.dash-item-val .pct { display: inline-flex; align-items: center; gap: 2px; font-size: 12.5px; }
+.dash-item-val .pct.down { color: #e8a04b; }
+.dash-item-val .pct.up { color: #4ade80; }
+
+/* ---- Transactions ---- */
+.dash-txn-cols, .dash-txn { display: grid; grid-template-columns: 1fr 110px 110px; align-items: center; gap: 16px; }
+.dash-txn-cols { color: #8b8b95; font-size: 13px; padding: 4px 0 2px; }
+.dash-txn-cols span:nth-child(2), .dash-txn-cols span:nth-child(3) { text-align: right; }
+.dash-txn-list { display: flex; flex-direction: column; }
+.dash-txn { padding: 13px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.dash-txn-name { display: flex; align-items: center; gap: 12px; color: #fff; font-size: 14px; font-weight: 500; }
+.dash-txn-badge {
+  width: 34px; height: 34px; border-radius: 50%; flex: none;
+  background: radial-gradient(circle at 34% 30%, #6d5bf5, #271a63 70%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+.dash-txn-amt { text-align: right; color: #fff; font-size: 14px; font-weight: 600; }
+.dash-pill { justify-self: end; padding: 5px 13px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.dash-pill.deposited { color: #a99bff; background: rgba(124, 99, 255, 0.16); border: 1px solid rgba(124, 99, 255, 0.3); }
+.dash-pill.pending { color: #e8a04b; background: rgba(232, 160, 75, 0.14); border: 1px solid rgba(232, 160, 75, 0.3); }

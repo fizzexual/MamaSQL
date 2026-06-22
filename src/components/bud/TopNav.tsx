@@ -30,15 +30,16 @@ export function TopNav({ onAddServer }: { onAddServer: () => void }) {
   const active = connections.find((c) => c.id === activeId);
   const topView = useStore((s) => s.topView);
   const setTopView = useStore((s) => s.setTopView);
+  const setScreen = useStore((s) => s.setScreen);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const [open, setOpen] = useState(false);
 
   return (
     <div className="bud-topnav">
       <div className="bud-topnav-left">
-        <div className="bud-brand">
+        <button className="bud-brand" onClick={() => setScreen("dashboard")} title="Back to dashboard">
           MAMA<span className="bud-brand-accent">SQL</span>
-        </div>
+        </button>
         <span className="bud-topnav-sep" />
         <nav className="bud-tabs">
           {TABS.map((t) => (

@@ -11,7 +11,7 @@ const url = process.env.URL || "http://localhost:1420";
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 try {
   const page = await browser.newPage({
-    viewport: { width: 1320, height: 840 },
+    viewport: { width: 1320, height: 1010 },
     deviceScaleFactor: 2,
   });
   for (let i = 0; i < 20; i++) {
@@ -23,18 +23,9 @@ try {
     }
   }
   try {
-    // The builder auto-opens the first connection + table, so the canvas
-    // populates without interaction.
-    // Open the datasource -> first table to populate the grid.
-    await page.waitForSelector(".bud-src.ds", { timeout: 12000 });
-    await page.click(".bud-src.ds");
-    await page.waitForSelector(".bud-table", { timeout: 6000 });
-    await page.click(".bud-table");
-    await page.waitForSelector(".bud-grid", { timeout: 6000 });
+    // The dashboard is the default landing screen — wait for it and shoot.
+    await page.waitForSelector(".dash-app", { timeout: 12000 });
     await page.waitForTimeout(600);
-    // Sort by a column to show the sort indicator.
-    await page.click(".bud-grid thead th:nth-child(4) .bud-th-sort").catch(() => {});
-    await page.waitForTimeout(300);
     await page.screenshot({ path: "screenshot.png" });
     console.log("wrote screenshot.png");
   } catch (e) {

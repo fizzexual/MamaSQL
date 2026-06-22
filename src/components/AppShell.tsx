@@ -8,10 +8,15 @@ import { Sources } from "./bud/Sources";
 import { StatusBar } from "./bud/StatusBar";
 import { TopNav } from "./bud/TopNav";
 import { WorkspacePanel } from "./bud/WorkspacePanel";
+import { Dashboard } from "./dash/Dashboard";
 
 export function AppShell() {
   const [serverModal, setServerModal] = useState<ConnectionConfig | "new" | null>(null);
   const topView = useStore((s) => s.topView);
+  const screen = useStore((s) => s.screen);
+
+  if (screen === "dashboard") return <Dashboard />;
+
   return (
     <div className="bud-app">
       <TopNav onAddServer={() => setServerModal("new")} />
