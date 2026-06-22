@@ -15,6 +15,7 @@ import {
   IconLayoutGrid,
   IconLoader2,
   IconPlus,
+  IconSearch,
   IconServer,
   IconSettings,
   IconSparkles,
@@ -334,18 +335,27 @@ function ConnectionsPage({
   const activeId = useStore((s) => s.activeConnectionId);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
-  const open = (c: ConnectionConfig) => {
+  const open = async (c: ConnectionConfig) => {
+    if (connectingId) return;
     if (c.id === activeId) {
       enter({ top: "data" });
       return;
     }
     setConnectingId(c.id);
-    window.setTimeout(() => {
-      void openAndIntrospect(c.id);
+    try {
+      await openAndIntrospect(c.id);
       enter({ top: "data" });
-    }, 750);
+    } catch {
+      setConnectingId(null);
+    }
   };
+
+  const q = query.trim().toLowerCase();
+  const shown = q
+    ? connections.filter((c) => `${c.name} ${c.host ?? ""} ${c.database ?? ""} ${c.engine}`.toLowerCase().includes(q))
+    : connections;
 
   return (
     <main className="dash-main dash-page">
@@ -359,15 +369,25 @@ function ConnectionsPage({
         </button>
       </header>
 
+      <div className="dash-conn-toolbar">
+        <div className="dash-search">
+          <IconSearch size={15} stroke={1.8} />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search connections…" />
+        </div>
+        <span className="dash-conn-count">
+          {shown.length} {shown.length === 1 ? "connection" : "connections"}
+        </span>
+      </div>
+
       <div className="dash-conn-grid">
-        {connections.map((c, i) => {
+        {shown.map((c, i) => {
           const isActive = c.id === activeId;
           const isConnecting = connectingId === c.id;
           return (
             <section
               className={`dash-card dash-conn-card ${isActive ? "on" : ""} ${isConnecting ? "connecting" : ""}`}
               key={c.id}
-              style={{ animationDelay: `${i * 55}ms` }}
+              style={{ animationDelay: `${i * 45}ms` }}
             >
               <div className="dash-conn-top">
                 <span className={`dash-conn-badge ${c.engine}`}>
@@ -377,13 +397,9 @@ function ConnectionsPage({
                   <h3>{c.name}</h3>
                   <span>{connSub(c)}</span>
                 </div>
-                <span className={`dash-status-dot ${isActive ? "on" : ""}`} title={isActive ? "Connected" : "Idle"} />
+                <span className={`dash-conn-chip ${isActive ? "on" : ""}`}>{isActive ? "Connected" : "Idle"}</span>
               </div>
               <div className="dash-conn-meta">
-                <div>
-                  <span className="k">Engine</span>
-                  <span className="v">{c.engine}</span>
-                </div>
                 <div>
                   <span className="k">Database</span>
                   <span className="v">{c.database || "—"}</span>
@@ -394,7 +410,7 @@ function ConnectionsPage({
                 </div>
               </div>
               <div className="dash-conn-actions">
-                <button className="dash-conn-open" onClick={() => open(c)} disabled={connectingId !== null}>
+                <button className="dash-conn-open" onClick={() => open(c)} disabled={isConnecting}>
                   {isConnecting ? (
                     <>
                       <IconLoader2 size={15} className="dash-spin" /> Connecting…
@@ -413,16 +429,13 @@ function ConnectionsPage({
           );
         })}
 
-        <button
-          className="dash-card dash-conn-add"
-          onClick={onAdd}
-          style={{ animationDelay: `${connections.length * 55}ms` }}
-        >
+        {shown.length === 0 && <div className="dash-conn-none">No connections match “{query}”.</div>}
+
+        <button className="dash-card dash-conn-add" onClick={onAdd} style={{ animationDelay: `${shown.length * 45}ms` }}>
           <span className="dash-conn-add-ic">
-            <IconPlus size={24} stroke={2} />
+            <IconPlus size={22} stroke={2} />
           </span>
           <span className="dash-conn-add-t">Add connection</span>
-          <span className="dash-conn-add-s">PostgreSQL · MySQL · SQLite</span>
         </button>
       </div>
     </main>
@@ -432,10 +445,10 @@ function ConnectionsPage({
 /* -------------------------------------------------------------------- Logs */
 
 const KPIS = [
-  { label: "Queries · 24h", val: "8,420", delta: "+6%", dir: "up" },
-  { label: "Errors", val: "12", delta: "-3", dir: "down" },
-  { label: "Avg latency", val: "42ms", delta: "-8ms", dir: "down" },
-  { label: "Slow queries", val: "5", delta: "+2", dir: "up" },
+  { label: "Queries · 24h", val: "8,420", delta: "6%", up: true, good: true },
+  { label: "Errors", val: "12", delta: "3", up: false, good: true },
+  { label: "Avg latency", val: "42 ms", delta: "8 ms", up: false, good: true },
+  { label: "Slow queries", val: "5", delta: "2", up: true, good: false },
 ];
 
 const LOGS = [
@@ -471,8 +484,9 @@ function LogsPage() {
           <div className="dash-card dash-kpi" key={k.label} style={{ animationDelay: `${i * 55}ms` }}>
             <span className="dash-kpi-label">{k.label}</span>
             <span className="dash-kpi-val">{k.val}</span>
-            <span className={`dash-kpi-trend ${k.dir}`}>
-              {k.dir === "up" ? <IconCaretUpFilled size={11} /> : <IconCaretDownFilled size={11} />}
+            <span className={`dash-kpi-trend ${k.good ? "good" : "bad"}`}>
+              {k.up ? <IconCaretUpFilled size={11} /> : <IconCaretDownFilled size={11} />}
+              {k.up ? "+" : "−"}
               {k.delta}
             </span>
           </div>
