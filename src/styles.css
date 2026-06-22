@@ -1650,7 +1650,7 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 }
 .dash-seg button.on { color: #fff; background: linear-gradient(135deg, #ec4899, #d6249f); box-shadow: 0 6px 16px rgba(236, 72, 153, 0.35); }
 
-.dash-chart { display: grid; grid-template-columns: 26px 1fr; gap: 12px; flex: 1; min-height: 222px; }
+.dash-chart { display: grid; grid-template-columns: 32px 1fr; gap: 12px; flex: 1; min-height: 222px; }
 .dash-yaxis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: #6a6a74; font-size: 12px; padding-bottom: 2px; }
 .dash-plot { position: relative; }
 .dash-grid { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; }
@@ -1687,7 +1687,7 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
   border-left: 6px solid transparent; border-right: 6px solid transparent; border-bottom: 9px solid #ec4899;
   filter: drop-shadow(0 0 6px rgba(236, 72, 153, 0.7));
 }
-.dash-xaxis { display: flex; margin-left: 38px; padding: 12px 1% 0; color: #cfcfd6; font-size: 13px; }
+.dash-xaxis { display: flex; margin-left: 44px; padding: 12px 1% 0; color: #cfcfd6; font-size: 13px; }
 .dash-xaxis span { flex: 1; text-align: center; }
 
 /* ---- Top Item Sales ---- */
@@ -1705,14 +1705,16 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 .dash-item-val .pct.up { color: #4ade80; }
 
 /* ---- Transactions ---- */
-.dash-txn-cols, .dash-txn { display: grid; grid-template-columns: 1fr 110px 110px; align-items: center; gap: 16px; }
+.dash-txn-cols, .dash-txn { display: grid; grid-template-columns: 1fr 64px 92px; align-items: center; gap: 14px; }
 .dash-txn-cols { color: #8b8b95; font-size: 13px; padding: 4px 0 2px; }
 .dash-txn-cols span:nth-child(2), .dash-txn-cols span:nth-child(3) { text-align: right; }
 .dash-txn-list { display: flex; flex-direction: column; }
 .dash-txn { padding: 13px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); }
-.dash-txn-name { display: flex; align-items: center; gap: 12px; color: #fff; font-size: 14px; font-weight: 500; }
+.dash-txn-name { display: flex; align-items: center; gap: 12px; min-width: 0; color: #fff; font-size: 14px; font-weight: 500; }
+.dash-txn-q { font-family: var(--mono); font-size: 12.5px; color: #e8e8ec; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-txn-badge {
-  width: 34px; height: 34px; border-radius: 50%; flex: none;
+  display: grid; place-items: center; flex: none;
+  width: 34px; height: 34px; border-radius: 50%; color: #fff;
   background: radial-gradient(circle at 34% 30%, #6d5bf5, #271a63 70%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
@@ -1720,3 +1722,5 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 .dash-pill { justify-self: end; padding: 5px 13px; border-radius: 999px; font-size: 12px; font-weight: 600; }
 .dash-pill.deposited { color: #a99bff; background: rgba(124, 99, 255, 0.16); border: 1px solid rgba(124, 99, 255, 0.3); }
 .dash-pill.pending { color: #e8a04b; background: rgba(232, 160, 75, 0.14); border: 1px solid rgba(232, 160, 75, 0.3); }
+.dash-pill.success { color: #5fe0a8; background: rgba(52, 211, 153, 0.14); border: 1px solid rgba(52, 211, 153, 0.32); }
+.dash-pill.running { color: #e8a04b; background: rgba(232, 160, 75, 0.14); border: 1px solid rgba(232, 160, 75, 0.3); }

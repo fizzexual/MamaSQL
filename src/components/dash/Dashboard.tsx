@@ -1,40 +1,40 @@
 import {
   IconArrowRight,
   IconArrowUpRight,
-  IconCalendar,
+  IconBolt,
   IconCaretDownFilled,
   IconCaretUpFilled,
   IconChartLine,
   IconChevronDown,
+  IconCode,
+  IconDatabase,
   IconFileText,
+  IconHistory,
   IconLayoutGrid,
-  IconMessage,
-  IconMessageCircle,
-  IconScissors,
-  IconSettings,
-  IconShoppingCart,
+  IconServer,
   IconSparkles,
+  IconTable,
   IconTag,
-  IconUserCircle,
-  IconWallet,
+  IconTerminal2,
 } from "@tabler/icons-react";
 import { type ComponentType, useState } from "react";
 import { useStore } from "../../state/store";
 
 type Icon = ComponentType<{ size?: number; stroke?: number }>;
+type Dest = { top?: "data" | "automation" | "settings"; view?: "data" | "sql" | "history" };
 
-const NAV: { id: string; label: string; Icon: Icon; workspace?: boolean }[] = [
+const NAV: { id: string; label: string; Icon: Icon; go?: Dest }[] = [
   { id: "dashboard", label: "Dashboard", Icon: IconLayoutGrid },
-  { id: "task", label: "Task", Icon: IconUserCircle },
-  { id: "docs", label: "Docs", Icon: IconFileText },
-  { id: "chat", label: "Chat", Icon: IconMessageCircle },
-  { id: "customers", label: "Customers", Icon: IconShoppingCart, workspace: true },
-  { id: "automation", label: "Automation", Icon: IconScissors },
-  { id: "calendar", label: "Calendar", Icon: IconCalendar },
-  { id: "messages", label: "Messages", Icon: IconMessage },
+  { id: "connections", label: "Connections", Icon: IconServer, go: {} },
+  { id: "tables", label: "Tables", Icon: IconTable, go: { top: "data" } },
+  { id: "editor", label: "Query Editor", Icon: IconTerminal2, go: { top: "data", view: "sql" } },
+  { id: "browser", label: "Data Browser", Icon: IconDatabase, go: { top: "data", view: "data" } },
+  { id: "automation", label: "Automation", Icon: IconBolt, go: { top: "automation" } },
+  { id: "history", label: "History", Icon: IconHistory, go: { top: "data", view: "history" } },
+  { id: "logs", label: "Logs", Icon: IconFileText, go: { top: "settings" } },
 ];
 
-/** Concentric topographic contour lines for the AI Finance Manager card. */
+/** Concentric topographic contour lines for the AI assistant card. */
 function TopoPattern() {
   const blob =
     "M0,-92 C52,-94 94,-56 96,-9 C99,42 60,96 8,99 C-47,102 -97,62 -99,8 C-101,-46 -58,-90 0,-92 Z";
@@ -78,12 +78,12 @@ const BARS = [
 const Y_TICKS = [30, 25, 20, 15, 10, 5, 0];
 const Y_MAX = 32;
 
-function PayrollChart() {
+function QueryChart() {
   const [range, setRange] = useState<"Monthly" | "Yearly">("Monthly");
   return (
     <section className="dash-card dash-chart-card">
       <div className="dash-card-head">
-        <h3>Payroll Expenses Breakdown</h3>
+        <h3>Query Volume Breakdown</h3>
         <span className="dash-round-ic">
           <IconChartLine size={16} stroke={1.7} />
         </span>
@@ -100,7 +100,7 @@ function PayrollChart() {
       <div className="dash-chart">
         <div className="dash-yaxis">
           {Y_TICKS.map((t) => (
-            <span key={t}>{t}</span>
+            <span key={t}>{t === 0 ? "0" : `${t}k`}</span>
           ))}
         </div>
         <div className="dash-plot">
@@ -125,12 +125,12 @@ function PayrollChart() {
           </div>
 
           <div className="dash-tooltip">
-            <div className="dash-tt-title">Transaction</div>
+            <div className="dash-tt-title">April</div>
             <div className="dash-tt-row">
-              <span className="dot" /> <b>$2,378.22</b> <span className="lbl">Base salary</span>
+              <span className="dot" /> <b>24,318</b> <span className="lbl">Reads</span>
             </div>
             <div className="dash-tt-row">
-              <span className="dot" /> <b>$4,232.84</b> <span className="lbl">Overtime</span>
+              <span className="dot" /> <b>5,204</b> <span className="lbl">Writes</span>
             </div>
           </div>
           <span className="dash-caret" />
@@ -145,13 +145,13 @@ function PayrollChart() {
   );
 }
 
-const ITEMS = [
-  { amt: "-$340.24", pct: "-12%", dir: "down", w: 78 },
-  { amt: "-$624.24", pct: "-24%", dir: "down", w: 72 },
-  { amt: "$640.24", pct: "40%", dir: "up", w: 55 },
+const TABLES = [
+  { name: "audit_log", schema: "ops", count: "2.10M", pct: "-4%", dir: "down", w: 92 },
+  { name: "users", schema: "public", count: "1.24M", pct: "+12%", dir: "up", w: 78 },
+  { name: "orders", schema: "public", count: "842K", pct: "+8%", dir: "up", w: 64 },
 ];
 
-function TopItems() {
+function TopTables() {
   return (
     <section className="dash-card dash-items-card">
       <div className="dash-card-head">
@@ -159,27 +159,27 @@ function TopItems() {
           <span className="dash-round-ic pink">
             <IconTag size={15} stroke={1.7} />
           </span>
-          <h3>Top Item Sales</h3>
+          <h3>Top Tables</h3>
         </div>
         <button className="dash-drop">
-          Monthly <IconChevronDown size={14} stroke={1.8} />
+          By rows <IconChevronDown size={14} stroke={1.8} />
         </button>
       </div>
       <div className="dash-items">
-        {ITEMS.map((it, i) => (
-          <div className="dash-item" key={i}>
+        {TABLES.map((t) => (
+          <div className="dash-item" key={t.name}>
             <div className="dash-item-name">
-              <span>Dual sense</span>
-              <span className="sub">Technique</span>
+              <span>{t.name}</span>
+              <span className="sub">{t.schema}</span>
             </div>
             <div className="dash-item-bar">
-              <div className="dash-item-fill" style={{ width: `${it.w}%` }} />
+              <div className="dash-item-fill" style={{ width: `${t.w}%` }} />
             </div>
             <div className="dash-item-val">
-              <span className="amt">{it.amt}</span>
-              <span className={`pct ${it.dir}`}>
-                {it.pct}
-                {it.dir === "up" ? <IconCaretUpFilled size={11} /> : <IconCaretDownFilled size={11} />}
+              <span className="amt">{t.count}</span>
+              <span className={`pct ${t.dir}`}>
+                {t.pct}
+                {t.dir === "up" ? <IconCaretUpFilled size={11} /> : <IconCaretDownFilled size={11} />}
               </span>
             </div>
           </div>
@@ -189,35 +189,37 @@ function TopItems() {
   );
 }
 
-const TXNS = [
-  { name: "Adobe After Effect", amount: "$80.09", status: "Deposited" },
-  { name: "Figma Professional", amount: "$15.00", status: "Pending" },
-  { name: "Notion Plus", amount: "$8.00", status: "Deposited" },
+const QUERIES = [
+  { sql: "SELECT * FROM users WHERE active = true", rows: "1,204", status: "Success", kind: "success" },
+  { sql: "UPDATE orders SET status = 'paid'", rows: "32", status: "Success", kind: "success" },
+  { sql: "ALTER TABLE events ADD COLUMN source text", rows: "—", status: "Running", kind: "running" },
 ];
 
-function Transactions() {
+function RecentQueries() {
   return (
     <section className="dash-card dash-txn-card">
       <div className="dash-card-head">
-        <h3>Transaction</h3>
+        <h3>Recent Queries</h3>
         <button className="dash-drop">
-          10 May - 20 May <IconChevronDown size={14} stroke={1.8} />
+          Last 24h <IconChevronDown size={14} stroke={1.8} />
         </button>
       </div>
       <div className="dash-txn-cols">
-        <span>Name</span>
-        <span>Amount</span>
+        <span>Query</span>
+        <span>Rows</span>
         <span>Status</span>
       </div>
       <div className="dash-txn-list">
-        {TXNS.map((t) => (
-          <div className="dash-txn" key={t.name}>
+        {QUERIES.map((q) => (
+          <div className="dash-txn" key={q.sql}>
             <div className="dash-txn-name">
-              <span className="dash-txn-badge" />
-              {t.name}
+              <span className="dash-txn-badge">
+                <IconCode size={16} stroke={1.8} />
+              </span>
+              <span className="dash-txn-q">{q.sql}</span>
             </div>
-            <span className="dash-txn-amt">{t.amount}</span>
-            <span className={`dash-pill ${t.status.toLowerCase()}`}>{t.status}</span>
+            <span className="dash-txn-amt">{q.rows}</span>
+            <span className={`dash-pill ${q.kind}`}>{q.status}</span>
           </div>
         ))}
       </div>
@@ -227,9 +229,15 @@ function Transactions() {
 
 export function Dashboard() {
   const setScreen = useStore((s) => s.setScreen);
+  const setTopView = useStore((s) => s.setTopView);
+  const setView = useStore((s) => s.setView);
   const [active, setActive] = useState("dashboard");
 
-  const enterWorkspace = () => setScreen("workspace");
+  const enter = (dest?: Dest) => {
+    setScreen("workspace");
+    if (dest?.top) setTopView(dest.top);
+    if (dest?.view) setView(dest.view);
+  };
 
   return (
     <div className="dash-app">
@@ -241,7 +249,7 @@ export function Dashboard() {
               className={`dash-nav-item ${active === n.id ? "active" : ""}`}
               onClick={() => {
                 setActive(n.id);
-                if (n.workspace) enterWorkspace();
+                if (n.go) enter(n.go);
               }}
             >
               <n.Icon size={19} stroke={1.6} />
@@ -249,16 +257,16 @@ export function Dashboard() {
             </button>
           ))}
         </nav>
-        <button className="dash-nav-item dash-settings" onClick={enterWorkspace}>
-          <IconSettings size={19} stroke={1.6} />
+        <button className="dash-nav-item dash-settings" onClick={() => enter({ top: "settings" })}>
+          <IconServer size={19} stroke={1.6} />
           Settings
         </button>
       </aside>
 
       <main className="dash-main">
         <header className="dash-top">
-          <h1>Dashboard overview</h1>
-          <button className="dash-viewmore" onClick={enterWorkspace}>
+          <h1>Database overview</h1>
+          <button className="dash-viewmore" onClick={() => enter({ top: "data" })}>
             View more <IconArrowRight size={17} stroke={1.8} />
           </button>
         </header>
@@ -267,33 +275,33 @@ export function Dashboard() {
           <section className="dash-card dash-ai-card">
             <TopoPattern />
             <div className="dash-ai-body">
-              <h2>AI Finance Manager</h2>
-              <p>Take control of your finances with real-time AI insights.</p>
+              <h2>AI SQL Assistant</h2>
+              <p>Write, explain and optimize queries with real-time AI.</p>
             </div>
-            <button className="dash-ai-cta" onClick={enterWorkspace}>
-              See a detail <IconArrowRight size={16} stroke={1.8} />
+            <button className="dash-ai-cta" onClick={() => enter({ top: "data", view: "sql" })}>
+              Open SQL editor <IconArrowRight size={16} stroke={1.8} />
             </button>
           </section>
 
           <section className="dash-card dash-wallet-card">
             <div className="dash-wallet-head">
               <span className="dash-wallet-ic">
-                <IconWallet size={20} stroke={1.7} />
+                <IconDatabase size={20} stroke={1.7} />
               </span>
               <div className="dash-wallet-id">
-                <h3>Main wallet</h3>
-                <span>0x1240</span>
+                <h3>Primary database</h3>
+                <span>postgres · localhost:5432</span>
               </div>
-              <button className="dash-link" onClick={enterWorkspace}>
+              <button className="dash-link" onClick={() => enter({ top: "data" })}>
                 Manage
               </button>
             </div>
             <div className="dash-wallet-foot">
-              <span className="dash-wallet-label">Total balance</span>
+              <span className="dash-wallet-label">Total rows</span>
               <div className="dash-wallet-row">
-                <span className="dash-wallet-amt">32,160.12</span>
+                <span className="dash-wallet-amt">1,284,503</span>
                 <span className="dash-wallet-trend">
-                  <IconArrowUpRight size={14} stroke={2} /> 15% from previous
+                  <IconArrowUpRight size={14} stroke={2} /> 12% this week
                 </span>
               </div>
             </div>
@@ -304,22 +312,22 @@ export function Dashboard() {
               <span className="dash-upgrade-mark">
                 <IconSparkles size={18} stroke={1.8} />
               </span>
-              <button className="dash-pro-btn" onClick={enterWorkspace}>
+              <button className="dash-pro-btn" onClick={() => enter({ top: "settings" })}>
                 Upgrade to PRO
               </button>
             </div>
             <div className="dash-upgrade-body">
-              <h2>Upgrade Your Money Mind</h2>
-              <p>Level up with AI tools built for results.</p>
+              <h2>Upgrade Your Data Stack</h2>
+              <p>Unlock AI queries, unlimited connections and team sharing.</p>
             </div>
           </section>
         </div>
 
         <div className="dash-row dash-row-bottom">
-          <PayrollChart />
+          <QueryChart />
           <div className="dash-col">
-            <TopItems />
-            <Transactions />
+            <TopTables />
+            <RecentQueries />
           </div>
         </div>
       </main>
