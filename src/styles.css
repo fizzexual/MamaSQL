@@ -1546,9 +1546,9 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 
 /* ---- Main ---- */
 .dash-main {
-  overflow: auto;
-  padding: 28px 32px 32px;
-  display: flex; flex-direction: column; gap: 20px;
+  overflow: hidden;
+  padding: 24px 30px;
+  display: flex; flex-direction: column; gap: 18px;
 }
 .dash-top { display: flex; align-items: center; justify-content: space-between; }
 .dash-top h1 {
@@ -1563,9 +1563,11 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 .dash-viewmore:hover { color: #fff; }
 
 .dash-row { display: grid; gap: 20px; }
-.dash-row-top { grid-template-columns: 1.08fr 1fr 1fr; }
-.dash-row-bottom { grid-template-columns: 1.28fr 1fr; align-items: stretch; }
-.dash-col { display: flex; flex-direction: column; gap: 20px; }
+.dash-row-top { grid-template-columns: 1.08fr 1fr 1fr; flex: 0 0 auto; }
+.dash-row-bottom { grid-template-columns: 1.28fr 1fr; align-items: stretch; flex: 1 1 0; min-height: 0; }
+.dash-row-bottom > * { min-height: 0; }
+.dash-col { display: flex; flex-direction: column; gap: 18px; min-height: 0; }
+.dash-col > .dash-card { flex: 1 1 0; min-height: 0; overflow: hidden; }
 
 /* ---- Card base ---- */
 .dash-card {
@@ -1574,7 +1576,7 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 22px; padding: 24px;
 }
-.dash-row-top .dash-card { min-height: 286px; display: flex; flex-direction: column; }
+.dash-row-top .dash-card { min-height: 208px; display: flex; flex-direction: column; }
 .dash-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
 .dash-card-head h3 { margin: 0; font-size: 18px; font-weight: 600; color: #fff; }
 .dash-head-titled { display: flex; align-items: center; gap: 11px; }
@@ -1650,7 +1652,7 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 }
 .dash-seg button.on { color: #fff; background: linear-gradient(135deg, #ec4899, #d6249f); box-shadow: 0 6px 16px rgba(236, 72, 153, 0.35); }
 
-.dash-chart { display: grid; grid-template-columns: 32px 1fr; gap: 12px; flex: 1; min-height: 222px; }
+.dash-chart { display: grid; grid-template-columns: 32px 1fr; gap: 12px; flex: 1; min-height: 0; }
 .dash-yaxis { display: flex; flex-direction: column; justify-content: space-between; align-items: flex-end; color: #6a6a74; font-size: 12px; padding-bottom: 2px; }
 .dash-plot { position: relative; }
 .dash-grid { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: space-between; }
@@ -1691,7 +1693,7 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 .dash-xaxis span { flex: 1; text-align: center; }
 
 /* ---- Top Item Sales ---- */
-.dash-items { display: flex; flex-direction: column; gap: 22px; margin-top: 4px; }
+.dash-items { display: flex; flex-direction: column; gap: 16px; margin-top: 2px; }
 .dash-item { display: grid; grid-template-columns: 92px 1fr 92px; align-items: center; gap: 16px; }
 .dash-item-name { display: flex; flex-direction: column; }
 .dash-item-name span { color: #fff; font-size: 14px; font-weight: 500; }
@@ -1709,7 +1711,7 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 .dash-txn-cols { color: #8b8b95; font-size: 13px; padding: 4px 0 2px; }
 .dash-txn-cols span:nth-child(2), .dash-txn-cols span:nth-child(3) { text-align: right; }
 .dash-txn-list { display: flex; flex-direction: column; }
-.dash-txn { padding: 13px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); }
+.dash-txn { padding: 11px 0; border-top: 1px solid rgba(255, 255, 255, 0.05); }
 .dash-txn-name { display: flex; align-items: center; gap: 12px; min-width: 0; color: #fff; font-size: 14px; font-weight: 500; }
 .dash-txn-q { font-family: var(--mono); font-size: 12.5px; color: #e8e8ec; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dash-txn-badge {
@@ -1724,3 +1726,80 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 .dash-pill.pending { color: #e8a04b; background: rgba(232, 160, 75, 0.14); border: 1px solid rgba(232, 160, 75, 0.3); }
 .dash-pill.success { color: #5fe0a8; background: rgba(52, 211, 153, 0.14); border: 1px solid rgba(52, 211, 153, 0.32); }
 .dash-pill.running { color: #e8a04b; background: rgba(232, 160, 75, 0.14); border: 1px solid rgba(232, 160, 75, 0.3); }
+
+/* ---- Inner pages (Connections, Logs) ---- */
+.dash-sub { margin: 6px 0 0; color: #8b8b95; font-size: 14px; }
+.dash-page .dash-top { align-items: flex-end; }
+.dash-add-btn {
+  display: flex; align-items: center; gap: 8px; border: none; color: #fff;
+  background: linear-gradient(135deg, #ec4899, #d6249f);
+  font-size: 14px; font-weight: 600; padding: 11px 18px; border-radius: 13px;
+  box-shadow: 0 8px 22px rgba(236, 72, 153, 0.32);
+}
+.dash-add-btn:hover { filter: brightness(1.08); }
+
+/* Connections grid */
+.dash-conn-grid {
+  flex: 1 1 0; min-height: 0; overflow: auto; padding-bottom: 4px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); grid-auto-rows: min-content; gap: 18px;
+}
+.dash-conn-card { display: flex; flex-direction: column; gap: 16px; padding: 20px; transition: border-color 0.15s, background 0.15s; }
+.dash-conn-card:hover { border-color: rgba(255, 255, 255, 0.12); }
+.dash-conn-card.on { border-color: rgba(236, 72, 153, 0.4); background: #161318; }
+.dash-conn-top { display: flex; align-items: center; gap: 13px; }
+.dash-conn-badge {
+  display: grid; place-items: center; width: 44px; height: 44px; flex: none; border-radius: 13px;
+  background: #1d1d22; border: 1px solid rgba(255, 255, 255, 0.08); color: #cfcfd6;
+}
+.dash-conn-badge.postgres { color: #7aa2ff; border-color: rgba(122, 162, 255, 0.35); }
+.dash-conn-badge.mysql { color: #f59e0b; border-color: rgba(245, 158, 11, 0.35); }
+.dash-conn-badge.sqlite { color: #a78bfa; border-color: rgba(167, 139, 250, 0.35); }
+.dash-conn-id { flex: 1; min-width: 0; }
+.dash-conn-id h3 { margin: 0 0 2px; font-size: 16px; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-conn-id span { color: #8b8b95; font-size: 12.5px; font-family: var(--mono); }
+.dash-status-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; background: #4a4a52; }
+.dash-status-dot.on { background: #34d399; box-shadow: 0 0 0 4px rgba(52, 211, 153, 0.16); }
+.dash-conn-meta {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 14px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05); border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+.dash-conn-meta .k { display: block; color: #6a6a74; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; margin-bottom: 4px; }
+.dash-conn-meta .v { display: block; color: #e8e8ec; font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dash-conn-actions { display: flex; gap: 10px; }
+.dash-conn-open { flex: 1; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.1); color: #fff; font-size: 13.5px; font-weight: 600; padding: 10px; border-radius: 11px; }
+.dash-conn-open:hover { background: rgba(255, 255, 255, 0.1); }
+.dash-conn-edit { display: grid; place-items: center; width: 40px; flex: none; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); color: #9a9aa4; border-radius: 11px; }
+.dash-conn-edit:hover { color: #fff; background: rgba(255, 255, 255, 0.08); }
+.dash-conn-add {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; min-height: 196px;
+  border: 1.5px dashed rgba(255, 255, 255, 0.14); background: transparent; color: #9a9aa4;
+}
+.dash-conn-add:hover { border-color: rgba(236, 72, 153, 0.5); color: #fff; background: rgba(236, 72, 153, 0.04); }
+.dash-conn-add-ic { display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: rgba(236, 72, 153, 0.12); color: #f472b6; }
+.dash-conn-add-t { font-size: 15px; font-weight: 600; }
+.dash-conn-add-s { font-size: 12px; color: #6a6a74; font-family: var(--mono); }
+
+/* Logs */
+.dash-kpis { flex: 0 0 auto; display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; }
+.dash-kpi { display: flex; flex-direction: column; gap: 6px; padding: 18px 20px; }
+.dash-kpi-label { color: #8b8b95; font-size: 13px; }
+.dash-kpi-val { color: #fff; font-size: 27px; font-weight: 700; letter-spacing: -0.5px; }
+.dash-kpi-trend { display: inline-flex; align-items: center; gap: 3px; font-size: 12.5px; }
+.dash-kpi-trend.up { color: #4ade80; }
+.dash-kpi-trend.down { color: #e8a04b; }
+.dash-logs-card { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.dash-log-filters { display: flex; gap: 4px; background: #161619; border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 10px; padding: 3px; }
+.dash-log-filters button { background: none; border: none; color: #8b8b95; font-size: 12.5px; font-weight: 500; padding: 6px 12px; border-radius: 8px; }
+.dash-log-filters button.on { background: rgba(255, 255, 255, 0.08); color: #fff; }
+.dash-log-list { flex: 1 1 0; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
+.dash-log { display: grid; grid-template-columns: 62px 70px 1fr auto; align-items: center; gap: 14px; padding: 11px 6px; border-top: 1px solid rgba(255, 255, 255, 0.04); }
+.dash-log:first-child { border-top: none; }
+.dash-log:hover { background: rgba(255, 255, 255, 0.02); }
+.dash-log-level { text-align: center; text-transform: uppercase; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; padding: 4px 0; border-radius: 6px; }
+.dash-log-level.query { color: #7aa2ff; background: rgba(122, 162, 255, 0.14); }
+.dash-log-level.info { color: #9a9aa4; background: rgba(255, 255, 255, 0.06); }
+.dash-log-level.warn { color: #e8a04b; background: rgba(232, 160, 75, 0.14); }
+.dash-log-level.error { color: #fb7185; background: rgba(251, 113, 133, 0.14); }
+.dash-log-time { color: #6a6a74; font-family: var(--mono); font-size: 12px; }
+.dash-log-msg { color: #e8e8ec; font-family: var(--mono); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dash-log-meta { color: #8b8b95; font-size: 12px; white-space: nowrap; }

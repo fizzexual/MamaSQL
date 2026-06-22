@@ -2,6 +2,7 @@ import {
   IconArrowRight,
   IconArrowUpRight,
   IconBolt,
+  IconBrandMysql,
   IconCaretDownFilled,
   IconCaretUpFilled,
   IconChartLine,
@@ -11,30 +12,40 @@ import {
   IconFileText,
   IconHistory,
   IconLayoutGrid,
+  IconPlus,
   IconServer,
+  IconSettings,
   IconSparkles,
   IconTable,
   IconTag,
   IconTerminal2,
 } from "@tabler/icons-react";
-import { type ComponentType, useState } from "react";
+import { type ComponentType, useEffect, useState } from "react";
+import type { ConnectionConfig } from "../../ipc/types";
 import { useStore } from "../../state/store";
 
 type Icon = ComponentType<{ size?: number; stroke?: number }>;
 type Dest = { top?: "data" | "automation" | "settings"; view?: "data" | "sql" | "history" };
+type Page = "dashboard" | "connections" | "logs";
 
-const NAV: { id: string; label: string; Icon: Icon; go?: Dest }[] = [
-  { id: "dashboard", label: "Dashboard", Icon: IconLayoutGrid },
-  { id: "connections", label: "Connections", Icon: IconServer, go: {} },
+const NAV: { id: string; label: string; Icon: Icon; page?: Page; go?: Dest }[] = [
+  { id: "dashboard", label: "Dashboard", Icon: IconLayoutGrid, page: "dashboard" },
+  { id: "connections", label: "Connections", Icon: IconServer, page: "connections" },
   { id: "tables", label: "Tables", Icon: IconTable, go: { top: "data" } },
   { id: "editor", label: "Query Editor", Icon: IconTerminal2, go: { top: "data", view: "sql" } },
   { id: "browser", label: "Data Browser", Icon: IconDatabase, go: { top: "data", view: "data" } },
   { id: "automation", label: "Automation", Icon: IconBolt, go: { top: "automation" } },
   { id: "history", label: "History", Icon: IconHistory, go: { top: "data", view: "history" } },
-  { id: "logs", label: "Logs", Icon: IconFileText, go: { top: "settings" } },
+  { id: "logs", label: "Logs", Icon: IconFileText, page: "logs" },
 ];
 
-/** Concentric topographic contour lines for the AI assistant card. */
+function EngineIcon({ engine, size = 18 }: { engine: string; size?: number }) {
+  if (engine === "mysql") return <IconBrandMysql size={size} stroke={1.7} />;
+  return <IconDatabase size={size} stroke={1.7} />;
+}
+
+/* ---------------------------------------------------------------- Overview */
+
 function TopoPattern() {
   const blob =
     "M0,-92 C52,-94 94,-56 96,-9 C99,42 60,96 8,99 C-47,102 -97,62 -99,8 C-101,-46 -58,-90 0,-92 Z";
@@ -227,11 +238,261 @@ function RecentQueries() {
   );
 }
 
-export function Dashboard() {
+function Overview({ enter }: { enter: (d?: Dest) => void }) {
+  return (
+    <main className="dash-main">
+      <header className="dash-top">
+        <h1>Database overview</h1>
+        <button className="dash-viewmore" onClick={() => enter({ top: "data" })}>
+          View more <IconArrowRight size={17} stroke={1.8} />
+        </button>
+      </header>
+
+      <div className="dash-row dash-row-top">
+        <section className="dash-card dash-ai-card">
+          <TopoPattern />
+          <div className="dash-ai-body">
+            <h2>AI SQL Assistant</h2>
+            <p>Write, explain and optimize queries with real-time AI.</p>
+          </div>
+          <button className="dash-ai-cta" onClick={() => enter({ top: "data", view: "sql" })}>
+            Open SQL editor <IconArrowRight size={16} stroke={1.8} />
+          </button>
+        </section>
+
+        <section className="dash-card dash-wallet-card">
+          <div className="dash-wallet-head">
+            <span className="dash-wallet-ic">
+              <IconDatabase size={20} stroke={1.7} />
+            </span>
+            <div className="dash-wallet-id">
+              <h3>Primary database</h3>
+              <span>postgres · localhost:5432</span>
+            </div>
+            <button className="dash-link" onClick={() => enter({ top: "data" })}>
+              Manage
+            </button>
+          </div>
+          <div className="dash-wallet-foot">
+            <span className="dash-wallet-label">Total rows</span>
+            <div className="dash-wallet-row">
+              <span className="dash-wallet-amt">1,284,503</span>
+              <span className="dash-wallet-trend">
+                <IconArrowUpRight size={14} stroke={2} /> 12% this week
+              </span>
+            </div>
+          </div>
+        </section>
+
+        <section className="dash-card dash-upgrade-card">
+          <div className="dash-upgrade-top">
+            <span className="dash-upgrade-mark">
+              <IconSparkles size={18} stroke={1.8} />
+            </span>
+            <button className="dash-pro-btn" onClick={() => enter({ top: "settings" })}>
+              Upgrade to PRO
+            </button>
+          </div>
+          <div className="dash-upgrade-body">
+            <h2>Upgrade Your Data Stack</h2>
+            <p>Unlock AI queries, unlimited connections and team sharing.</p>
+          </div>
+        </section>
+      </div>
+
+      <div className="dash-row dash-row-bottom">
+        <QueryChart />
+        <div className="dash-col">
+          <TopTables />
+          <RecentQueries />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------- Connections */
+
+function connSub(c: ConnectionConfig): string {
+  if (c.engine === "sqlite") return c.database || "local file";
+  return `${c.host || "localhost"}${c.port ? `:${c.port}` : ""}`;
+}
+
+function ConnectionsPage({
+  onAddServer,
+  onEditServer,
+  enter,
+}: {
+  onAddServer: () => void;
+  onEditServer: (c: ConnectionConfig) => void;
+  enter: (d?: Dest) => void;
+}) {
+  const connections = useStore((s) => s.connections);
+  const activeId = useStore((s) => s.activeConnectionId);
+  const openAndIntrospect = useStore((s) => s.openAndIntrospect);
+
+  const open = (id: string) => {
+    void openAndIntrospect(id);
+    enter({ top: "data" });
+  };
+
+  return (
+    <main className="dash-main dash-page">
+      <header className="dash-top">
+        <div>
+          <h1>Connections</h1>
+          <p className="dash-sub">Manage your database servers and data sources.</p>
+        </div>
+        <button className="dash-add-btn" onClick={onAddServer}>
+          <IconPlus size={17} stroke={2} /> Add connection
+        </button>
+      </header>
+
+      <div className="dash-conn-grid">
+        {connections.map((c) => {
+          const isActive = c.id === activeId;
+          return (
+            <section className={`dash-card dash-conn-card ${isActive ? "on" : ""}`} key={c.id}>
+              <div className="dash-conn-top">
+                <span className={`dash-conn-badge ${c.engine}`}>
+                  <EngineIcon engine={c.engine} />
+                </span>
+                <div className="dash-conn-id">
+                  <h3>{c.name}</h3>
+                  <span>{connSub(c)}</span>
+                </div>
+                <span className={`dash-status-dot ${isActive ? "on" : ""}`} title={isActive ? "Connected" : "Idle"} />
+              </div>
+              <div className="dash-conn-meta">
+                <div>
+                  <span className="k">Engine</span>
+                  <span className="v">{c.engine}</span>
+                </div>
+                <div>
+                  <span className="k">Database</span>
+                  <span className="v">{c.database || "—"}</span>
+                </div>
+                <div>
+                  <span className="k">User</span>
+                  <span className="v">{c.username || "—"}</span>
+                </div>
+              </div>
+              <div className="dash-conn-actions">
+                <button className="dash-conn-open" onClick={() => open(c.id)}>
+                  {isActive ? "Open data" : "Connect"}
+                </button>
+                <button className="dash-conn-edit" onClick={() => onEditServer(c)} title="Edit connection">
+                  <IconSettings size={16} stroke={1.7} />
+                </button>
+              </div>
+            </section>
+          );
+        })}
+
+        <button className="dash-card dash-conn-add" onClick={onAddServer}>
+          <span className="dash-conn-add-ic">
+            <IconPlus size={24} stroke={2} />
+          </span>
+          <span className="dash-conn-add-t">Add connection</span>
+          <span className="dash-conn-add-s">PostgreSQL · MySQL · SQLite</span>
+        </button>
+      </div>
+    </main>
+  );
+}
+
+/* -------------------------------------------------------------------- Logs */
+
+const KPIS = [
+  { label: "Queries · 24h", val: "8,420", delta: "+6%", dir: "up" },
+  { label: "Errors", val: "12", delta: "-3", dir: "down" },
+  { label: "Avg latency", val: "42ms", delta: "-8ms", dir: "down" },
+  { label: "Slow queries", val: "5", delta: "+2", dir: "up" },
+];
+
+const LOGS = [
+  { level: "query", time: "12:04:22", msg: "SELECT * FROM users WHERE active = true", meta: "1,204 rows · 18ms" },
+  { level: "query", time: "12:03:58", msg: "UPDATE orders SET status = 'paid' WHERE id = 4821", meta: "1 row · 6ms" },
+  { level: "warn", time: "12:01:10", msg: "Slow query: SELECT … FROM audit_log JOIN events …", meta: "2.1s · 84k rows" },
+  { level: "error", time: "11:58:44", msg: 'ERROR: relation "invoces" does not exist', meta: "0 rows" },
+  { level: "info", time: "11:55:02", msg: "Connection opened — postgres@localhost:5432", meta: "—" },
+  { level: "query", time: "11:54:30", msg: "CREATE INDEX idx_users_email ON users(email)", meta: "OK · 312ms" },
+  { level: "info", time: "11:50:18", msg: "Backup completed — nightly_dump.sql", meta: "42 MB" },
+  { level: "query", time: "11:49:01", msg: "DELETE FROM sessions WHERE expires < now()", meta: "208 rows · 22ms" },
+];
+
+function LogsPage() {
+  const [filter, setFilter] = useState<"all" | "query" | "error">("all");
+  const shown = LOGS.filter((l) => (filter === "all" ? true : filter === "error" ? l.level === "error" || l.level === "warn" : l.level === "query"));
+  return (
+    <main className="dash-main dash-page">
+      <header className="dash-top">
+        <div>
+          <h1>Logs</h1>
+          <p className="dash-sub">Query activity and server events.</p>
+        </div>
+        <button className="dash-drop">
+          Last 24h <IconChevronDown size={14} stroke={1.8} />
+        </button>
+      </header>
+
+      <div className="dash-kpis">
+        {KPIS.map((k) => (
+          <div className="dash-card dash-kpi" key={k.label}>
+            <span className="dash-kpi-label">{k.label}</span>
+            <span className="dash-kpi-val">{k.val}</span>
+            <span className={`dash-kpi-trend ${k.dir}`}>
+              {k.dir === "up" ? <IconCaretUpFilled size={11} /> : <IconCaretDownFilled size={11} />}
+              {k.delta}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <section className="dash-card dash-logs-card">
+        <div className="dash-card-head">
+          <h3>Activity</h3>
+          <div className="dash-log-filters">
+            {(["all", "query", "error"] as const).map((f) => (
+              <button key={f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>
+                {f === "all" ? "All" : f === "query" ? "Queries" : "Errors"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="dash-log-list">
+          {shown.map((l, i) => (
+            <div className="dash-log" key={`${l.time}-${i}`}>
+              <span className={`dash-log-level ${l.level}`}>{l.level}</span>
+              <span className="dash-log-time">{l.time}</span>
+              <span className="dash-log-msg">{l.msg}</span>
+              <span className="dash-log-meta">{l.meta}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+    </main>
+  );
+}
+
+/* ------------------------------------------------------------------- Shell */
+
+export function Dashboard({
+  onAddServer,
+  onEditServer,
+}: {
+  onAddServer: () => void;
+  onEditServer: (c: ConnectionConfig) => void;
+}) {
   const setScreen = useStore((s) => s.setScreen);
   const setTopView = useStore((s) => s.setTopView);
   const setView = useStore((s) => s.setView);
-  const [active, setActive] = useState("dashboard");
+  const loadConnections = useStore((s) => s.loadConnections);
+  const [page, setPage] = useState<Page>("dashboard");
+
+  useEffect(() => {
+    void loadConnections();
+  }, [loadConnections]);
 
   const enter = (dest?: Dest) => {
     setScreen("workspace");
@@ -246,10 +507,10 @@ export function Dashboard() {
           {NAV.map((n) => (
             <button
               key={n.id}
-              className={`dash-nav-item ${active === n.id ? "active" : ""}`}
+              className={`dash-nav-item ${n.page && page === n.page ? "active" : ""}`}
               onClick={() => {
-                setActive(n.id);
-                if (n.go) enter(n.go);
+                if (n.page) setPage(n.page);
+                else if (n.go) enter(n.go);
               }}
             >
               <n.Icon size={19} stroke={1.6} />
@@ -258,79 +519,18 @@ export function Dashboard() {
           ))}
         </nav>
         <button className="dash-nav-item dash-settings" onClick={() => enter({ top: "settings" })}>
-          <IconServer size={19} stroke={1.6} />
+          <IconSettings size={19} stroke={1.6} />
           Settings
         </button>
       </aside>
 
-      <main className="dash-main">
-        <header className="dash-top">
-          <h1>Database overview</h1>
-          <button className="dash-viewmore" onClick={() => enter({ top: "data" })}>
-            View more <IconArrowRight size={17} stroke={1.8} />
-          </button>
-        </header>
-
-        <div className="dash-row dash-row-top">
-          <section className="dash-card dash-ai-card">
-            <TopoPattern />
-            <div className="dash-ai-body">
-              <h2>AI SQL Assistant</h2>
-              <p>Write, explain and optimize queries with real-time AI.</p>
-            </div>
-            <button className="dash-ai-cta" onClick={() => enter({ top: "data", view: "sql" })}>
-              Open SQL editor <IconArrowRight size={16} stroke={1.8} />
-            </button>
-          </section>
-
-          <section className="dash-card dash-wallet-card">
-            <div className="dash-wallet-head">
-              <span className="dash-wallet-ic">
-                <IconDatabase size={20} stroke={1.7} />
-              </span>
-              <div className="dash-wallet-id">
-                <h3>Primary database</h3>
-                <span>postgres · localhost:5432</span>
-              </div>
-              <button className="dash-link" onClick={() => enter({ top: "data" })}>
-                Manage
-              </button>
-            </div>
-            <div className="dash-wallet-foot">
-              <span className="dash-wallet-label">Total rows</span>
-              <div className="dash-wallet-row">
-                <span className="dash-wallet-amt">1,284,503</span>
-                <span className="dash-wallet-trend">
-                  <IconArrowUpRight size={14} stroke={2} /> 12% this week
-                </span>
-              </div>
-            </div>
-          </section>
-
-          <section className="dash-card dash-upgrade-card">
-            <div className="dash-upgrade-top">
-              <span className="dash-upgrade-mark">
-                <IconSparkles size={18} stroke={1.8} />
-              </span>
-              <button className="dash-pro-btn" onClick={() => enter({ top: "settings" })}>
-                Upgrade to PRO
-              </button>
-            </div>
-            <div className="dash-upgrade-body">
-              <h2>Upgrade Your Data Stack</h2>
-              <p>Unlock AI queries, unlimited connections and team sharing.</p>
-            </div>
-          </section>
-        </div>
-
-        <div className="dash-row dash-row-bottom">
-          <QueryChart />
-          <div className="dash-col">
-            <TopTables />
-            <RecentQueries />
-          </div>
-        </div>
-      </main>
+      {page === "connections" ? (
+        <ConnectionsPage onAddServer={onAddServer} onEditServer={onEditServer} enter={enter} />
+      ) : page === "logs" ? (
+        <LogsPage />
+      ) : (
+        <Overview enter={enter} />
+      )}
     </div>
   );
 }

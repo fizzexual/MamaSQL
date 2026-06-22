@@ -1,0 +1,9 @@
+﻿feat(ui): Connections + Logs pages, fit dashboard without scrolling
+
+- Dashboard is now a multi-page shell (Overview / Connections / Logs)
+  driven by the sidebar; other items still bridge to the workspace
+- Connections: card grid of saved servers (engine-tinted badges, status
+  dot, meta, Connect/Edit) plus a dashed Add-connection tile; Add and
+  Edit open the shared ServerModal, now mounted at the app root
+- Logs: KPI tiles plus a level-coded activity feed (query/info/warn/error)
+- Overview reflows with flexbox so it fills the viewport with no scroll

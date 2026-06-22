@@ -15,20 +15,27 @@ export function AppShell() {
   const topView = useStore((s) => s.topView);
   const screen = useStore((s) => s.screen);
 
-  if (screen === "dashboard") return <Dashboard />;
+  const openAdd = () => setServerModal("new");
+  const openEdit = (c: ConnectionConfig) => setServerModal(c);
 
   return (
-    <div className="bud-app">
-      <TopNav onAddServer={() => setServerModal("new")} />
-      <div className="bud-body">
-        <Sources onAddServer={() => setServerModal("new")} onEditServer={(c) => setServerModal(c)} />
-        {topView === "data" ? <DataView /> : <WorkspacePanel view={topView} />}
-      </div>
-      <StatusBar />
+    <>
+      {screen === "dashboard" ? (
+        <Dashboard onAddServer={openAdd} onEditServer={openEdit} />
+      ) : (
+        <div className="bud-app">
+          <TopNav onAddServer={openAdd} />
+          <div className="bud-body">
+            <Sources onAddServer={openAdd} onEditServer={openEdit} />
+            {topView === "data" ? <DataView /> : <WorkspacePanel view={topView} />}
+          </div>
+          <StatusBar />
+        </div>
+      )}
       {serverModal && (
         <ServerModal existing={serverModal === "new" ? null : serverModal} onClose={() => setServerModal(null)} />
       )}
       <DialogHost />
-    </div>
+    </>
   );
 }
