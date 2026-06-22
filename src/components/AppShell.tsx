@@ -21,7 +21,7 @@ export function AppShell() {
   return (
     <>
       {screen === "dashboard" ? (
-        <Dashboard onAddServer={openAdd} onEditServer={openEdit} />
+        <Dashboard />
       ) : (
         <div className="bud-app">
           <TopNav onAddServer={openAdd} />

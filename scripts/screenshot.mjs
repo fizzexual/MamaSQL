@@ -31,13 +31,22 @@ try {
 
     // Connections page.
     await page.click('.dash-nav-item:has-text("Connections")');
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(500);
     await page.screenshot({ path: "screenshot-connections.png" });
     console.log("wrote screenshot-connections.png");
 
+    // Custom Add-connection modal.
+    await page.click(".dash-add-btn");
+    await page.waitForSelector(".dmodal", { timeout: 4000 });
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: "screenshot-modal.png" });
+    console.log("wrote screenshot-modal.png");
+    await page.click(".dmodal-x").catch(() => {});
+    await page.waitForTimeout(250);
+
     // Logs page.
     await page.click('.dash-nav-item:has-text("Logs")');
-    await page.waitForTimeout(400);
+    await page.waitForTimeout(500);
     await page.screenshot({ path: "screenshot-logs.png" });
     console.log("wrote screenshot-logs.png");
   } catch (e) {

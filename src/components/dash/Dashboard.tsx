@@ -1,4 +1,5 @@
 import {
+  IconActivity,
   IconArrowRight,
   IconArrowUpRight,
   IconBolt,
@@ -12,6 +13,7 @@ import {
   IconFileText,
   IconHistory,
   IconLayoutGrid,
+  IconLoader2,
   IconPlus,
   IconServer,
   IconSettings,
@@ -23,8 +25,9 @@ import {
 import { type ComponentType, useEffect, useState } from "react";
 import type { ConnectionConfig } from "../../ipc/types";
 import { useStore } from "../../state/store";
+import { ConnectionModal } from "./ConnectionModal";
 
-type Icon = ComponentType<{ size?: number; stroke?: number }>;
+type Icon = ComponentType<{ size?: number; stroke?: number; className?: string }>;
 type Dest = { top?: "data" | "automation" | "settings"; view?: "data" | "sql" | "history" };
 type Page = "dashboard" | "connections" | "logs";
 
@@ -319,21 +322,29 @@ function connSub(c: ConnectionConfig): string {
 }
 
 function ConnectionsPage({
-  onAddServer,
-  onEditServer,
+  onAdd,
+  onEdit,
   enter,
 }: {
-  onAddServer: () => void;
-  onEditServer: (c: ConnectionConfig) => void;
+  onAdd: () => void;
+  onEdit: (c: ConnectionConfig) => void;
   enter: (d?: Dest) => void;
 }) {
   const connections = useStore((s) => s.connections);
   const activeId = useStore((s) => s.activeConnectionId);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
 
-  const open = (id: string) => {
-    void openAndIntrospect(id);
-    enter({ top: "data" });
+  const open = (c: ConnectionConfig) => {
+    if (c.id === activeId) {
+      enter({ top: "data" });
+      return;
+    }
+    setConnectingId(c.id);
+    window.setTimeout(() => {
+      void openAndIntrospect(c.id);
+      enter({ top: "data" });
+    }, 750);
   };
 
   return (
@@ -343,16 +354,21 @@ function ConnectionsPage({
           <h1>Connections</h1>
           <p className="dash-sub">Manage your database servers and data sources.</p>
         </div>
-        <button className="dash-add-btn" onClick={onAddServer}>
+        <button className="dash-add-btn" onClick={onAdd}>
           <IconPlus size={17} stroke={2} /> Add connection
         </button>
       </header>
 
       <div className="dash-conn-grid">
-        {connections.map((c) => {
+        {connections.map((c, i) => {
           const isActive = c.id === activeId;
+          const isConnecting = connectingId === c.id;
           return (
-            <section className={`dash-card dash-conn-card ${isActive ? "on" : ""}`} key={c.id}>
+            <section
+              className={`dash-card dash-conn-card ${isActive ? "on" : ""} ${isConnecting ? "connecting" : ""}`}
+              key={c.id}
+              style={{ animationDelay: `${i * 55}ms` }}
+            >
               <div className="dash-conn-top">
                 <span className={`dash-conn-badge ${c.engine}`}>
                   <EngineIcon engine={c.engine} />
@@ -378,10 +394,18 @@ function ConnectionsPage({
                 </div>
               </div>
               <div className="dash-conn-actions">
-                <button className="dash-conn-open" onClick={() => open(c.id)}>
-                  {isActive ? "Open data" : "Connect"}
+                <button className="dash-conn-open" onClick={() => open(c)} disabled={connectingId !== null}>
+                  {isConnecting ? (
+                    <>
+                      <IconLoader2 size={15} className="dash-spin" /> Connecting…
+                    </>
+                  ) : isActive ? (
+                    "Open data"
+                  ) : (
+                    "Connect"
+                  )}
                 </button>
-                <button className="dash-conn-edit" onClick={() => onEditServer(c)} title="Edit connection">
+                <button className="dash-conn-edit" onClick={() => onEdit(c)} title="Edit connection">
                   <IconSettings size={16} stroke={1.7} />
                 </button>
               </div>
@@ -389,7 +413,11 @@ function ConnectionsPage({
           );
         })}
 
-        <button className="dash-card dash-conn-add" onClick={onAddServer}>
+        <button
+          className="dash-card dash-conn-add"
+          onClick={onAdd}
+          style={{ animationDelay: `${connections.length * 55}ms` }}
+        >
           <span className="dash-conn-add-ic">
             <IconPlus size={24} stroke={2} />
           </span>
@@ -423,7 +451,9 @@ const LOGS = [
 
 function LogsPage() {
   const [filter, setFilter] = useState<"all" | "query" | "error">("all");
-  const shown = LOGS.filter((l) => (filter === "all" ? true : filter === "error" ? l.level === "error" || l.level === "warn" : l.level === "query"));
+  const shown = LOGS.filter((l) =>
+    filter === "all" ? true : filter === "error" ? l.level === "error" || l.level === "warn" : l.level === "query",
+  );
   return (
     <main className="dash-main dash-page">
       <header className="dash-top">
@@ -437,8 +467,8 @@ function LogsPage() {
       </header>
 
       <div className="dash-kpis">
-        {KPIS.map((k) => (
-          <div className="dash-card dash-kpi" key={k.label}>
+        {KPIS.map((k, i) => (
+          <div className="dash-card dash-kpi" key={k.label} style={{ animationDelay: `${i * 55}ms` }}>
             <span className="dash-kpi-label">{k.label}</span>
             <span className="dash-kpi-val">{k.val}</span>
             <span className={`dash-kpi-trend ${k.dir}`}>
@@ -451,7 +481,12 @@ function LogsPage() {
 
       <section className="dash-card dash-logs-card">
         <div className="dash-card-head">
-          <h3>Activity</h3>
+          <div className="dash-head-titled">
+            <span className="dash-round-ic pink">
+              <IconActivity size={15} stroke={1.7} />
+            </span>
+            <h3>Activity</h3>
+          </div>
           <div className="dash-log-filters">
             {(["all", "query", "error"] as const).map((f) => (
               <button key={f} className={filter === f ? "on" : ""} onClick={() => setFilter(f)}>
@@ -462,7 +497,7 @@ function LogsPage() {
         </div>
         <div className="dash-log-list">
           {shown.map((l, i) => (
-            <div className="dash-log" key={`${l.time}-${i}`}>
+            <div className="dash-log" key={`${l.time}-${i}`} style={{ animationDelay: `${i * 40}ms` }}>
               <span className={`dash-log-level ${l.level}`}>{l.level}</span>
               <span className="dash-log-time">{l.time}</span>
               <span className="dash-log-msg">{l.msg}</span>
@@ -477,18 +512,13 @@ function LogsPage() {
 
 /* ------------------------------------------------------------------- Shell */
 
-export function Dashboard({
-  onAddServer,
-  onEditServer,
-}: {
-  onAddServer: () => void;
-  onEditServer: (c: ConnectionConfig) => void;
-}) {
+export function Dashboard() {
   const setScreen = useStore((s) => s.setScreen);
   const setTopView = useStore((s) => s.setTopView);
   const setView = useStore((s) => s.setView);
   const loadConnections = useStore((s) => s.loadConnections);
   const [page, setPage] = useState<Page>("dashboard");
+  const [modal, setModal] = useState<null | "new" | ConnectionConfig>(null);
 
   useEffect(() => {
     void loadConnections();
@@ -525,12 +555,14 @@ export function Dashboard({
       </aside>
 
       {page === "connections" ? (
-        <ConnectionsPage onAddServer={onAddServer} onEditServer={onEditServer} enter={enter} />
+        <ConnectionsPage onAdd={() => setModal("new")} onEdit={(c) => setModal(c)} enter={enter} />
       ) : page === "logs" ? (
         <LogsPage />
       ) : (
         <Overview enter={enter} />
       )}
+
+      {modal && <ConnectionModal existing={modal === "new" ? null : modal} onClose={() => setModal(null)} />}
     </div>
   );
 }
