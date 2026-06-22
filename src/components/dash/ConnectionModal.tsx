@@ -25,12 +25,20 @@ function errMsg(e: unknown): string {
   return String(e);
 }
 
-export function ConnectionModal({ existing, onClose }: { existing?: ConnectionConfig | null; onClose: () => void }) {
+export function ConnectionModal({
+  existing,
+  initialEngine,
+  onClose,
+}: {
+  existing?: ConnectionConfig | null;
+  initialEngine?: Engine;
+  onClose: () => void;
+}) {
   const saveConnection = useStore((s) => s.saveConnection);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const editing = !!existing;
 
-  const [engine, setEngine] = useState<Engine>(existing?.engine ?? "postgres");
+  const [engine, setEngine] = useState<Engine>(existing?.engine ?? initialEngine ?? "postgres");
   const [name, setName] = useState(existing?.name ?? "");
   const [host, setHost] = useState(existing?.host ?? "localhost");
   const [port, setPort] = useState(existing?.port != null ? String(existing.port) : "");
