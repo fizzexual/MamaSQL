@@ -62,33 +62,6 @@ function connSub(c: ConnectionConfig): string {
   return `${c.host || "localhost"}${c.port ? `:${c.port}` : ""}`;
 }
 
-function TopoPattern() {
-  const blob =
-    "M0,-92 C52,-94 94,-56 96,-9 C99,42 60,96 8,99 C-47,102 -97,62 -99,8 C-101,-46 -58,-90 0,-92 Z";
-  const rings = Array.from({ length: 11 }, (_, i) => 0.2 + i * 0.14);
-  return (
-    <svg className="dash-topo" viewBox="0 0 360 260" preserveAspectRatio="xMidYMid slice" aria-hidden>
-      <defs>
-        <radialGradient id="topoGlow" cx="78%" cy="22%" r="60%">
-          <stop offset="0%" stopColor="#ff2d8e" stopOpacity="0.42" />
-          <stop offset="45%" stopColor="#c026d3" stopOpacity="0.14" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id="topoLine" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#ff5bb0" />
-          <stop offset="100%" stopColor="#9d22b8" />
-        </linearGradient>
-      </defs>
-      <rect width="360" height="260" fill="url(#topoGlow)" />
-      <g stroke="url(#topoLine)" fill="none" strokeWidth="1">
-        {rings.map((s, i) => (
-          <path key={s} d={blob} transform={`translate(280 50) scale(${s})`} opacity={Math.max(0.08, 0.4 - i * 0.03)} />
-        ))}
-      </g>
-    </svg>
-  );
-}
-
 /* ----------------------------------------------------------- chart helpers */
 
 const BARS = [
@@ -230,6 +203,11 @@ function Home({ enter, connections, onAdd }: { enter: (d?: Dest) => void; connec
           </p>
         </div>
         <div className="dash-home-actions">
+          <button className="dash-cmdk-btn" onClick={() => window.dispatchEvent(new Event("mamasql:cmdk"))}>
+            <IconSearch size={15} stroke={1.8} />
+            <span>Search</span>
+            <kbd>⌘K</kbd>
+          </button>
           <button className="dash-ghost-btn" onClick={onAdd}>
             <IconPlus size={16} stroke={2} /> New connection
           </button>
@@ -253,7 +231,6 @@ function Home({ enter, connections, onAdd }: { enter: (d?: Dest) => void; connec
         <ActivityChart />
 
         <section className="dash-card dash-console a-console">
-          <TopoPattern />
           <div className="dash-card-head">
             <div className="dash-head-titled">
               <span className="dash-round-ic pink">
@@ -718,7 +695,8 @@ export function Dashboard() {
   const setView = useStore((s) => s.setView);
   const loadConnections = useStore((s) => s.loadConnections);
   const connections = useStore((s) => s.connections);
-  const [page, setPage] = useState<Page>("home");
+  const page = useStore((s) => s.dashPage);
+  const setPage = useStore((s) => s.setDashPage);
   const [modal, setModal] = useState<ModalState>(null);
 
   useEffect(() => {

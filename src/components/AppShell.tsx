@@ -8,6 +8,7 @@ import { Sources } from "./bud/Sources";
 import { StatusBar } from "./bud/StatusBar";
 import { TopNav } from "./bud/TopNav";
 import { WorkspacePanel } from "./bud/WorkspacePanel";
+import { CommandPalette } from "./dash/CommandPalette";
 import { Dashboard } from "./dash/Dashboard";
 
 export function AppShell() {
@@ -35,6 +36,7 @@ export function AppShell() {
       {serverModal && (
         <ServerModal existing={serverModal === "new" ? null : serverModal} onClose={() => setServerModal(null)} />
       )}
+      <CommandPalette onAddServer={openAdd} />
       <DialogHost />
     </>
   );

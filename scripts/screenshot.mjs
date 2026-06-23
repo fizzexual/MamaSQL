@@ -29,6 +29,15 @@ try {
     await page.screenshot({ path: "screenshot.png" });
     console.log("wrote screenshot.png");
 
+    // Command palette (⌘K).
+    await page.click(".dash-cmdk-btn").catch(() => {});
+    await page.waitForSelector(".cmdk", { timeout: 4000 }).catch(() => {});
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: "screenshot-cmdk.png" });
+    console.log("wrote screenshot-cmdk.png");
+    await page.keyboard.press("Escape").catch(() => {});
+    await page.waitForTimeout(200);
+
     // Connections page.
     await page.click('.dash-nav-item:has-text("Connections")');
     await page.waitForTimeout(500);
