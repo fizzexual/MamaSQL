@@ -154,13 +154,23 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
               <div className="bud-field-row">
                 <label className="bud-field">
                   <span>Host</span>
-                  <input value={host} onChange={(e) => setHost(e.target.value)} />
+                  <input value={host} onChange={(e) => setHost(e.target.value)} placeholder="e.g. postgres, mysql, host.docker.internal" />
                 </label>
                 <label className="bud-field port">
                   <span>Port</span>
                   <input value={port} onChange={(e) => setPort(e.target.value)} placeholder={defaultPort} />
                 </label>
               </div>
+              {!isTauri() && /^(localhost|127\.0\.0\.1|::1)$/i.test(host.trim()) && (
+                <div className="bud-conn-hint warn">
+                  <IconInfoCircle size={15} stroke={1.7} />
+                  <span>
+                    The engine server may run in Docker, where <code>localhost</code> is the bridge itself — not your
+                    database. Use the compose service name (e.g. <code>postgres</code> / <code>mysql</code>), or{" "}
+                    <code>host.docker.internal</code> for a database on your own machine.
+                  </span>
+                </div>
+              )}
               <div className="bud-field-row">
                 <label className="bud-field">
                   <span>Username</span>
