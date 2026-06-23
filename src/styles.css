@@ -2774,3 +2774,40 @@ select.bud-cb-select {
 .bud-newrow-num { color: var(--green-bright); }
 .bud-rowx { color: var(--faint); }
 .bud-rowx:hover { color: var(--danger); }
+
+/* ============================================================
+   Beyond DbVisualizer: command palette pill, result chart,
+   live row filter, table/chart toggle
+   ============================================================ */
+
+/* title-bar ⌘K command-palette pill */
+.bud-tb-tools .bud-cmdk-pill {
+  width: auto; height: 24px; gap: 7px; padding: 0 9px; margin-left: 2px;
+  background: var(--input-bg); border: 1px solid var(--border-strong); color: var(--muted); border-radius: 5px;
+}
+.bud-tb-tools .bud-cmdk-pill:hover { border-color: var(--accent); color: var(--text); background: var(--panel-2); }
+.bud-cmdk-pill span { font-size: 12px; }
+.bud-cmdk-pill kbd { font-family: var(--mono); font-size: 10px; background: var(--panel-3); border-radius: 3px; padding: 1px 5px; color: var(--muted); }
+
+/* result Table/Chart segmented toggle */
+.bud-res-seg { display: inline-flex; border: 1px solid var(--border-strong); border-radius: 4px; overflow: hidden; flex: none; }
+.bud-res-seg button { display: inline-flex; align-items: center; gap: 5px; border: none; background: var(--input-bg); color: var(--muted); font-size: 11.5px; padding: 4px 10px; cursor: pointer; }
+.bud-res-seg button + button { border-left: 1px solid var(--border-strong); }
+.bud-res-seg button:hover { color: var(--text); }
+.bud-res-seg button.on { background: var(--accent); color: #fff; }
+
+/* live row filter */
+.bud-res-filter { display: inline-flex; align-items: center; gap: 6px; background: var(--input-bg); border: 1px solid var(--border-strong); border-radius: 4px; padding: 3px 8px; flex: none; }
+.bud-res-filter svg { color: var(--faint); flex: none; }
+.bud-res-filter input { background: none; border: none; outline: none; color: var(--text); font-size: 12px; width: 130px; }
+.bud-res-filter input::placeholder { color: var(--faint); }
+
+/* instant result bar chart */
+.bud-chart { flex: 1; min-height: 0; overflow: auto; padding: 14px 16px; }
+.bud-chart-head { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+.bud-chart-bars { display: flex; flex-direction: column; gap: 7px; }
+.bud-chart-row { display: grid; grid-template-columns: 150px 1fr 90px; align-items: center; gap: 10px; }
+.bud-chart-label { font-size: 12px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bud-chart-track { height: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 3px; overflow: hidden; }
+.bud-chart-fill { display: block; height: 100%; background: linear-gradient(90deg, var(--green), var(--green-bright)); border-radius: 3px; min-width: 2px; transition: width 0.3s ease; }
+.bud-chart-val { text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; font-family: var(--mono); }

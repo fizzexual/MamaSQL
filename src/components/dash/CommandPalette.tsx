@@ -3,13 +3,13 @@ import {
   IconCode,
   IconCornerDownLeft,
   IconDatabase,
+  IconEraser,
   IconFileText,
   IconHistory,
-  IconLayoutGrid,
   IconPlus,
   IconSearch,
-  IconServer,
   IconSettings,
+  IconStar,
   IconTable,
   IconTerminal2,
 } from "@tabler/icons-react";
@@ -19,7 +19,7 @@ import { useStore } from "../../state/store";
 type Icon = ComponentType<{ size?: number; stroke?: number }>;
 type Cmd = { id: string; group: string; label: string; hint?: string; Icon: Icon; run: () => void };
 
-const GROUPS = ["Actions", "Navigate", "Connections", "Tables"];
+const GROUPS = ["Actions", "Navigate", "Connections", "Tables", "Scripts", "Favorites"];
 
 export function CommandPalette({ onAddServer }: { onAddServer: () => void }) {
   const [open, setOpen] = useState(false);
@@ -30,10 +30,12 @@ export function CommandPalette({ onAddServer }: { onAddServer: () => void }) {
   const connections = useStore((s) => s.connections);
   const tables = useStore((s) => s.schema.tables);
   const activeId = useStore((s) => s.activeConnectionId);
-  const setScreen = useStore((s) => s.setScreen);
-  const setDashPage = useStore((s) => s.setDashPage);
+  const scripts = useStore((s) => s.scripts);
+  const favorites = useStore((s) => s.favorites);
   const setTopView = useStore((s) => s.setTopView);
   const setView = useStore((s) => s.setView);
+  const setSql = useStore((s) => s.setSql);
+  const loadSql = useStore((s) => s.loadSql);
   const run = useStore((s) => s.run);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const openTableData = useStore((s) => s.openTableData);
@@ -72,13 +74,12 @@ export function CommandPalette({ onAddServer }: { onAddServer: () => void }) {
   };
 
   const cmds: Cmd[] = useMemo(() => {
-    const toWorkspace = (top: "data" | "settings", view?: "data" | "sql" | "history") => () => {
-      setScreen("workspace");
-      setTopView(top);
-      if (view) setView(view);
+    const editor = () => {
+      setTopView("data");
+      setView("sql");
     };
     const list: Cmd[] = [
-      { id: "a-query", group: "Actions", label: "New query", hint: "SQL", Icon: IconBolt, run: act(toWorkspace("data", "sql")) },
+      { id: "a-query", group: "Actions", label: "New query", hint: "SQL", Icon: IconBolt, run: act(() => loadSql("")) },
       { id: "a-conn", group: "Actions", label: "New connection", Icon: IconPlus, run: act(onAddServer) },
       {
         id: "a-run",
@@ -87,17 +88,33 @@ export function CommandPalette({ onAddServer }: { onAddServer: () => void }) {
         hint: "⌘↵",
         Icon: IconCode,
         run: act(() => {
-          toWorkspace("data", "sql")();
+          editor();
           if (activeId) void run();
         }),
       },
-      { id: "n-home", group: "Navigate", label: "Home", Icon: IconLayoutGrid, run: act(() => setDashPage("home")) },
-      { id: "n-conns", group: "Navigate", label: "Connections", Icon: IconServer, run: act(() => setDashPage("connections")) },
-      { id: "n-logs", group: "Navigate", label: "Logs", Icon: IconFileText, run: act(() => setDashPage("logs")) },
-      { id: "n-tables", group: "Navigate", label: "Data browser", Icon: IconTable, run: act(toWorkspace("data", "data")) },
-      { id: "n-editor", group: "Navigate", label: "Query editor", Icon: IconTerminal2, run: act(toWorkspace("data", "sql")) },
-      { id: "n-history", group: "Navigate", label: "Query history", Icon: IconHistory, run: act(toWorkspace("data", "history")) },
-      { id: "n-settings", group: "Navigate", label: "Settings", Icon: IconSettings, run: act(toWorkspace("settings")) },
+      { id: "a-clear", group: "Actions", label: "Clear editor", Icon: IconEraser, run: act(() => setSql("")) },
+      { id: "n-editor", group: "Navigate", label: "Query editor", Icon: IconTerminal2, run: act(editor) },
+      {
+        id: "n-data",
+        group: "Navigate",
+        label: "Data browser",
+        Icon: IconTable,
+        run: act(() => {
+          setTopView("data");
+          setView("data");
+        }),
+      },
+      {
+        id: "n-history",
+        group: "Navigate",
+        label: "SQL history",
+        Icon: IconHistory,
+        run: act(() => {
+          setTopView("data");
+          setView("history");
+        }),
+      },
+      { id: "n-settings", group: "Navigate", label: "Settings", Icon: IconSettings, run: act(() => setTopView("settings")) },
     ];
     for (const c of connections) {
       list.push({
@@ -118,9 +135,15 @@ export function CommandPalette({ onAddServer }: { onAddServer: () => void }) {
         run: act(() => void openTableData(t.name)),
       });
     }
+    for (const s of scripts) {
+      list.push({ id: `s-${s.id}`, group: "Scripts", label: s.name, Icon: IconFileText, run: act(() => loadSql(s.sql)) });
+    }
+    for (const f of favorites) {
+      list.push({ id: `fav-${f.id}`, group: "Favorites", label: f.name, Icon: IconStar, run: act(() => loadSql(f.sql)) });
+    }
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [connections, tables, activeId]);
+  }, [connections, tables, scripts, favorites, activeId]);
 
   const ql = q.trim().toLowerCase();
   const filtered = ql ? cmds.filter((c) => c.label.toLowerCase().includes(ql)) : cmds;

@@ -1,7 +1,9 @@
 import {
   IconAlignLeft,
   IconArrowBackUp,
+  IconChartBar,
   IconCheck,
+  IconCopy,
   IconDeviceFloppy,
   IconDownload,
   IconEraser,
@@ -10,13 +12,15 @@ import {
   IconPlayerSkipForward,
   IconPlayerStop,
   IconRefresh,
+  IconSearch,
   IconStar,
+  IconTable,
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getBackend } from "../../ipc/backend";
 import { download, toCsv, toJson } from "../../lib/csv";
 import { promptDialog } from "../../state/dialog";
-import type { AppError, QueryResult } from "../../ipc/types";
+import type { AppError, Column, QueryResult } from "../../ipc/types";
 import { useStore } from "../../state/store";
 
 function normalize(e: unknown): AppError {
@@ -118,6 +122,9 @@ export function SqlPanel() {
   const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
   const [editorH, setEditorH] = useState<number | null>(null);
   const [ac, setAc] = useState<{ items: Suggestion[]; index: number; token: string; x: number; y: number } | null>(null);
+  const [resultView, setResultView] = useState<"table" | "chart">("table");
+  const [rowFilter, setRowFilter] = useState("");
+  const [copied, setCopied] = useState(false);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const hlRef = useRef<HTMLPreElement>(null);
@@ -284,15 +291,36 @@ export function SqlPanel() {
     });
   }, [res, sort]);
   const shownRows = Number.isFinite(cap) && cap > 0 ? sortedRows.slice(0, cap) : sortedRows;
+  const rf = rowFilter.trim().toLowerCase();
+  const filteredRows = rf
+    ? shownRows.filter((r) => r.some((c) => c != null && String(c).toLowerCase().includes(rf)))
+    : shownRows;
 
   const toggleSort = (col: number) =>
     setSort((s) => (!s || s.col !== col ? { col, dir: 1 } : s.dir === 1 ? { col, dir: -1 } : null));
 
   const exportAs = (fmt: "csv" | "json") => {
     if (!res) return;
-    const data = { ...res, rows: shownRows };
+    const data = { ...res, rows: filteredRows };
     if (fmt === "csv") download("result.csv", toCsv(data));
     else download("result.json", toJson(data));
+  };
+
+  const copyMarkdown = () => {
+    if (!res) return;
+    const names = res.columns.map((c) => c.name);
+    const head = `| ${names.join(" | ")} |`;
+    const sep = `| ${names.map(() => "---").join(" | ")} |`;
+    const body = filteredRows
+      .map((r) => `| ${r.map((c) => (c == null ? "" : String(c).replace(/\|/g, "\\|"))).join(" | ")} |`)
+      .join("\n");
+    void navigator.clipboard
+      ?.writeText([head, sep, body].join("\n"))
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1200);
+      })
+      .catch(() => {});
   };
 
   return (
@@ -495,6 +523,18 @@ export function SqlPanel() {
           ) : res && res.columns.length > 0 ? (
             <>
               <div className="bud-res-toolbar">
+                <div className="bud-res-seg">
+                  <button className={resultView === "table" ? "on" : ""} title="Table view" onClick={() => setResultView("table")}>
+                    <IconTable size={14} stroke={1.7} /> Table
+                  </button>
+                  <button className={resultView === "chart" ? "on" : ""} title="Chart view" onClick={() => setResultView("chart")}>
+                    <IconChartBar size={14} stroke={1.7} /> Chart
+                  </button>
+                </div>
+                <div className="bud-res-filter">
+                  <IconSearch size={13} stroke={1.7} />
+                  <input value={rowFilter} onChange={(e) => setRowFilter(e.target.value)} placeholder="Filter rows…" />
+                </div>
                 <button title="Re-run" onClick={() => void exec()} disabled={running || !connId}>
                   <IconRefresh size={14} stroke={1.7} />
                 </button>
@@ -504,40 +544,47 @@ export function SqlPanel() {
                 <button title="Export to JSON" onClick={() => exportAs("json")}>
                   <IconDownload size={14} stroke={1.7} /> JSON
                 </button>
+                <button title="Copy as Markdown" onClick={copyMarkdown}>
+                  <IconCopy size={14} stroke={1.7} /> {copied ? "Copied!" : "Copy MD"}
+                </button>
                 <span className="bud-res-meta">
-                  {shownRows.length.toLocaleString()} {shownRows.length === 1 ? "row" : "rows"}
+                  {filteredRows.length.toLocaleString()} {filteredRows.length === 1 ? "row" : "rows"}
                   {limited ? ` (capped at ${cap})` : ""} · {res.elapsedMs} ms
                 </span>
               </div>
-              <div className="bud-grid-wrap">
-                <table className="bud-grid">
-                  <thead>
-                    <tr>
-                      <th className="bud-rownum" />
-                      {res.columns.map((c, i) => (
-                        <th key={i} className={sort?.col === i ? "sorted" : ""}>
-                          <button className="bud-th-sort" title={`Sort by ${c.name}`} onClick={() => toggleSort(i)}>
-                            <span className="bud-th-name">{c.name}</span>
-                            {sort?.col === i && <span className="bud-th-arrow">{sort.dir === 1 ? "↑" : "↓"}</span>}
-                          </button>
-                        </th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {shownRows.map((row, ri) => (
-                      <tr key={ri}>
-                        <td className="bud-rownum">{ri + 1}</td>
-                        {row.map((cell, ci) => (
-                          <td key={ci} className={cell == null ? "bud-null" : ""}>
-                            {cell == null ? "NULL" : String(cell)}
-                          </td>
+              {resultView === "chart" ? (
+                <ResultChart columns={res.columns} rows={filteredRows} />
+              ) : (
+                <div className="bud-grid-wrap">
+                  <table className="bud-grid">
+                    <thead>
+                      <tr>
+                        <th className="bud-rownum" />
+                        {res.columns.map((c, i) => (
+                          <th key={i} className={sort?.col === i ? "sorted" : ""}>
+                            <button className="bud-th-sort" title={`Sort by ${c.name}`} onClick={() => toggleSort(i)}>
+                              <span className="bud-th-name">{c.name}</span>
+                              {sort?.col === i && <span className="bud-th-arrow">{sort.dir === 1 ? "↑" : "↓"}</span>}
+                            </button>
+                          </th>
                         ))}
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {filteredRows.map((row, ri) => (
+                        <tr key={ri}>
+                          <td className="bud-rownum">{ri + 1}</td>
+                          {row.map((cell, ci) => (
+                            <td key={ci} className={cell == null ? "bud-null" : ""}>
+                              {cell == null ? "NULL" : String(cell)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </>
           ) : res ? (
             <div className="bud-empty">Statement ran. {res.rowsAffected} rows affected.</div>
@@ -565,6 +612,51 @@ export function SqlPanel() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Instant horizontal bar chart of a result set — picks a numeric column and a label column. */
+function ResultChart({ columns, rows }: { columns: Column[]; rows: unknown[][] }) {
+  const isNum = (i: number) =>
+    rows.length > 0 &&
+    rows.some((r) => r[i] != null && String(r[i]).trim() !== "") &&
+    rows.every((r) => r[i] == null || (String(r[i]).trim() !== "" && !Number.isNaN(Number(r[i]))));
+
+  const idLike = (name: string) => /(^id$|_id$|^.*key$)/i.test(name);
+  const numericIdxs = columns.map((_, i) => i).filter((i) => isNum(i));
+  if (numericIdxs.length === 0) return <div className="bud-empty">No numeric column to chart.</div>;
+  // Prefer a real measure over a primary/foreign key column.
+  const valueIdx = numericIdxs.find((i) => !idLike(columns[i].name)) ?? numericIdxs[0];
+  const textIdx = columns.findIndex((_, i) => i !== valueIdx && !isNum(i));
+  const labelIdx = textIdx >= 0 ? textIdx : columns.findIndex((_, i) => i !== valueIdx);
+
+  const data = rows.slice(0, 24).map((r, i) => ({
+    label: labelIdx >= 0 && r[labelIdx] != null ? String(r[labelIdx]) : `#${i + 1}`,
+    value: Number(r[valueIdx]) || 0,
+  }));
+  const max = Math.max(1, ...data.map((d) => Math.abs(d.value)));
+
+  return (
+    <div className="bud-chart">
+      <div className="bud-chart-head">
+        {columns[valueIdx].name}
+        {labelIdx >= 0 ? ` by ${columns[labelIdx].name}` : ""}
+        {rows.length > 24 ? ` · first 24 of ${rows.length}` : ""}
+      </div>
+      <div className="bud-chart-bars">
+        {data.map((d, i) => (
+          <div className="bud-chart-row" key={i}>
+            <span className="bud-chart-label" title={d.label}>
+              {d.label}
+            </span>
+            <span className="bud-chart-track">
+              <span className="bud-chart-fill" style={{ width: `${(Math.abs(d.value) / max) * 100}%` }} />
+            </span>
+            <span className="bud-chart-val">{d.value.toLocaleString()}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

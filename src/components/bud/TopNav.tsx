@@ -6,6 +6,7 @@ import {
   IconPlayerPlay,
   IconPlugConnected,
   IconRefresh,
+  IconSearch,
   IconSettings,
 } from "@tabler/icons-react";
 import { useRef } from "react";
@@ -80,6 +81,16 @@ export function TopNav({ onAddServer }: { onAddServer: () => void }) {
         </button>
         <button title="Settings" onClick={() => setTopView("settings")}>
           <IconSettings size={16} stroke={1.6} />
+        </button>
+        <span className="bud-tb-divider" />
+        <button
+          className="bud-cmdk-pill"
+          title="Command palette (⌘K)"
+          onClick={() => window.dispatchEvent(new Event("mamasql:cmdk"))}
+        >
+          <IconSearch size={13} stroke={1.8} />
+          <span>Search</span>
+          <kbd>⌘K</kbd>
         </button>
       </div>
       <div className="bud-tb-title">{title}</div>
