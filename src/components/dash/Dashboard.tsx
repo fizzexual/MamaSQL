@@ -1,30 +1,31 @@
 import {
   IconActivity,
+  IconAdjustmentsHorizontal,
   IconAlertTriangle,
+  IconArchive,
+  IconArrowDownRight,
   IconArrowRight,
-  IconBolt,
-  IconBookmark,
+  IconArrowUpRight,
   IconBrandMysql,
   IconCaretDownFilled,
   IconCaretUpFilled,
-  IconChartLine,
   IconChevronDown,
   IconClock,
-  IconCode,
   IconDatabase,
-  IconFileText,
-  IconHistory,
-  IconLayoutGrid,
+  IconGauge,
+  IconHome,
+  IconLayoutSidebarLeftCollapse,
   IconLoader2,
-  IconPlayerPlay,
+  IconLogout,
   IconPlus,
+  IconSchema,
   IconSearch,
   IconServer,
   IconSettings,
-  IconSparkles,
   IconTable,
   IconTerminal2,
   IconTrash,
+  IconUsers,
 } from "@tabler/icons-react";
 import { type ComponentType, useEffect, useState } from "react";
 import type { ConnectionConfig, Engine } from "../../ipc/types";
@@ -37,18 +38,24 @@ type Dest = { top?: "data" | "automation" | "settings"; view?: "data" | "sql" | 
 type Page = "home" | "connections" | "logs";
 type ModalState = null | { engine?: Engine } | ConnectionConfig;
 
-type NavItem = { id: string; label: string; Icon: Icon; page?: Page; go?: Dest };
-const HOME_ITEM: NavItem = { id: "home", label: "Home", Icon: IconLayoutGrid, page: "home" };
-const MAIN_REST: NavItem[] = [
-  { id: "tables", label: "Tables", Icon: IconTable, go: { top: "data" } },
+type NavItem = { id: string; label: string; Icon: Icon; page?: Page; go?: Dest; badge?: string };
+const MAIN_NAV: NavItem[] = [
+  { id: "home", label: "Home", Icon: IconHome, page: "home" },
   { id: "editor", label: "Query Editor", Icon: IconTerminal2, go: { top: "data", view: "sql" } },
   { id: "browser", label: "Data Browser", Icon: IconDatabase, go: { top: "data", view: "data" } },
-  { id: "logs", label: "Logs", Icon: IconFileText, page: "logs" },
 ];
-const ACCOUNT_ITEMS: NavItem[] = [
-  { id: "history", label: "History", Icon: IconHistory, go: { top: "data", view: "history" } },
+const DB_NAV: NavItem[] = [
+  { id: "monitoring", label: "Monitoring", Icon: IconActivity, page: "logs" },
+  { id: "performance", label: "Performance", Icon: IconGauge, page: "logs" },
+  { id: "connections", label: "Connections", Icon: IconServer, page: "connections" },
+  { id: "backups", label: "Backups", Icon: IconArchive, go: { top: "settings" }, badge: "New" },
+  { id: "users", label: "Users", Icon: IconUsers, go: { top: "settings" } },
+];
+const FOOT_NAV: NavItem[] = [
   { id: "settings", label: "Settings", Icon: IconSettings, go: { top: "settings" } },
+  { id: "logout", label: "Log out", Icon: IconLogout },
 ];
+const SCHEMA_CHILDREN = ["Tables", "Views", "Indexes", "Functions", "Triggers"];
 
 function EngineIcon({ engine, size = 18 }: { engine: string; size?: number }) {
   if (engine === "mysql") return <IconBrandMysql size={size} stroke={1.7} />;
@@ -64,277 +71,149 @@ function connSub(c: ConnectionConfig): string {
   return `${c.host || "localhost"}${c.port ? `:${c.port}` : ""}`;
 }
 
-/* ----------------------------------------------------------- chart helpers */
+/* ------------------------------------------------------------- overview data */
 
-const BARS = [
-  { m: "Mon", v: 18 },
-  { m: "Tue", v: 24 },
-  { m: "Wed", v: 21 },
-  { m: "Thu", v: 30, hot: true },
-  { m: "Fri", v: 26 },
-  { m: "Sat", v: 12 },
-  { m: "Sun", v: 9 },
+const TONE: Record<string, string> = { green: "#4ade80", red: "#f87171", blue: "#5b9df8" };
+const OV_KPIS = [
+  { label: "Uptime", val: "99.9%", delta: "0.2%", up: true, tone: "green", spark: [4, 5, 4, 6, 5, 7, 6, 8] },
+  { label: "Error rate", val: "0.4%", delta: "12%", up: false, tone: "red", spark: [8, 7, 8, 6, 7, 5, 6, 4] },
+  { label: "Cache hit ratio", val: "94%", delta: "6%", up: true, tone: "blue", spark: [5, 6, 5, 7, 6, 7, 8, 9] },
+  { label: "Throughput", val: "8.4k/s", delta: "6%", up: true, tone: "blue", spark: [4, 6, 5, 7, 6, 8, 7, 9] },
 ];
-const Y_TICKS = [30, 20, 10, 0];
-const Y_MAX = 32;
+const MONTHS = ["Jan 2024", "Feb 2024", "Mar 2024", "Apr 2024", "May 2024", "Jun 2024", "Jul 2024", "Aug 2024"];
+const HEAT_COLS = ["M1", "M2", "M3", "M4", "M5", "M6", "M7", "M8", "M9", "M10", "M11", "M12"];
+const HEAT = [
+  [10, 6, 6, 6, 0, 6, 0, 0, 0, 0, 0, 0],
+  [6, 6, 6, 6, 0, 6, 6, 6, 0, 0, 0, 0],
+  [10, 6, 0, 0, 0, 6, 6, 0, 0, 0, 0, 0],
+  [10, 10, 10, 10, 6, 0, 6, 6, 0, 0, 0, 0],
+  [10, 6, 0, 0, 6, 0, 6, 6, 0, 0, 0, 0],
+  [10, 6, 6, 0, 6, 0, 6, 0, 0, 0, 0, 0],
+  [10, 6, 0, 6, 0, 0, 6, 0, 0, 0, 0, 0],
+  [6, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+];
+const HEAT_TABS = ["Heatmap", "Timeline", "By table", "Top queries", "By engine"];
 
-function ActivityChart() {
-  const [range, setRange] = useState<"Daily" | "Weekly">("Daily");
+function Sparkline({ data, color }: { data: number[]; color: string }) {
+  const w = 74;
+  const h = 30;
+  const max = Math.max(...data);
+  const min = Math.min(...data);
+  const range = max - min || 1;
+  const pts = data
+    .map((v, i) => `${((i / (data.length - 1)) * w).toFixed(1)},${(h - 3 - ((v - min) / range) * (h - 6)).toFixed(1)}`)
+    .join(" ");
   return (
-    <section className="dash-card dash-chart-card a-activity">
-      <div className="dash-card-head">
-        <div className="dash-head-titled">
-          <span className="dash-round-ic">
-            <IconChartLine size={16} stroke={1.7} />
-          </span>
-          <h3>Query activity</h3>
-        </div>
-        <div className="dash-seg">
-          <button className={range === "Daily" ? "on" : ""} onClick={() => setRange("Daily")}>
-            Daily
-          </button>
-          <button className={range === "Weekly" ? "on" : ""} onClick={() => setRange("Weekly")}>
-            Weekly
-          </button>
-        </div>
-      </div>
-      <div className="dash-chart">
-        <div className="dash-yaxis">
-          {Y_TICKS.map((t) => (
-            <span key={t}>{t === 0 ? "0" : `${t}k`}</span>
-          ))}
-        </div>
-        <div className="dash-plot">
-          <div className="dash-grid">
-            {Y_TICKS.map((t) => (
-              <i key={t} />
-            ))}
-          </div>
-          <div className="dash-bars">
-            {BARS.map((b) => (
-              <div className="dash-bar-col" key={b.m}>
-                <div className={`dash-bar ${b.hot ? "hot" : ""}`} style={{ height: `${(b.v / Y_MAX) * 100}%` }}>
-                  {b.hot && (
-                    <>
-                      <span className="dash-bar-stem" />
-                      <span className="dash-bar-dot" />
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="dash-tooltip">
-            <div className="dash-tt-title">Thursday</div>
-            <div className="dash-tt-row">
-              <span className="dot" /> <b>24,318</b> <span className="lbl">Reads</span>
-            </div>
-            <div className="dash-tt-row">
-              <span className="dot" /> <b>5,204</b> <span className="lbl">Writes</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      <div className="dash-xaxis">
-        {BARS.map((b) => (
-          <span key={b.m}>{b.m}</span>
-        ))}
-      </div>
-    </section>
+    <svg className="dash-spark" width={w} height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" aria-hidden>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
   );
 }
 
-/* ------------------------------------------------------------------- Home */
+function heatBg(v: number) {
+  if (v <= 0) return "#181b24";
+  return `rgba(124, 108, 245, ${(0.2 + (v / 10) * 0.74).toFixed(2)})`;
+}
 
-const HOME_METRICS = [
-  { label: "Tables", val: "48", sub: "across 6 schemas" },
-  { label: "Rows", val: "1.28M", sub: "total records" },
-  { label: "Storage", val: "4.2 GB", sub: "on disk" },
-  { label: "Indexes", val: "112", sub: "12 unused" },
-  { label: "Avg query", val: "24 ms", sub: "last 24h" },
-];
-
-const LARGEST = [
-  { name: "audit_log", schema: "ops", size: "1.6 GB", rows: "2.10M", w: 100 },
-  { name: "events", schema: "analytics", size: "920 MB", rows: "1.84M", w: 70 },
-  { name: "users", schema: "public", size: "412 MB", rows: "1.24M", w: 44 },
-  { name: "orders", schema: "public", size: "180 MB", rows: "842K", w: 24 },
-];
-
-const RECENT = [
-  { sql: "SELECT * FROM users WHERE active = true", when: "2m" },
-  { sql: "UPDATE orders SET status = 'paid' WHERE id = 4821", when: "8m" },
-  { sql: "SELECT count(*) FROM events WHERE ts > now() - interval '1 day'", when: "21m" },
-  { sql: "DELETE FROM sessions WHERE expires < now()", when: "1h" },
-  { sql: "ALTER TABLE events ADD COLUMN source text", when: "2h" },
-];
-
-const SAVED = [
-  { name: "Active users", sql: "SELECT * FROM users WHERE active = true" },
-  { name: "Daily signups", sql: "SELECT date_trunc('day', created_at) d, count(*) FROM users GROUP BY 1" },
-  { name: "Top customers", sql: "SELECT customer_id, sum(total) FROM orders GROUP BY 1 ORDER BY 2 DESC" },
-  { name: "Stale sessions", sql: "SELECT * FROM sessions WHERE expires < now()" },
-];
-
-function Home({ enter, connections, onAdd }: { enter: (d?: Dest) => void; connections: ConnectionConfig[]; onAdd: () => void }) {
-  const activeId = useStore((s) => s.activeConnectionId);
-  const setSql = useStore((s) => s.setSql);
-  const run = useStore((s) => s.run);
-  const [text, setText] = useState("SELECT *\nFROM users\nWHERE active = true\nLIMIT 100;");
-
-  const loadQuery = (sql: string) => {
-    setSql(sql);
-    enter({ top: "data", view: "sql" });
-  };
-  const runConsole = () => {
-    setSql(text);
-    if (activeId) void run();
-    enter({ top: "data", view: "sql" });
-  };
-
-  const metrics = [{ label: "Databases", val: String(connections.length), sub: "connected sources" }, ...HOME_METRICS];
-
+function Home({ enter }: { enter: (d?: Dest) => void }) {
+  const [tab, setTab] = useState(0);
   return (
-    <main className="dash-main dash-home">
-      <header className="dash-top">
-        <div>
-          <h1>Workspace</h1>
-          <p className="dash-sub">
-            {activeId ? "Connected · " : "No active connection · "}
-            {connections.length} {connections.length === 1 ? "source" : "sources"}
-          </p>
-        </div>
-        <div className="dash-home-actions">
-          <button className="dash-cmdk-btn" onClick={() => window.dispatchEvent(new Event("mamasql:cmdk"))}>
-            <IconSearch size={15} stroke={1.8} />
-            <span>Search</span>
-            <kbd>⌘K</kbd>
-          </button>
-          <button className="dash-ghost-btn" onClick={onAdd}>
-            <IconPlus size={16} stroke={2} /> New connection
-          </button>
-          <button className="dash-add-btn" onClick={() => enter({ top: "data", view: "sql" })}>
-            <IconBolt size={16} stroke={2} /> New query
-          </button>
-        </div>
-      </header>
+    <main className="dash-main dash-overview">
+      <h1 className="dash-ov-title">Database overview</h1>
 
-      <div className="dash-metrics">
-        {metrics.map((m) => (
-          <div className="dash-card dash-metric" key={m.label}>
-            <span className="dash-metric-label">{m.label}</span>
-            <span className="dash-metric-val">{m.val}</span>
-            <span className="dash-metric-sub">{m.sub}</span>
+      <div className="dash-ov-filters">
+        <button className="dash-drop">
+          Last 30 days <IconChevronDown size={14} stroke={1.8} />
+        </button>
+        <button className="dash-drop">
+          All databases <IconChevronDown size={14} stroke={1.8} />
+        </button>
+        <button className="dash-filters-btn">
+          <IconAdjustmentsHorizontal size={15} stroke={1.8} /> Filters
+        </button>
+      </div>
+
+      <div className="dash-kpi-grid">
+        {OV_KPIS.map((k) => (
+          <div className="dash-card dash-kpi-card" key={k.label}>
+            <div className="dash-kpi-top">
+              <span className="dash-kpi-l">{k.label}</span>
+              <Sparkline data={k.spark} color={TONE[k.tone]} />
+            </div>
+            <div className="dash-kpi-v">{k.val}</div>
+            <div className={`dash-kpi-trend t-${k.tone}`}>
+              <span className="dash-kpi-arrow">
+                {k.up ? <IconArrowUpRight size={11} stroke={2.6} /> : <IconArrowDownRight size={11} stroke={2.6} />}
+              </span>
+              <b>{k.delta}</b>
+              <span className="muted">than last month</span>
+            </div>
           </div>
         ))}
-      </div>
 
-      <div className="dash-home-grid">
-        <ActivityChart />
-
-        <section className="dash-card dash-console a-console">
-          <div className="dash-card-head">
-            <div className="dash-head-titled">
-              <span className="dash-round-ic pink">
-                <IconTerminal2 size={15} stroke={1.7} />
-              </span>
-              <h3>Run SQL</h3>
-            </div>
-            <span className="dash-console-conn">{activeId ? "main" : "no connection"}</span>
+        <section className="dash-card dash-promo">
+          <div className="dash-promo-art">
+            <svg viewBox="0 0 120 92" fill="none" aria-hidden>
+              <ellipse cx="60" cy="60" rx="48" ry="30" fill="rgba(124, 108, 245, 0.22)" />
+              <rect x="40" y="10" width="40" height="30" rx="5" fill="#f4f2ff" />
+              <line x1="47" y1="21" x2="73" y2="21" stroke="#9b8bf0" strokeWidth="3" strokeLinecap="round" />
+              <line x1="47" y1="29" x2="66" y2="29" stroke="#cabff7" strokeWidth="3" strokeLinecap="round" />
+              <rect x="30" y="36" width="60" height="40" rx="8" fill="url(#promoEnv)" />
+              <path d="M30 44 L60 64 L90 44" stroke="rgba(255,255,255,0.55)" strokeWidth="2.4" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+              <path d="M100 18 l1.6 4.6 4.6 1.6 -4.6 1.6 -1.6 4.6 -1.6 -4.6 -4.6 -1.6 4.6 -1.6 z" fill="#cabff7" />
+              <circle cx="20" cy="32" r="2.4" fill="#8b7bf7" />
+              <defs>
+                <linearGradient id="promoEnv" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0" stopColor="#8b7bf7" />
+                  <stop offset="1" stopColor="#6a58ee" />
+                </linearGradient>
+              </defs>
+            </svg>
           </div>
-          <textarea
-            className="dash-console-input"
-            spellCheck={false}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-          />
-          <div className="dash-console-foot">
-            <button className="dash-console-ai" onClick={() => loadQuery(text)}>
-              <IconSparkles size={15} stroke={1.7} /> Ask AI
-            </button>
-            <button className="dash-console-run" onClick={runConsole}>
-              <IconPlayerPlay size={15} stroke={1.8} /> Run
-            </button>
-          </div>
-        </section>
-
-        <section className="dash-card a-tables">
-          <div className="dash-card-head">
-            <div className="dash-head-titled">
-              <span className="dash-round-ic">
-                <IconTable size={15} stroke={1.7} />
-              </span>
-              <h3>Largest tables</h3>
-            </div>
-            <button className="dash-link" onClick={() => enter({ top: "data" })}>
-              All
-            </button>
-          </div>
-          <div className="dash-items">
-            {LARGEST.map((t) => (
-              <button className="dash-item dash-item-btn" key={t.name} onClick={() => enter({ top: "data" })}>
-                <div className="dash-item-name">
-                  <span>{t.name}</span>
-                  <span className="sub">{t.schema}</span>
-                </div>
-                <div className="dash-item-bar">
-                  <div className="dash-item-fill" style={{ width: `${t.w}%` }} />
-                </div>
-                <div className="dash-item-val">
-                  <span className="amt">{t.size}</span>
-                  <span className="dash-item-meta">{t.rows} rows</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="dash-card a-recent">
-          <div className="dash-card-head">
-            <div className="dash-head-titled">
-              <span className="dash-round-ic">
-                <IconHistory size={15} stroke={1.7} />
-              </span>
-              <h3>Recent queries</h3>
-            </div>
-            <button className="dash-link" onClick={() => enter({ top: "data", view: "history" })}>
-              History
-            </button>
-          </div>
-          <div className="dash-qlist">
-            {RECENT.map((q) => (
-              <button className="dash-qrow" key={q.sql} onClick={() => loadQuery(q.sql)}>
-                <IconCode size={15} stroke={1.7} />
-                <span className="dash-qrow-sql">{q.sql}</span>
-                <span className="dash-qrow-meta">{q.when}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="dash-card a-saved">
-          <div className="dash-card-head">
-            <div className="dash-head-titled">
-              <span className="dash-round-ic pink">
-                <IconBookmark size={15} stroke={1.7} />
-              </span>
-              <h3>Saved queries</h3>
-            </div>
-            <button className="dash-link" onClick={runConsole}>
-              New
-            </button>
-          </div>
-          <div className="dash-qlist">
-            {SAVED.map((s) => (
-              <button className="dash-qrow saved" key={s.name} onClick={() => loadQuery(s.sql)}>
-                <IconBookmark size={15} stroke={1.7} />
-                <span className="dash-qrow-name">{s.name}</span>
-                <span className="dash-qrow-sql dim">{s.sql}</span>
-              </button>
-            ))}
-          </div>
+          <p className="dash-promo-t">Get started with AI queries for FREE</p>
+          <button className="dash-promo-btn" onClick={() => enter({ top: "data", view: "sql" })}>
+            Try now
+          </button>
         </section>
       </div>
+
+      <section className="dash-card dash-active">
+        <div className="dash-active-head">
+          <h3>Active on site</h3>
+          <button className="dash-active-link" onClick={() => enter({ top: "data" })}>
+            <IconArrowUpRight size={16} stroke={1.8} />
+          </button>
+        </div>
+        <div className="dash-active-tabs">
+          {HEAT_TABS.map((t, i) => (
+            <button key={t} className={i === tab ? "on" : ""} onClick={() => setTab(i)}>
+              {t}
+            </button>
+          ))}
+        </div>
+        <div className="dash-heat-wrap">
+          <div className="dash-heat">
+            <div className="dash-heat-row head">
+              <span className="dash-heat-label" />
+              {HEAT_COLS.map((c) => (
+                <span key={c} className="dash-heat-colh">
+                  {c}
+                </span>
+              ))}
+            </div>
+            {HEAT.map((row, r) => (
+              <div className="dash-heat-row" key={MONTHS[r]}>
+                <span className="dash-heat-label">{MONTHS[r]}</span>
+                {row.map((v, c) => (
+                  <span key={`${r}-${c}`} className={`dash-heat-cell ${v <= 0 ? "z" : ""}`} style={{ background: heatBg(v) }}>
+                    {v}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </main>
   );
 }
@@ -696,13 +575,21 @@ export function Dashboard() {
   const setTopView = useStore((s) => s.setTopView);
   const setView = useStore((s) => s.setView);
   const loadConnections = useStore((s) => s.loadConnections);
-  const connections = useStore((s) => s.connections);
-  const activeId = useStore((s) => s.activeConnectionId);
-  const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const page = useStore((s) => s.dashPage);
   const setPage = useStore((s) => s.setDashPage);
   const [modal, setModal] = useState<ModalState>(null);
-  const [connsOpen, setConnsOpen] = useState(true);
+  const [schemaOpen, setSchemaOpen] = useState(true);
+  const [sideHidden, setSideHidden] = useState(false);
+
+  useEffect(() => {
+    void loadConnections();
+  }, [loadConnections]);
+
+  const enter = (dest?: Dest) => {
+    setScreen("workspace");
+    if (dest?.top) setTopView(dest.top);
+    if (dest?.view) setView(dest.view);
+  };
 
   const navBtn = (n: NavItem) => (
     <button
@@ -715,75 +602,68 @@ export function Dashboard() {
     >
       <n.Icon size={18} stroke={1.7} />
       <span className="dash-nav-t">{n.label}</span>
+      {n.badge && <span className="dash-nav-newbadge">{n.badge}</span>}
     </button>
   );
-
-  useEffect(() => {
-    void loadConnections();
-  }, [loadConnections]);
-
-  const enter = (dest?: Dest) => {
-    setScreen("workspace");
-    if (dest?.top) setTopView(dest.top);
-    if (dest?.view) setView(dest.view);
-  };
 
   const isEdit = modal !== null && "id" in modal;
   const initialEngine = modal !== null && !("id" in modal) ? modal.engine : undefined;
 
   return (
-    <div className="dash-app">
-      <aside className="dash-side">
-        <div className="dash-logo">
-          <span className="dash-logo-mark" />
-          <span className="dash-logo-text">
-            MAMA<span>SQL</span>
+    <div className={`dash-app ${sideHidden ? "side-hidden" : ""}`}>
+      <header className="dash-topbar">
+        <div className="dash-tb-l">
+          <span className="dash-tb-logo">
+            <span className="dash-tb-logomark" />
+            MamaSQL
+            <IconChevronDown size={13} stroke={2} className="dash-tb-logocaret" />
           </span>
+          <button className="dash-tb-collapse" title="Toggle sidebar" onClick={() => setSideHidden((v) => !v)}>
+            <IconLayoutSidebarLeftCollapse size={18} stroke={1.7} />
+          </button>
         </div>
+        <div className="dash-tb-crumb">
+          <span>Workspace</span> <span className="sep">/</span> <span className="cur">Overview</span>
+        </div>
+        <button className="dash-tb-user">
+          <span className="dash-tb-avatar">A</span>
+          <span className="dash-tb-uname">Alex Wilkerson</span>
+          <IconChevronDown size={15} stroke={1.8} />
+        </button>
+      </header>
+
+      <aside className="dash-side">
+        <button className="dash-side-search" onClick={() => window.dispatchEvent(new Event("mamasql:cmdk"))}>
+          <IconSearch size={15} stroke={1.8} />
+          <span>Search</span>
+          <kbd>⌘K</kbd>
+        </button>
 
         <div className="dash-nav-scroll">
           <div className="dash-nav-label">Main menu</div>
-          <nav className="dash-nav">
-            {navBtn(HOME_ITEM)}
+          <nav className="dash-nav">{MAIN_NAV.map(navBtn)}</nav>
 
-            <button className={`dash-nav-item ${page === "connections" ? "active" : ""}`} onClick={() => setPage("connections")}>
-              <IconServer size={18} stroke={1.7} />
-              <span className="dash-nav-t">Connections</span>
-              <span
-                className="dash-nav-chevron"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setConnsOpen((o) => !o);
-                }}
-              >
-                <IconChevronDown size={15} stroke={1.9} className={`ic ${connsOpen ? "open" : ""}`} />
-              </span>
+          <div className="dash-nav-label">Database</div>
+          <nav className="dash-nav">
+            <button className="dash-nav-item" onClick={() => setSchemaOpen((o) => !o)}>
+              <IconSchema size={18} stroke={1.7} />
+              <span className="dash-nav-t">Schema</span>
+              <IconChevronDown size={15} stroke={1.9} className={`dash-nav-caret ${schemaOpen ? "open" : ""}`} />
             </button>
-            {connsOpen && (
+            {schemaOpen && (
               <div className="dash-subnav">
-                {connections.map((c) => (
-                  <button
-                    key={c.id}
-                    className={`dash-subitem ${c.id === activeId ? "active" : ""}`}
-                    onClick={() => {
-                      void openAndIntrospect(c.id);
-                      enter({ top: "data" });
-                    }}
-                  >
-                    <EngineIcon engine={c.engine} size={14} />
-                    <span>{c.name}</span>
+                {SCHEMA_CHILDREN.map((x) => (
+                  <button key={x} className="dash-subitem" onClick={() => enter({ top: "data" })}>
+                    <span>{x}</span>
                   </button>
                 ))}
-                {connections.length === 0 && <span className="dash-subempty">No connections yet</span>}
               </div>
             )}
-
-            {MAIN_REST.map(navBtn)}
+            {DB_NAV.map(navBtn)}
           </nav>
-
-          <div className="dash-nav-label acc">Account</div>
-          <nav className="dash-nav">{ACCOUNT_ITEMS.map(navBtn)}</nav>
         </div>
+
+        <div className="dash-side-foot">{FOOT_NAV.map(navBtn)}</div>
       </aside>
 
       {page === "connections" ? (
@@ -791,7 +671,7 @@ export function Dashboard() {
       ) : page === "logs" ? (
         <LogsPage />
       ) : (
-        <Home enter={enter} connections={connections} onAdd={() => setModal({})} />
+        <Home enter={enter} />
       )}
 
       {modal !== null && (

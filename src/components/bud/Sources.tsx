@@ -8,16 +8,15 @@ import {
   IconEye,
   IconFilter,
   IconFolderOpen,
+  IconLayoutSidebar,
   IconPencil,
   IconPlus,
   IconRefresh,
   IconSearch,
   IconSettings,
-  IconShieldLock,
   IconTable,
   IconTablePlus,
   IconTrash,
-  IconUser,
   IconX,
 } from "@tabler/icons-react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -26,9 +25,11 @@ import type { ConnectionConfig, Engine } from "../../ipc/types";
 import { useStore } from "../../state/store";
 import { ContextMenu, type CtxAnchor, type MenuItem } from "./ContextMenu";
 
+const PANELS = ["Databases", "Scripts", "Favorites"] as const;
+
 function EngineIcon({ engine }: { engine: Engine }) {
-  if (engine === "mysql") return <IconBrandMysql size={16} stroke={1.7} />;
-  return <IconDatabase size={15} stroke={1.7} />;
+  if (engine === "mysql") return <IconBrandMysql size={15} stroke={1.7} />;
+  return <IconDatabase size={14} stroke={1.7} />;
 }
 
 function connString(c: ConnectionConfig): string {
@@ -40,19 +41,30 @@ function connString(c: ConnectionConfig): string {
   return `${scheme}://${user}${host}:${port}/${c.database}`;
 }
 
-/** A collapsible category section (SYSTEM, DATA SOURCES …). */
-function CategoryGroup({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
-  const [open, setOpen] = useState(true);
+/** A collapsible object-type folder inside a connection (Tables, Views, …). */
+function ObjectGroup({
+  label,
+  count,
+  defaultOpen = false,
+  children,
+}: {
+  label: string;
+  count: number;
+  defaultOpen?: boolean;
+  children?: ReactNode;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="bud-cat">
-      <div className="bud-cat-head">
-        <button className="bud-cat-toggle" onClick={() => setOpen((v) => !v)}>
-          {open ? <IconChevronDown size={12} stroke={2.2} /> : <IconChevronRight size={12} stroke={2.2} />}
-          {title}
-        </button>
-        {action}
+    <div className="bud-objgroup">
+      <div className="bud-objgroup-head" onClick={() => setOpen((v) => !v)}>
+        <span className="bud-ds-arrow">
+          {open ? <IconChevronDown size={12} stroke={2} /> : <IconChevronRight size={12} stroke={2} />}
+        </span>
+        <IconFolderOpen size={14} stroke={1.7} className="bud-objgroup-ic" />
+        <span className="bud-objgroup-label">{label}</span>
+        <span className="bud-objgroup-count">{count}</span>
       </div>
-      {open && <div className="bud-cat-body">{children}</div>}
+      {open && children && <div className="bud-objgroup-body">{children}</div>}
     </div>
   );
 }
@@ -69,6 +81,8 @@ export function Sources({
   const scanLocal = useStore((s) => s.scanLocal);
   const [filter, setFilter] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [panel, setPanel] = useState<(typeof PANELS)[number]>("Databases");
+  const [rootOpen, setRootOpen] = useState(true);
 
   useEffect(() => {
     loadConnections();
@@ -77,25 +91,40 @@ export function Sources({
 
   return (
     <aside className="bud-sources">
-      <div className="bud-sources-head">
-        <span>Sources</span>
-        <div className="bud-sources-actions">
-          <button
-            className={`icon-btn ${searchOpen ? "active" : ""}`}
-            title="Search tables"
-            onClick={() => setSearchOpen((v) => !v)}
-          >
-            <IconSearch size={15} stroke={1.7} />
+      <nav className="bud-panel-tabs">
+        {PANELS.map((p) => (
+          <button key={p} className={`bud-panel-tab ${panel === p ? "on" : ""}`} onClick={() => setPanel(p)}>
+            {p}
           </button>
-          <button className="icon-btn" title="Add server" onClick={onAddServer}>
-            <IconPlus size={16} stroke={1.8} />
-          </button>
-        </div>
+        ))}
+      </nav>
+
+      <div className="bud-tree-toolbar">
+        <button title="New connection" onClick={onAddServer}>
+          <IconPlus size={15} stroke={1.8} />
+        </button>
+        <button
+          title="Refresh"
+          onClick={() => {
+            void loadConnections();
+            void scanLocal();
+          }}
+        >
+          <IconRefresh size={15} stroke={1.7} />
+        </button>
+        <button className={searchOpen ? "on" : ""} title="Filter objects" onClick={() => setSearchOpen((v) => !v)}>
+          <IconFilter size={15} stroke={1.7} />
+        </button>
+        <span className="bud-tree-toolbar-sp" />
+        <button title="Tree layout">
+          <IconLayoutSidebar size={15} stroke={1.7} />
+        </button>
       </div>
+
       {searchOpen && (
         <div className="bud-src-search">
           <IconSearch size={14} stroke={1.7} />
-          <input autoFocus placeholder="Filter tables…" value={filter} onChange={(e) => setFilter(e.target.value)} />
+          <input autoFocus placeholder="Filter objects…" value={filter} onChange={(e) => setFilter(e.target.value)} />
           {filter && (
             <button className="bud-src-search-x" title="Clear" onClick={() => setFilter("")}>
               <IconX size={13} stroke={1.9} />
@@ -103,34 +132,32 @@ export function Sources({
           )}
         </div>
       )}
-      <div className="bud-sources-list">
-        <CategoryGroup title="SYSTEM">
-          <div className="bud-src static">
-            <span className="bud-src-ic">
-              <IconUser size={15} stroke={1.7} />
-            </span>{" "}
-            App users
-          </div>
-          <div className="bud-src static">
-            <span className="bud-src-ic">
-              <IconShieldLock size={15} stroke={1.7} />
-            </span>{" "}
-            Manage roles
-          </div>
-        </CategoryGroup>
 
-        <CategoryGroup
-          title="DATA SOURCES"
-          action={
-            <button className="bud-cat-add" title="Add server" onClick={onAddServer}>
-              <IconPlus size={14} stroke={2} />
-            </button>
-          }
-        >
-          {connections.map((c) => (
-            <Datasource key={c.id} conn={c} onEditServer={onEditServer} filter={filter} />
-          ))}
-        </CategoryGroup>
+      <div className="bud-sources-list">
+        {panel === "Databases" ? (
+          <>
+            <div className="bud-tnode root" onClick={() => setRootOpen((v) => !v)}>
+              <span className="bud-tnode-arrow">
+                {rootOpen ? <IconChevronDown size={13} stroke={2} /> : <IconChevronRight size={13} stroke={2} />}
+              </span>
+              <IconFolderOpen size={14} stroke={1.7} className="bud-tnode-ic" />
+              <span className="bud-tnode-label">Demo Databases</span>
+            </div>
+            {rootOpen && (
+              <div className="bud-tree-children">
+                {connections.length === 0 ? (
+                  <div className="bud-ds-empty">No connections yet</div>
+                ) : (
+                  connections.map((c) => (
+                    <Datasource key={c.id} conn={c} onEditServer={onEditServer} filter={filter} />
+                  ))
+                )}
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="bud-ds-empty">{panel === "Scripts" ? "No scripts yet." : "No favorites yet."}</div>
+        )}
       </div>
     </aside>
   );
@@ -159,6 +186,8 @@ function Datasource({
   const shownTables = filter
     ? tables.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()))
     : tables;
+  const schemaName = conn.engine === "postgres" ? "public" : "main";
+  const dbName = conn.database || "database";
 
   const toggle = async () => {
     if (!isActive) await openAndIntrospect(conn.id);
@@ -193,18 +222,18 @@ function Datasource({
 
   const items: MenuItem[] = [
     {
-      label: isActive ? "Open (selected)" : "Select / open",
+      label: isActive ? "Open (selected)" : "Connect",
       icon: (<IconFolderOpen size={15} stroke={1.7} />),
       disabled: isActive,
       onClick: () => void openAndIntrospect(conn.id),
     },
-    { label: "Refresh tables", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: () => void openAndIntrospect(conn.id) },
+    { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: () => void openAndIntrospect(conn.id) },
     { label: "New table", icon: (<IconTablePlus size={15} stroke={1.7} />), onClick: () => void newTable() },
     { divider: true },
     { label: "Rename", icon: (<IconPencil size={15} stroke={1.7} />), onClick: () => void rename() },
     { label: "Edit connection…", icon: (<IconDatabaseCog size={15} stroke={1.7} />), onClick: () => onEditServer(conn) },
     {
-      label: "Settings",
+      label: "Properties",
       icon: (<IconSettings size={15} stroke={1.7} />),
       onClick: () => {
         void openAndIntrospect(conn.id);
@@ -213,11 +242,11 @@ function Datasource({
     },
     { label: "Copy connection string", icon: (<IconCopy size={15} stroke={1.7} />), onClick: copyString },
     { divider: true },
-    { label: "Delete data source", icon: (<IconTrash size={15} stroke={1.7} />), danger: true, onClick: remove },
+    { label: "Remove data source", icon: (<IconTrash size={15} stroke={1.7} />), danger: true, onClick: remove },
   ];
 
   return (
-    <div className="bud-ds">
+    <div className={`bud-ds ${isActive ? "connected" : ""}`}>
       <div
         className="bud-src ds"
         onClick={toggle}
@@ -238,10 +267,27 @@ function Datasource({
         <div className="bud-ds-tables">
           {loadingTables ? (
             <div className="bud-ds-empty">Loading…</div>
-          ) : shownTables.length === 0 ? (
-            <div className="bud-ds-empty">{filter ? "No match" : "No tables"}</div>
           ) : (
-            shownTables.map((t) => <TableRow key={t.name} table={t.name} connectionId={conn.id} />)
+            <ObjectGroup label="Databases" count={1} defaultOpen>
+              <ObjectGroup label={`${dbName} (Default)`} count={1} defaultOpen>
+                <ObjectGroup label="Schemas" count={1} defaultOpen>
+                  <ObjectGroup label={schemaName} count={shownTables.length} defaultOpen>
+                    <ObjectGroup label="Tables" count={shownTables.length} defaultOpen>
+                      {shownTables.length === 0 ? (
+                        <div className="bud-ds-empty">{filter ? "No match" : "No tables"}</div>
+                      ) : (
+                        shownTables.map((t) => <TableRow key={t.name} table={t.name} connectionId={conn.id} />)
+                      )}
+                    </ObjectGroup>
+                    <ObjectGroup label="Views" count={0} />
+                    <ObjectGroup label="Indexes" count={0} />
+                    <ObjectGroup label="Sequences" count={0} />
+                    <ObjectGroup label="Procedures" count={0} />
+                    <ObjectGroup label="Functions" count={0} />
+                  </ObjectGroup>
+                </ObjectGroup>
+              </ObjectGroup>
+            </ObjectGroup>
           )}
         </div>
       )}
@@ -302,7 +348,7 @@ function TableRow({ table, connectionId }: { table: string; connectionId: string
         }}
       >
         <span className="bud-table-ic">
-          <IconTable size={15} stroke={1.7} />
+          <IconTable size={14} stroke={1.7} />
         </span>
         {table}
       </div>

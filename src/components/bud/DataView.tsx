@@ -2,13 +2,7 @@ import {
   IconBolt,
   IconCode,
   IconCopy,
-  IconDeviceDesktop,
-  IconDots,
   IconDownload,
-  IconLink,
-  IconLock,
-  IconSettings,
-  IconSparkles,
   IconTable,
   IconTrash,
   IconUpload,
@@ -17,20 +11,14 @@ import {
 import { type ComponentType, type MouseEvent, useRef, useState } from "react";
 import { download, fromCsv, toCsv } from "../../lib/csv";
 import { useStore } from "../../state/store";
-import { CreateViewModal } from "./CreateViewModal";
 import { DataGrid } from "./DataGrid";
 import { SqlPanel } from "./SqlPanel";
 
 type Icon = ComponentType<{ size?: number; stroke?: number }>;
 const TOOLS: { Icon: Icon; label: string }[] = [
-  { Icon: IconLock, label: "Access: App user" },
-  { Icon: IconLink, label: "Define relationship" },
   { Icon: IconDownload, label: "Import" },
   { Icon: IconUpload, label: "Export" },
   { Icon: IconBolt, label: "Row actions" },
-  { Icon: IconDeviceDesktop, label: "Screens" },
-  { Icon: IconSettings, label: "Automations" },
-  { Icon: IconSparkles, label: "Generate" },
 ];
 
 type MenuState = { kind: "rowactions" | "generate"; x: number; y: number } | null;
@@ -49,10 +37,7 @@ export function DataView() {
   const deleteSelected = useStore((s) => s.deleteSelected);
   const duplicateSelected = useStore((s) => s.duplicateSelected);
   const clearSelection = useStore((s) => s.clearSelection);
-  const activeViewId = useStore((s) => s.activeViewId);
-
   const [menu, setMenu] = useState<MenuState>(null);
-  const [viewModal, setViewModal] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const table = editTable?.table ?? "export";
@@ -114,26 +99,23 @@ export function DataView() {
 
   return (
     <main className="bud-main">
-      <div className="bud-breadcrumb">
-        <span className="bud-bc-table">
-          <span className="bud-bc-ic">
-            <IconTable size={15} stroke={1.7} />
+      <div className="bud-qtabs">
+        <button className={`bud-qtab ${view === "sql" ? "on" : ""}`} onClick={() => setView("sql")}>
+          <IconCode size={14} stroke={1.7} className="bud-qtab-ic sql" />
+          <span>SQL Editor</span>
+          <span className="bud-qtab-x">
+            <IconX size={12} stroke={2} />
           </span>
-          {editTable ? editTable.table : "data"}
-          <IconDots size={15} stroke={1.8} className="bud-bc-menu" />
-        </span>
-        <button className="bud-create-view" disabled={!editTable || !result} onClick={() => setViewModal(true)}>
-          Create a view
         </button>
-        <span className="bud-bc-help">
-          {activeViewId ? "Viewing a filtered subset of this table." : "To create subsets of data, control access and more, create a view."}
-        </span>
-        <button
-          className={`bud-sql-toggle ${view === "sql" ? "active" : ""}`}
-          onClick={() => setView(view === "sql" ? "data" : "sql")}
-        >
-          <IconCode size={14} stroke={1.7} /> SQL
-        </button>
+        {editTable && (
+          <button className={`bud-qtab ${view !== "sql" ? "on" : ""}`} onClick={() => setView("data")}>
+            <IconTable size={14} stroke={1.7} className="bud-qtab-ic" />
+            <span>{editTable.table}</span>
+            <span className="bud-qtab-x">
+              <IconX size={12} stroke={2} />
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="bud-toolbar">
@@ -215,9 +197,6 @@ export function DataView() {
         </>
       )}
 
-      {viewModal && editTable && (
-        <CreateViewModal table={editTable.table} columns={cols} onClose={() => setViewModal(false)} />
-      )}
     </main>
   );
 }

@@ -1,115 +1,76 @@
-import { useState } from "react";
 import {
-  IconBrandMysql,
-  IconChevronDown,
-  IconDatabase,
+  IconChartBar,
+  IconDeviceFloppy,
+  IconFilePlus,
+  IconFolderOpen,
+  IconHistory,
   IconPlayerPlay,
-  IconPlus,
-  IconRocket,
-  IconServer,
-  IconUsers,
+  IconPlugConnected,
+  IconRefresh,
+  IconScript,
+  IconSettings,
 } from "@tabler/icons-react";
-import type { ConnectionConfig } from "../../ipc/types";
-import { type TopView, useStore } from "../../state/store";
+import { useStore } from "../../state/store";
 
-const TABS: { id: TopView; label: string }[] = [
-  { id: "data", label: "Data" },
-  { id: "design", label: "Design" },
-  { id: "automation", label: "Automation" },
-  { id: "settings", label: "Settings" },
-];
-
-function EngineIcon({ conn, size = 15 }: { conn: ConnectionConfig; size?: number }) {
-  if (conn.engine === "mysql") return <IconBrandMysql size={size} stroke={1.7} />;
-  return <IconDatabase size={size} stroke={1.7} />;
+/** Mac-style window controls (decorative, matches DbVisualizer on macOS). */
+function TrafficLights() {
+  return (
+    <div className="bud-traffic" aria-hidden>
+      <span className="tl r" />
+      <span className="tl y" />
+      <span className="tl g" />
+    </div>
+  );
 }
 
 export function TopNav({ onAddServer }: { onAddServer: () => void }) {
-  const connections = useStore((s) => s.connections);
-  const activeId = useStore((s) => s.activeConnectionId);
-  const active = connections.find((c) => c.id === activeId);
-  const topView = useStore((s) => s.topView);
+  const active = useStore((s) => s.connections.find((c) => c.id === s.activeConnectionId));
   const setTopView = useStore((s) => s.setTopView);
-  const setScreen = useStore((s) => s.setScreen);
-  const openAndIntrospect = useStore((s) => s.openAndIntrospect);
-  const [open, setOpen] = useState(false);
+  const setView = useStore((s) => s.setView);
+  const run = useStore((s) => s.run);
+
+  const engineName = active ? (active.engine === "postgres" ? "PostgreSQL" : active.engine === "mysql" ? "MySQL" : "SQLite") : null;
+  const title = active ? `DbVisualizer Pro — ${engineName} — ${active.name}` : "DbVisualizer Pro — Untitled";
 
   return (
-    <div className="bud-topnav">
-      <div className="bud-topnav-left">
-        <button className="bud-brand" onClick={() => setScreen("dashboard")} title="Back to dashboard">
-          MAMA<span className="bud-brand-accent">SQL</span>
+    <div className="bud-titlebar">
+      <TrafficLights />
+      <div className="bud-tb-tools">
+        <button title="New SQL file" onClick={() => { setTopView("data"); setView("sql"); }}>
+          <IconFilePlus size={16} stroke={1.6} />
         </button>
-        <span className="bud-topnav-sep" />
-        <nav className="bud-tabs">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              className={`bud-tab ${topView === t.id ? "active" : ""}`}
-              onClick={() => setTopView(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
+        <button title="New script" onClick={() => { setTopView("data"); setView("sql"); }}>
+          <IconScript size={16} stroke={1.6} />
+        </button>
+        <button title="Open file">
+          <IconFolderOpen size={16} stroke={1.6} />
+        </button>
+        <button title="Save">
+          <IconDeviceFloppy size={16} stroke={1.6} />
+        </button>
+        <span className="bud-tb-divider" />
+        <button title="New connection" onClick={onAddServer}>
+          <IconPlugConnected size={16} stroke={1.6} />
+        </button>
+        <button title="Reconnect">
+          <IconRefresh size={16} stroke={1.6} />
+        </button>
+        <span className="bud-tb-divider" />
+        <button className="bud-tb-run" title="Execute (⌘↵)" onClick={() => void run()}>
+          <IconPlayerPlay size={16} stroke={1.7} />
+        </button>
+        <span className="bud-tb-divider" />
+        <button title="Monitor">
+          <IconChartBar size={16} stroke={1.6} />
+        </button>
+        <button title="SQL history" onClick={() => setView("history")}>
+          <IconHistory size={16} stroke={1.6} />
+        </button>
+        <button title="Settings" onClick={() => setTopView("settings")}>
+          <IconSettings size={16} stroke={1.6} />
+        </button>
       </div>
-
-      <div className="bud-topnav-center">
-        <button className={`bud-connsw ${open ? "open" : ""}`} onClick={() => setOpen((v) => !v)}>
-          <span className="bud-connsw-ic">
-            {active ? <EngineIcon conn={active} size={15} /> : <IconServer size={15} stroke={1.7} />}
-          </span>
-          <span className={`bud-connsw-name ${active ? "" : "muted"}`}>{active ? active.name : "No connection"}</span>
-          <IconChevronDown size={14} stroke={1.8} className="bud-connsw-caret" />
-        </button>
-        {open && (
-          <>
-            <div className="bud-menu-backdrop" onClick={() => setOpen(false)} />
-            <div className="bud-connsw-menu">
-              <div className="bud-connsw-label">Servers</div>
-              {connections.length === 0 && <div className="bud-connsw-empty">No servers yet</div>}
-              {connections.map((c) => (
-                <button
-                  key={c.id}
-                  className={`bud-connsw-item ${c.id === activeId ? "active" : ""}`}
-                  onClick={() => {
-                    if (c.id !== activeId) void openAndIntrospect(c.id);
-                    setOpen(false);
-                  }}
-                >
-                  <EngineIcon conn={c} size={15} />
-                  <span className="bud-connsw-iname">{c.name}</span>
-                  {c.id === activeId && <span className="bud-connsw-dot" />}
-                </button>
-              ))}
-              <div className="bud-connsw-div" />
-              <button
-                className="bud-connsw-add"
-                onClick={() => {
-                  setOpen(false);
-                  onAddServer();
-                }}
-              >
-                <IconPlus size={15} stroke={2} /> Add server
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-
-      <div className="bud-topnav-right">
-        <button className="bud-naction">
-          <IconUsers size={16} stroke={1.7} /> Users
-        </button>
-        <button className="bud-naction bud-preview">
-          <IconPlayerPlay size={15} stroke={1.7} /> Preview
-        </button>
-        <button className="bud-publish">
-          <IconRocket size={15} stroke={1.7} /> Publish
-          <IconChevronDown size={13} stroke={1.8} className="caret" />
-        </button>
-        <span className="bud-avatar">R</span>
-      </div>
+      <div className="bud-tb-title">{title}</div>
     </div>
   );
 }

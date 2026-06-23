@@ -12,7 +12,7 @@ const browser = await chromium.launch({ channel: "msedge", headless: true });
 try {
   const page = await browser.newPage({
     viewport: { width: 1320, height: 860 },
-    deviceScaleFactor: 2,
+    deviceScaleFactor: 1,
   });
   for (let i = 0; i < 20; i++) {
     try {
@@ -23,41 +23,18 @@ try {
     }
   }
   try {
-    // The dashboard is the default landing screen — wait for it and shoot.
-    await page.waitForSelector(".dash-app", { timeout: 12000 });
-    await page.waitForTimeout(600);
+    // The SQL-client workspace is the app — wait for it, then open the first
+    // datasource → first table so the editor + results grid are populated.
+    await page.waitForSelector(".bud-app", { timeout: 12000 });
+    await page.waitForTimeout(700);
+    // Activate the first connection, then run the default query so the
+    // SQL editor + results are populated (DbVisualizer-style view).
+    await page.click(".bud-src.ds").catch(() => {});
+    await page.waitForTimeout(700);
+    await page.click(".bud-sql-run").catch(() => {});
+    await page.waitForTimeout(900);
     await page.screenshot({ path: "screenshot.png" });
-    console.log("wrote screenshot.png");
-
-    // Command palette (⌘K).
-    await page.click(".dash-cmdk-btn").catch(() => {});
-    await page.waitForSelector(".cmdk", { timeout: 4000 }).catch(() => {});
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: "screenshot-cmdk.png" });
-    console.log("wrote screenshot-cmdk.png");
-    await page.keyboard.press("Escape").catch(() => {});
-    await page.waitForTimeout(200);
-
-    // Connections page.
-    await page.click('.dash-nav-item:has-text("Connections")');
-    await page.waitForTimeout(500);
-    await page.screenshot({ path: "screenshot-connections.png" });
-    console.log("wrote screenshot-connections.png");
-
-    // Custom Add-connection modal.
-    await page.click(".dash-add-btn");
-    await page.waitForSelector(".dmodal", { timeout: 4000 });
-    await page.waitForTimeout(400);
-    await page.screenshot({ path: "screenshot-modal.png" });
-    console.log("wrote screenshot-modal.png");
-    await page.click(".dmodal-x").catch(() => {});
-    await page.waitForTimeout(250);
-
-    // Logs page.
-    await page.click('.dash-nav-item:has-text("Logs")');
-    await page.waitForTimeout(500);
-    await page.screenshot({ path: "screenshot-logs.png" });
-    console.log("wrote screenshot-logs.png");
+    console.log("wrote screenshot.png (workspace)");
   } catch (e) {
     console.log("interaction error: " + e.message);
     await page.screenshot({ path: "screenshot.png" });
