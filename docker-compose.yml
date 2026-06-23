@@ -1,56 +1,63 @@
 name: mamasql
 
+# Easiest way to run MamaSQL: pulls prebuilt images from GitHub Container
+# Registry — no source checkout, no build step.
+#
+#   1. (optional) cp .env.example .env   and edit it
+#   2. docker compose up -d
+#   3. open http://localhost:5001
+#
+# To build the images yourself instead, use docker-compose.build.yml.
+
 services:
-  # The browser app (built static frontend served by nginx). nginx also
-  # reverse-proxies /api to the engine bridge, so everything is one origin.
+  # The app: built UI served by nginx, which also proxies /api to the bridge.
   web:
-    build:
-      context: .
-      dockerfile: docker/web.Dockerfile
+    container_name: mamasql_web
+    image: ghcr.io/fizzexual/mamasql-web:${MAMASQL_VERSION:-latest}
     ports:
       - "${WEB_PORT:-5001}:80"
     depends_on:
       - bridge
-    restart: unless-stopped
+    restart: always
 
-  # Node service that opens real PostgreSQL / MySQL connections for the browser.
-  # Not published — only reached through the web container's /api proxy.
+  # Opens real PostgreSQL / MySQL connections on the browser's behalf.
+  # Reached only through the web container's /api proxy.
   bridge:
-    build:
-      context: .
-      dockerfile: docker/bridge.Dockerfile
+    container_name: mamasql_bridge
+    image: ghcr.io/fizzexual/mamasql-bridge:${MAMASQL_VERSION:-latest}
     environment:
       BRIDGE_PORT: "5174"
     expose:
       - "5174"
-    restart: unless-stopped
+    restart: always
 
   # --- Optional demo databases ---------------------------------------------
-  # Connect to these from the app with host "postgres" / "mysql" (port 5432 /
-  # 3306) — the bridge reaches them over the compose network. Remove these two
-  # services if you only connect to your own databases.
+  # Connect from the app with host "postgres" / "mysql" (port 5432 / 3306).
+  # Delete these two services if you only connect to your own databases.
   postgres:
+    container_name: mamasql_postgres
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: mamasql
-      POSTGRES_PASSWORD: mamasql
-      POSTGRES_DB: demo
+      POSTGRES_USER: ${DB_USERNAME:-mamasql}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mamasql}
+      POSTGRES_DB: ${DB_DATABASE:-demo}
     ports:
       - "${PG_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
-    restart: unless-stopped
+    restart: always
 
   mysql:
+    container_name: mamasql_mysql
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: mamasql
-      MYSQL_DATABASE: demo
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-mamasql}
+      MYSQL_DATABASE: ${DB_DATABASE:-demo}
     ports:
       - "${MYSQL_PORT:-3307}:3306"
     volumes:
       - mysqldata:/var/lib/mysql
-    restart: unless-stopped
+    restart: always
 
 volumes:
   pgdata:

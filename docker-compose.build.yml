@@ -1,0 +1,58 @@
+name: mamasql
+
+# Build the images from source (for development or before the published images
+# exist). For the easy "just pull prebuilt images" path, use docker-compose.yml.
+#
+#   docker compose -f docker-compose.build.yml up -d --build
+
+services:
+  web:
+    container_name: mamasql_web
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - "${WEB_PORT:-5001}:80"
+    depends_on:
+      - bridge
+    restart: unless-stopped
+
+  bridge:
+    container_name: mamasql_bridge
+    build:
+      context: .
+      dockerfile: docker/bridge.Dockerfile
+    environment:
+      BRIDGE_PORT: "5174"
+    expose:
+      - "5174"
+    restart: unless-stopped
+
+  postgres:
+    container_name: mamasql_postgres
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USERNAME:-mamasql}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-mamasql}
+      POSTGRES_DB: ${DB_DATABASE:-demo}
+    ports:
+      - "${PG_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  mysql:
+    container_name: mamasql_mysql
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-mamasql}
+      MYSQL_DATABASE: ${DB_DATABASE:-demo}
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mysqldata:

@@ -13,10 +13,14 @@ editor, edit data inline, and (soon) work with results in a spreadsheet-and-char
 
 ## Run with Docker (easiest — any OS)
 
-Requires Docker with Compose. From the repo root:
+Requires Docker with Compose. You only need two files — `docker-compose.yml` and
+`.env` — no source checkout, no build step. Prebuilt images are pulled from the
+GitHub Container Registry.
 
 ```bash
-docker compose up -d --build
+# grab the compose file (and optionally the env template), then:
+cp .env.example .env      # optional — only to change ports/credentials
+docker compose up -d
 ```
 
 Then open **http://localhost:5001**. This runs the web UI (`web`), the engine
@@ -30,12 +34,24 @@ Connect from the app via **＋ New connection**:
 - **Demo MySQL** — host `mysql`, port `3306`, user `root`, password `mamasql`, database `demo`.
 - **Your own DB** — use its host/port; for a DB on your host machine use `host.docker.internal`.
 
-`docker compose down` stops it (`-v` also removes the demo-DB volumes). Override
-ports with `WEB_PORT`/`PG_PORT`/`MYSQL_PORT`. Don't want the demo databases?
-Delete the `postgres`/`mysql` services from `docker-compose.yml`.
+`docker compose down` stops it (`-v` also removes the demo-DB volumes). Configure
+ports/credentials/version in `.env` (see `.env.example`). Don't want the demo
+databases? Delete the `postgres`/`mysql` services from `docker-compose.yml`.
 
-To run from source instead: `npm install && npm run dev:all` (web app + bridge),
-then open the printed Vite URL.
+**Build the images yourself** (from a source checkout) instead of pulling:
+
+```bash
+docker compose -f docker-compose.build.yml up -d --build
+```
+
+> The published images come from the **Publish Docker images** GitHub Action
+> (`.github/workflows/docker-publish.yml`), which pushes `mamasql-web` and
+> `mamasql-bridge` to `ghcr.io/<owner>/…` on every push to `main` and on
+> `v*` tags. After the first run, make those two packages **public** in the
+> repo's GitHub *Packages* settings so anyone can pull them without logging in.
+
+To run from source for development: `npm install && npm run dev:all` (web app +
+bridge), then open the printed Vite URL.
 
 ## Download
 
