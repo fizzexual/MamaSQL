@@ -1,6 +1,7 @@
 import { IconAlertTriangle, IconCheck, IconInfoCircle, IconPlus, IconRefresh } from "@tabler/icons-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getBackend, isTauri } from "../../ipc/backend";
+import { bridgeHealthy } from "../../ipc/http";
 import type { ConnectionConfig, Engine } from "../../ipc/types";
 import { promptDialog } from "../../state/dialog";
 import { useStore } from "../../state/store";
@@ -26,7 +27,19 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
   const editing = !!existing;
 
   const [engine, setEngine] = useState<Engine>(existing?.engine ?? "sqlite");
+  const [bridgeUp, setBridgeUp] = useState<boolean | null>(null);
   const remoteInBrowser = engine !== "sqlite" && !isTauri();
+  const remoteReady = isTauri() || bridgeUp === true;
+
+  useEffect(() => {
+    if (!remoteInBrowser) return;
+    let alive = true;
+    setBridgeUp(null);
+    void bridgeHealthy().then((ok) => alive && setBridgeUp(ok));
+    return () => {
+      alive = false;
+    };
+  }, [remoteInBrowser]);
   const [name, setName] = useState(existing?.name ?? "");
   const [host, setHost] = useState(existing?.host ?? "localhost");
   const [port, setPort] = useState(existing?.port != null ? String(existing.port) : "");
@@ -101,7 +114,7 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
     }
   };
 
-  const canSave = engine === "sqlite" ? !!database.trim() : !remoteInBrowser && !!database.trim() && !!host.trim();
+  const canSave = engine === "sqlite" ? !!database.trim() : remoteReady && !!database.trim() && !!host.trim();
 
   return (
     <>
@@ -118,9 +131,15 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
             </select>
           </label>
           {remoteInBrowser && (
-            <div className="bud-conn-hint">
-              <IconInfoCircle size={15} stroke={1.7} />
-              <span>Remote databases need the desktop app. In the browser, use SQLite to create a real local database.</span>
+            <div className={`bud-conn-hint ${bridgeUp === false ? "warn" : bridgeUp ? "ok" : ""}`}>
+              {bridgeUp ? <IconCheck size={15} stroke={2} /> : <IconInfoCircle size={15} stroke={1.7} />}
+              <span>
+                {bridgeUp == null
+                  ? "Checking engine server…"
+                  : bridgeUp
+                    ? "Engine server connected — PostgreSQL & MySQL are ready."
+                    : "Engine server offline. Run “npm run bridge” (or “npm run dev:all”) to connect to remote databases."}
+              </span>
             </div>
           )}
           <label className="bud-field">

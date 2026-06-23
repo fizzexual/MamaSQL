@@ -2863,4 +2863,8 @@ select.bud-cb-select {
 /* connection-modal hints (browser vs desktop) */
 .bud-conn-hint { display: flex; align-items: flex-start; gap: 8px; padding: 9px 11px; border-radius: 6px; background: rgba(74, 136, 199, 0.1); border: 1px solid rgba(74, 136, 199, 0.3); color: var(--text); font-size: 12px; line-height: 1.45; }
 .bud-conn-hint svg { color: var(--accent-2); flex: none; margin-top: 1px; }
+.bud-conn-hint.ok { background: rgba(78, 157, 81, 0.12); border-color: rgba(95, 184, 95, 0.35); }
+.bud-conn-hint.ok svg { color: var(--green-bright); }
+.bud-conn-hint.warn { background: rgba(232, 160, 75, 0.12); border-color: rgba(232, 160, 75, 0.35); }
+.bud-conn-hint.warn svg { color: #e8a04b; }
 .bud-field-hint { font-size: 11px; color: var(--faint); font-weight: 400; line-height: 1.4; }

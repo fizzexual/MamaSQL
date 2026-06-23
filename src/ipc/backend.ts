@@ -1,5 +1,5 @@
-import { localBackend } from "./local";
 import { tauriBackend } from "./tauri";
+import { webBackend } from "./web";
 import type {
   ColumnDef,
   ColumnInfo,
@@ -50,8 +50,11 @@ export function isTauri(): boolean {
 
 let active: Backend | null = null;
 
-/** Tauri backend on the desktop; a real local SQLite (WASM) backend in the browser. */
+/**
+ * Tauri backend on the desktop; in the browser, a router that runs SQLite
+ * in-process (sql.js) and sends PostgreSQL/MySQL to the local engine bridge.
+ */
 export function getBackend(): Backend {
-  if (!active) active = isTauri() ? tauriBackend : localBackend;
+  if (!active) active = isTauri() ? tauriBackend : webBackend;
   return active;
 }

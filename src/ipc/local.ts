@@ -98,30 +98,10 @@ async function idbDel(key: string): Promise<void> {
 class LocalBackend implements Backend {
   private sql: Promise<SqlJsStatic> | null = null;
   private open = new Map<string, Database>();
-  private history: HistoryEntry[] = this.loadHistory();
-  private histId = this.history.reduce((m, h) => Math.max(m, h.id), 0);
 
   private SQL(): Promise<SqlJsStatic> {
     if (!this.sql) this.sql = initSqlJs({ locateFile: () => sqlWasmUrl });
     return this.sql;
-  }
-
-  private loadHistory(): HistoryEntry[] {
-    try {
-      const raw = JSON.parse(localStorage.getItem(HIST_KEY) ?? "[]");
-      return Array.isArray(raw) ? (raw as HistoryEntry[]) : [];
-    } catch {
-      return [];
-    }
-  }
-  private pushHistory(connectionId: string, sql: string): void {
-    this.history.unshift({ id: ++this.histId, connectionId, sql, ranAt: new Date().toISOString() });
-    if (this.history.length > 200) this.history.length = 200;
-    try {
-      localStorage.setItem(HIST_KEY, JSON.stringify(this.history));
-    } catch {
-      /* ignore */
-    }
   }
 
   private cfg(id: string): ConnectionConfig | undefined {
@@ -193,7 +173,6 @@ class LocalBackend implements Backend {
   async runQuery(connectionId: string, sql: string): Promise<QueryResult> {
     const db = await this.ensureDb(connectionId);
     const started = performance.now();
-    this.pushHistory(connectionId, sql);
     let columns: { name: string; dataType: string }[] = [];
     let rows: unknown[][] = [];
     try {
@@ -241,7 +220,12 @@ class LocalBackend implements Backend {
     }));
   }
   async recentHistory(limit: number): Promise<HistoryEntry[]> {
-    return this.history.slice(0, limit);
+    try {
+      const raw = JSON.parse(localStorage.getItem(HIST_KEY) ?? "[]");
+      return Array.isArray(raw) ? (raw as HistoryEntry[]).slice(0, limit) : [];
+    } catch {
+      return [];
+    }
   }
 
   /* ---- row + schema edits ---- */
