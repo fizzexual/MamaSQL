@@ -29,8 +29,9 @@ const PILL_COLORS: [string, string][] = [
  * mirror — show a plain empty state instead of a generic skeleton.
  */
 function GridSkeleton({ columns }: { columns?: ColumnInfo[] }) {
+  // Structure not known yet — don't fake a grid, just say we're loading.
   if (!columns || columns.length === 0) {
-    return <div className="bud-empty">This is empty — nothing to show.</div>;
+    return <div className="bud-empty">Loading…</div>;
   }
   const rows = Array.from({ length: 8 });
   return (
@@ -86,6 +87,9 @@ export function DataGrid() {
   const [newRow, setNewRow] = useState<string[] | null>(null);
   const [colEditor, setColEditor] = useState<ColumnEditorAnchor | null>(null);
   const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
+  // Only show the skeleton if loading actually lingers — avoids a flash on the
+  // near-instant in-browser SQLite loads.
+  const [showSkel, setShowSkel] = useState(false);
 
   const pkCol = editTable?.pkColumn ?? null;
   const pkIdx = useMemo(
@@ -127,7 +131,17 @@ export function DataGrid() {
 
   useEffect(() => setSort(null), [editTable?.table]);
 
-  if (loadingResult) return <GridSkeleton columns={columns} />;
+  useEffect(() => {
+    if (!loadingResult) {
+      setShowSkel(false);
+      return;
+    }
+    const t = setTimeout(() => setShowSkel(true), 160);
+    return () => clearTimeout(t);
+  }, [loadingResult]);
+
+  // While loading: nothing for the first moment (no flash), then the skeleton.
+  if (loadingResult) return showSkel ? <GridSkeleton columns={columns} /> : null;
   if (!result || !editTable) return null;
   const table = editTable.table;
   const allSelected = result.rows.length > 0 && selection.length === result.rows.length;
