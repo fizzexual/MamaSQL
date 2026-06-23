@@ -11,6 +11,32 @@ editor, edit data inline, and (soon) work with results in a spreadsheet-and-char
 > MariaDB 12.3 integration & an edit round-trip — and 11 TypeScript); strict `tsc` + Vite
 > bundle clean.
 
+## Run with Docker (easiest — any OS)
+
+Requires Docker with Compose. From the repo root:
+
+```bash
+docker compose up -d --build
+```
+
+Then open **http://localhost:5001**. This runs the web UI (`web`), the engine
+bridge that opens real PostgreSQL/MySQL sockets for the browser (`bridge`), and
+two demo databases you can connect to right away (`postgres`, `mysql`).
+
+Connect from the app via **＋ New connection**:
+
+- **SQLite** — pick a name; it's a real local database kept in your browser (no server).
+- **Demo PostgreSQL** — host `postgres`, port `5432`, user/password `mamasql`, database `demo`.
+- **Demo MySQL** — host `mysql`, port `3306`, user `root`, password `mamasql`, database `demo`.
+- **Your own DB** — use its host/port; for a DB on your host machine use `host.docker.internal`.
+
+`docker compose down` stops it (`-v` also removes the demo-DB volumes). Override
+ports with `WEB_PORT`/`PG_PORT`/`MYSQL_PORT`. Don't want the demo databases?
+Delete the `postgres`/`mysql` services from `docker-compose.yml`.
+
+To run from source instead: `npm install && npm run dev:all` (web app + bridge),
+then open the printed Vite URL.
+
 ## Download
 
 Grab the latest **standalone Windows executable** from the

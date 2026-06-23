@@ -1,0 +1,57 @@
+name: mamasql
+
+services:
+  # The browser app (built static frontend served by nginx). nginx also
+  # reverse-proxies /api to the engine bridge, so everything is one origin.
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - "${WEB_PORT:-5001}:80"
+    depends_on:
+      - bridge
+    restart: unless-stopped
+
+  # Node service that opens real PostgreSQL / MySQL connections for the browser.
+  # Not published — only reached through the web container's /api proxy.
+  bridge:
+    build:
+      context: .
+      dockerfile: docker/bridge.Dockerfile
+    environment:
+      BRIDGE_PORT: "5174"
+    expose:
+      - "5174"
+    restart: unless-stopped
+
+  # --- Optional demo databases ---------------------------------------------
+  # Connect to these from the app with host "postgres" / "mysql" (port 5432 /
+  # 3306) — the bridge reaches them over the compose network. Remove these two
+  # services if you only connect to your own databases.
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mamasql
+      POSTGRES_PASSWORD: mamasql
+      POSTGRES_DB: demo
+    ports:
+      - "${PG_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: mamasql
+      MYSQL_DATABASE: demo
+    ports:
+      - "${MYSQL_PORT:-3307}:3306"
+    volumes:
+      - mysqldata:/var/lib/mysql
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  mysqldata:

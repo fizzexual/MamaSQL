@@ -28,5 +28,11 @@ export default defineConfig(async () => ({
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ["**/src-tauri/**"],
     },
+    // Forward the engine-bridge API to the local bridge (npm run bridge),
+    // matching how the Docker web container proxies /api to the bridge.
+    proxy: {
+      // @ts-expect-error process is a nodejs global
+      "/api": { target: process.env.BRIDGE_URL || "http://localhost:5174", changeOrigin: true },
+    },
   },
 }));

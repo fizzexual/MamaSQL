@@ -1,0 +1,14 @@
+{
+  "name": "mamasql-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "MamaSQL engine bridge — connects the browser app to PostgreSQL/MySQL.",
+  "scripts": {
+    "start": "node bridge.mjs"
+  },
+  "dependencies": {
+    "mysql2": "^3.22.5",
+    "pg": "^8.22.0"
+  }
+}

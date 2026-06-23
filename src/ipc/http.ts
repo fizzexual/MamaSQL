@@ -6,13 +6,16 @@
 import type { Backend } from "./backend";
 import type { AppError, ConnectionConfig } from "./types";
 
-const DEFAULT_BRIDGE = "http://localhost:5174";
+// Same-origin by default: the dev server (vite proxy) and the Docker web
+// container (nginx) both forward "/api" to the bridge, so no host/port is
+// baked in. Override with localStorage "mamasql.bridge" to point elsewhere.
+const DEFAULT_BRIDGE = "";
 const CONNS_KEY = "mamasql.connections";
 const SECRETS_KEY = "mamasql.secrets";
 
 export function bridgeUrl(): string {
   try {
-    return localStorage.getItem("mamasql.bridge") || DEFAULT_BRIDGE;
+    return localStorage.getItem("mamasql.bridge") ?? DEFAULT_BRIDGE;
   } catch {
     return DEFAULT_BRIDGE;
   }

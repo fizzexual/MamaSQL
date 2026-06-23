@@ -1,0 +1,14 @@
+node_modules
+dist
+.git
+.gitignore
+src-tauri/target
+src-tauri/gen
+**/*.log
+screenshot*.png
+shot-*.png
+scripts/_verify*.mjs
+scripts/_repro*.mjs
+.claude
+.vscode
+.idea
