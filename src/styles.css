@@ -2901,3 +2901,7 @@ select.bud-cb-select {
 .bud-toast-msg { flex: 1; }
 .bud-toast-x { background: none; border: none; color: var(--faint); display: inline-flex; cursor: pointer; padding: 2px; border-radius: 4px; }
 .bud-toast-x:hover { color: var(--text); }
+
+/* empty-table state inside the data grid (mirrors header, no skeleton body) */
+.bud-empty-row td { border-bottom: none; background: transparent; }
+.bud-grid .bud-empty-cell { padding: 26px 14px; text-align: center; color: var(--faint); font-size: 13px; }

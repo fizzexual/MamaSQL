@@ -22,10 +22,17 @@ const PILL_COLORS: [string, string][] = [
   ["#2a1240", "#d8b4fe"],
 ];
 
-/** Shimmer placeholder shown while a table's rows are loading. */
-function GridSkeleton() {
-  const rows = Array.from({ length: 12 });
-  const cols = Array.from({ length: 5 });
+/**
+ * Loading placeholder that mirrors the table it's about to show: the real
+ * column headers are rendered (so nothing shifts when data arrives) and only
+ * the cell bodies shimmer. If the structure isn't known yet there's nothing to
+ * mirror — show a plain empty state instead of a generic skeleton.
+ */
+function GridSkeleton({ columns }: { columns?: ColumnInfo[] }) {
+  if (!columns || columns.length === 0) {
+    return <div className="bud-empty">This is empty — nothing to show.</div>;
+  }
+  const rows = Array.from({ length: 8 });
   return (
     <div className="bud-grid-wrap">
       <table className="bud-grid bud-grid-skel">
@@ -33,9 +40,10 @@ function GridSkeleton() {
           <tr>
             <th className="bud-checkcol" />
             <th className="bud-rownum" />
-            {cols.map((_, i) => (
-              <th key={i}>
-                <span className="sk sk-th" />
+            {columns.map((c) => (
+              <th key={c.name}>
+                <span className="bud-th-ic">{typeIcon(c.dataType)}</span>
+                <span className="bud-th-name">{c.name}</span>
               </th>
             ))}
             <th className="bud-addcol" />
@@ -46,9 +54,9 @@ function GridSkeleton() {
             <tr key={r}>
               <td className="bud-checkcol" />
               <td className="bud-rownum">{r + 1}</td>
-              {cols.map((_, c) => (
-                <td key={c}>
-                  <span className="sk sk-cell" style={{ width: `${45 + ((r * 7 + c * 23) % 45)}%` }} />
+              {columns.map((c, ci) => (
+                <td key={c.name}>
+                  <span className="sk sk-cell" style={{ width: `${45 + ((r * 7 + ci * 23) % 45)}%` }} />
                 </td>
               ))}
               <td />
@@ -119,7 +127,7 @@ export function DataGrid() {
 
   useEffect(() => setSort(null), [editTable?.table]);
 
-  if (loadingResult) return <GridSkeleton />;
+  if (loadingResult) return <GridSkeleton columns={columns} />;
   if (!result || !editTable) return null;
   const table = editTable.table;
   const allSelected = result.rows.length > 0 && selection.length === result.rows.length;
@@ -233,6 +241,15 @@ export function DataGrid() {
                 </td>
               ))}
               <td />
+            </tr>
+          )}
+          {order.length === 0 && !newRow && (
+            <tr className="bud-empty-row">
+              <td className="bud-checkcol" />
+              <td className="bud-rownum" />
+              <td className="bud-empty-cell" colSpan={result.columns.length + 1}>
+                This table is empty — add a row below.
+              </td>
             </tr>
           )}
           {order.map((ri, pos) => {
