@@ -37,11 +37,17 @@ const placeholder = { postgres: (i) => `$${i + 1}`, mysql: () => "?" };
 /* ---- low-level query helpers (rows as arrays, no key collisions) ---- */
 async function rawArrayRows(engine, conn, sql, params = []) {
   if (engine === "postgres") {
-    const r = await conn.query({ text: sql, values: params, rowMode: "array" });
+    // With params we use the extended (prepared) protocol; without, the simple
+    // protocol — which is what allows multiple statements in one execute.
+    const r = await conn.query(
+      params.length ? { text: sql, values: params, rowMode: "array" } : { text: sql, rowMode: "array" },
+    );
     const last = Array.isArray(r) ? r[r.length - 1] : r;
     return { columns: (last.fields || []).map((f) => f.name), rows: last.rows || [], rowsAffected: last.rowCount ?? 0 };
   }
-  const [res, fields] = await conn.query({ sql, values: params, rowsAsArray: true });
+  const [res, fields] = await conn.query(
+    params.length ? { sql, values: params, rowsAsArray: true } : { sql, rowsAsArray: true },
+  );
   const multi = Array.isArray(fields) && fields.length > 0 && Array.isArray(fields[0]);
   const rowsOut = multi ? res[res.length - 1] : res;
   const fld = multi ? fields[fields.length - 1] : fields;
