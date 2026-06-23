@@ -37,15 +37,17 @@ type Dest = { top?: "data" | "automation" | "settings"; view?: "data" | "sql" | 
 type Page = "home" | "connections" | "logs";
 type ModalState = null | { engine?: Engine } | ConnectionConfig;
 
-const NAV: { id: string; label: string; Icon: Icon; page?: Page; go?: Dest }[] = [
-  { id: "home", label: "Home", Icon: IconLayoutGrid, page: "home" },
-  { id: "connections", label: "Connections", Icon: IconServer, page: "connections" },
+type NavItem = { id: string; label: string; Icon: Icon; page?: Page; go?: Dest };
+const HOME_ITEM: NavItem = { id: "home", label: "Home", Icon: IconLayoutGrid, page: "home" };
+const MAIN_REST: NavItem[] = [
   { id: "tables", label: "Tables", Icon: IconTable, go: { top: "data" } },
   { id: "editor", label: "Query Editor", Icon: IconTerminal2, go: { top: "data", view: "sql" } },
   { id: "browser", label: "Data Browser", Icon: IconDatabase, go: { top: "data", view: "data" } },
-  { id: "automation", label: "Automation", Icon: IconBolt, go: { top: "automation" } },
-  { id: "history", label: "History", Icon: IconHistory, go: { top: "data", view: "history" } },
   { id: "logs", label: "Logs", Icon: IconFileText, page: "logs" },
+];
+const ACCOUNT_ITEMS: NavItem[] = [
+  { id: "history", label: "History", Icon: IconHistory, go: { top: "data", view: "history" } },
+  { id: "settings", label: "Settings", Icon: IconSettings, go: { top: "settings" } },
 ];
 
 function EngineIcon({ engine, size = 18 }: { engine: string; size?: number }) {
@@ -695,9 +697,26 @@ export function Dashboard() {
   const setView = useStore((s) => s.setView);
   const loadConnections = useStore((s) => s.loadConnections);
   const connections = useStore((s) => s.connections);
+  const activeId = useStore((s) => s.activeConnectionId);
+  const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const page = useStore((s) => s.dashPage);
   const setPage = useStore((s) => s.setDashPage);
   const [modal, setModal] = useState<ModalState>(null);
+  const [connsOpen, setConnsOpen] = useState(true);
+
+  const navBtn = (n: NavItem) => (
+    <button
+      key={n.id}
+      className={`dash-nav-item ${n.page && page === n.page ? "active" : ""}`}
+      onClick={() => {
+        if (n.page) setPage(n.page);
+        else if (n.go) enter(n.go);
+      }}
+    >
+      <n.Icon size={18} stroke={1.7} />
+      <span className="dash-nav-t">{n.label}</span>
+    </button>
+  );
 
   useEffect(() => {
     void loadConnections();
@@ -715,28 +734,56 @@ export function Dashboard() {
   return (
     <div className="dash-app">
       <aside className="dash-side">
-        <div className="dash-brand">
-          MAMA<span>SQL</span>
+        <div className="dash-logo">
+          <span className="dash-logo-mark" />
+          <span className="dash-logo-text">
+            MAMA<span>SQL</span>
+          </span>
         </div>
-        <nav className="dash-nav">
-          {NAV.map((n) => (
-            <button
-              key={n.id}
-              className={`dash-nav-item ${n.page && page === n.page ? "active" : ""}`}
-              onClick={() => {
-                if (n.page) setPage(n.page);
-                else if (n.go) enter(n.go);
-              }}
-            >
-              <n.Icon size={19} stroke={1.6} />
-              {n.label}
+
+        <div className="dash-nav-scroll">
+          <div className="dash-nav-label">Main menu</div>
+          <nav className="dash-nav">
+            {navBtn(HOME_ITEM)}
+
+            <button className={`dash-nav-item ${page === "connections" ? "active" : ""}`} onClick={() => setPage("connections")}>
+              <IconServer size={18} stroke={1.7} />
+              <span className="dash-nav-t">Connections</span>
+              <span
+                className="dash-nav-chevron"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setConnsOpen((o) => !o);
+                }}
+              >
+                <IconChevronDown size={15} stroke={1.9} className={`ic ${connsOpen ? "open" : ""}`} />
+              </span>
             </button>
-          ))}
-        </nav>
-        <button className="dash-nav-item dash-settings" onClick={() => enter({ top: "settings" })}>
-          <IconSettings size={19} stroke={1.6} />
-          Settings
-        </button>
+            {connsOpen && (
+              <div className="dash-subnav">
+                {connections.map((c) => (
+                  <button
+                    key={c.id}
+                    className={`dash-subitem ${c.id === activeId ? "active" : ""}`}
+                    onClick={() => {
+                      void openAndIntrospect(c.id);
+                      enter({ top: "data" });
+                    }}
+                  >
+                    <EngineIcon engine={c.engine} size={14} />
+                    <span>{c.name}</span>
+                  </button>
+                ))}
+                {connections.length === 0 && <span className="dash-subempty">No connections yet</span>}
+              </div>
+            )}
+
+            {MAIN_REST.map(navBtn)}
+          </nav>
+
+          <div className="dash-nav-label acc">Account</div>
+          <nav className="dash-nav">{ACCOUNT_ITEMS.map(navBtn)}</nav>
+        </div>
       </aside>
 
       {page === "connections" ? (
