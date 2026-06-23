@@ -3,6 +3,8 @@ import {
   IconFilePlus,
   IconFolderOpen,
   IconHistory,
+  IconKeyboard,
+  IconLayoutSidebar,
   IconPlayerPlay,
   IconPlugConnected,
   IconRefresh,
@@ -24,7 +26,15 @@ function TrafficLights() {
   );
 }
 
-export function TopNav({ onAddServer }: { onAddServer: () => void }) {
+export function TopNav({
+  onAddServer,
+  onToggleSidebar,
+  sidebarHidden,
+}: {
+  onAddServer: () => void;
+  onToggleSidebar: () => void;
+  sidebarHidden: boolean;
+}) {
   const active = useStore((s) => s.connections.find((c) => c.id === s.activeConnectionId));
   const activeId = useStore((s) => s.activeConnectionId);
   const sql = useStore((s) => s.sql);
@@ -55,6 +65,10 @@ export function TopNav({ onAddServer }: { onAddServer: () => void }) {
     <div className="bud-titlebar">
       <TrafficLights />
       <div className="bud-tb-tools">
+        <button title={sidebarHidden ? "Show sidebar" : "Hide sidebar"} className={sidebarHidden ? "" : "on"} onClick={onToggleSidebar}>
+          <IconLayoutSidebar size={16} stroke={1.6} />
+        </button>
+        <span className="bud-tb-divider" />
         <button title="New SQL" onClick={() => loadSql("")}>
           <IconFilePlus size={16} stroke={1.6} />
         </button>
@@ -82,6 +96,9 @@ export function TopNav({ onAddServer }: { onAddServer: () => void }) {
         <button title="Settings" onClick={() => setTopView("settings")}>
           <IconSettings size={16} stroke={1.6} />
         </button>
+        <button title="Keyboard shortcuts (?)" onClick={() => window.dispatchEvent(new Event("mamasql:shortcuts"))}>
+          <IconKeyboard size={16} stroke={1.6} />
+        </button>
         <span className="bud-tb-divider" />
         <button
           className="bud-cmdk-pill"
@@ -93,7 +110,13 @@ export function TopNav({ onAddServer }: { onAddServer: () => void }) {
           <kbd>⌘K</kbd>
         </button>
       </div>
+
+      <div className={`bud-tb-conn ${active ? "on" : ""}`} title={active ? `Connected to ${active.name}` : "No active connection"}>
+        <span className="bud-tb-conn-dot" />
+        <span>{active ? "Connected" : "Disconnected"}</span>
+      </div>
       <div className="bud-tb-title">{title}</div>
+
       <input
         ref={fileRef}
         type="file"

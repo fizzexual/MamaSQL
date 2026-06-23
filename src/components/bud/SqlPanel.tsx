@@ -8,6 +8,7 @@ import {
   IconDownload,
   IconEraser,
   IconFileCode,
+  IconMessage2,
   IconPlayerPlay,
   IconPlayerSkipForward,
   IconPlayerStop,
@@ -125,6 +126,7 @@ export function SqlPanel() {
   const [resultView, setResultView] = useState<"table" | "chart">("table");
   const [rowFilter, setRowFilter] = useState("");
   const [copied, setCopied] = useState(false);
+  const [cellDetail, setCellDetail] = useState<{ value: string; x: number; y: number } | null>(null);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const hlRef = useRef<HTMLPreElement>(null);
@@ -162,6 +164,31 @@ export function SqlPanel() {
   const stop = () => {
     runId.current++; // any in-flight result will be ignored
     setRunning(false);
+  };
+
+  /** The highlighted selection if there is one, otherwise the whole editor. */
+  const selectedOrAll = () => {
+    const ta = taRef.current;
+    if (ta && ta.selectionStart !== ta.selectionEnd) return ta.value.slice(ta.selectionStart, ta.selectionEnd);
+    return sql;
+  };
+
+  /** Toggle `-- ` line comments across the selected (or current) lines. */
+  const toggleComment = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const s = ta.selectionStart;
+    const e = ta.selectionEnd;
+    const lines = sql.split("\n");
+    const startLine = sql.slice(0, s).split("\n").length - 1;
+    const endLine = sql.slice(0, e).split("\n").length - 1;
+    const span = lines.slice(startLine, endLine + 1);
+    const allCommented = span.every((l) => l.trim() === "" || l.trimStart().startsWith("--"));
+    for (let i = startLine; i <= endLine; i++) {
+      if (allCommented) lines[i] = lines[i].replace(/^(\s*)-- ?/, "$1");
+      else if (lines[i].trim() !== "") lines[i] = lines[i].replace(/^(\s*)/, "$1-- ");
+    }
+    setSql(lines.join("\n"));
   };
 
   const sync = () => {
@@ -326,7 +353,12 @@ export function SqlPanel() {
   return (
     <div className="bud-sqlpanel" ref={panelRef}>
       <div className="bud-ide-toolbar">
-        <button className="bud-sql-run bud-tb-exec" title="Execute (⌘↵)" onClick={() => void exec()} disabled={running || !connId}>
+        <button
+          className="bud-sql-run bud-tb-exec"
+          title="Execute — runs the selection if any (⌘↵)"
+          onClick={() => void exec(selectedOrAll())}
+          disabled={running || !connId}
+        >
           <IconPlayerPlay size={15} stroke={1.8} />
         </button>
         <button className="bud-tb-exec" title="Execute as script" onClick={() => void exec()} disabled={running || !connId}>
@@ -346,10 +378,13 @@ export function SqlPanel() {
         <button title="Format SQL" onClick={() => setSql(formatSql(sql))} disabled={!sql.trim()}>
           <IconAlignLeft size={15} stroke={1.8} />
         </button>
-        <button title="Re-run" onClick={() => void exec()} disabled={running || !connId}>
+        <button title="Toggle comment (Ctrl+/)" onClick={toggleComment} disabled={!sql.trim()}>
+          <IconMessage2 size={15} stroke={1.8} />
+        </button>
+        <button title="Re-run" onClick={() => void exec(selectedOrAll())} disabled={running || !connId}>
           <IconRefresh size={15} stroke={1.8} />
         </button>
-        <button title="Explain plan" onClick={() => void exec(explainPrefix + sql)} disabled={!sql.trim() || !connId}>
+        <button title="Explain plan" onClick={() => void exec(explainPrefix + selectedOrAll())} disabled={!sql.trim() || !connId}>
           <IconFileCode size={15} stroke={1.8} />
         </button>
         <span className="bud-tb-sep" />
@@ -444,7 +479,13 @@ export function SqlPanel() {
               onKeyDown={(e) => {
                 if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
                   setAc(null);
-                  void exec();
+                  void exec(selectedOrAll());
+                  return;
+                }
+                if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+                  e.preventDefault();
+                  setAc(null);
+                  toggleComment();
                   return;
                 }
                 if (ac) {
@@ -575,7 +616,18 @@ export function SqlPanel() {
                         <tr key={ri}>
                           <td className="bud-rownum">{ri + 1}</td>
                           {row.map((cell, ci) => (
-                            <td key={ci} className={cell == null ? "bud-null" : ""}>
+                            <td
+                              key={ci}
+                              className={cell == null ? "bud-null" : ""}
+                              title="Click for full value"
+                              onClick={(ev) =>
+                                setCellDetail({
+                                  value: cell == null ? "NULL" : String(cell),
+                                  x: Math.min(ev.clientX, window.innerWidth - 340),
+                                  y: Math.min(ev.clientY, window.innerHeight - 240),
+                                })
+                              }
+                            >
                               {cell == null ? "NULL" : String(cell)}
                             </td>
                           ))}
@@ -611,6 +663,27 @@ export function SqlPanel() {
             </button>
           ))}
         </div>
+      )}
+
+      {cellDetail && (
+        <>
+          <div className="bud-menu-backdrop" onClick={() => setCellDetail(null)} />
+          <div className="bud-cell-pop" style={{ left: cellDetail.x, top: cellDetail.y }}>
+            <div className="bud-cell-pop-head">
+              <span>Cell value · {cellDetail.value.length} chars</span>
+              <button
+                title="Copy"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(cellDetail.value).catch(() => {});
+                  setCellDetail(null);
+                }}
+              >
+                <IconCopy size={13} stroke={1.7} /> Copy
+              </button>
+            </div>
+            <pre className="bud-cell-pop-body">{cellDetail.value}</pre>
+          </div>
+        </>
       )}
     </div>
   );
