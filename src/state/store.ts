@@ -161,7 +161,7 @@ export const useStore = create<AppStore>((set, get) => ({
   connections: [],
   activeConnectionId: null,
   schema: { tables: [], columnsByTable: {} },
-  sql: "SELECT * FROM customers LIMIT 100;",
+  sql: "-- Create a connection, then write SQL here.\n-- e.g. CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT);\nSELECT 1;",
   result: null,
   error: null,
   running: false,

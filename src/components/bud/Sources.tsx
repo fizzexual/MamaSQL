@@ -174,7 +174,7 @@ export function Sources({
                 {rootOpen ? <IconChevronDown size={13} stroke={2} /> : <IconChevronRight size={13} stroke={2} />}
               </span>
               <IconFolderOpen size={14} stroke={1.7} className="bud-tnode-ic" />
-              <span className="bud-tnode-label">Demo Databases</span>
+              <span className="bud-tnode-label">Connections</span>
             </div>
             {rootCtx && <ContextMenu anchor={rootCtx} onClose={() => setRootCtx(null)} />}
             {rootOpen && (

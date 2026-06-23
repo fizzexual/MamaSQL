@@ -1,6 +1,6 @@
-import { IconAlertTriangle, IconCheck, IconPlus, IconRefresh } from "@tabler/icons-react";
+import { IconAlertTriangle, IconCheck, IconInfoCircle, IconPlus, IconRefresh } from "@tabler/icons-react";
 import { useState } from "react";
-import { getBackend } from "../../ipc/backend";
+import { getBackend, isTauri } from "../../ipc/backend";
 import type { ConnectionConfig, Engine } from "../../ipc/types";
 import { promptDialog } from "../../state/dialog";
 import { useStore } from "../../state/store";
@@ -25,7 +25,8 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const editing = !!existing;
 
-  const [engine, setEngine] = useState<Engine>(existing?.engine ?? "mysql");
+  const [engine, setEngine] = useState<Engine>(existing?.engine ?? "sqlite");
+  const remoteInBrowser = engine !== "sqlite" && !isTauri();
   const [name, setName] = useState(existing?.name ?? "");
   const [host, setHost] = useState(existing?.host ?? "localhost");
   const [port, setPort] = useState(existing?.port != null ? String(existing.port) : "");
@@ -100,7 +101,7 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
     }
   };
 
-  const canSave = engine === "sqlite" ? !!database.trim() : !!database.trim() && !!host.trim();
+  const canSave = engine === "sqlite" ? !!database.trim() : !remoteInBrowser && !!database.trim() && !!host.trim();
 
   return (
     <>
@@ -111,11 +112,17 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
           <label className="bud-field">
             <span>Engine</span>
             <select value={engine} onChange={(e) => { setEngine(e.target.value as Engine); setDatabases(null); setStatus(null); }}>
+              <option value="sqlite">SQLite (local — works here)</option>
               <option value="postgres">PostgreSQL</option>
               <option value="mysql">MySQL / MariaDB</option>
-              <option value="sqlite">SQLite</option>
             </select>
           </label>
+          {remoteInBrowser && (
+            <div className="bud-conn-hint">
+              <IconInfoCircle size={15} stroke={1.7} />
+              <span>Remote databases need the desktop app. In the browser, use SQLite to create a real local database.</span>
+            </div>
+          )}
           <label className="bud-field">
             <span>Name</span>
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="My database" />
@@ -188,8 +195,9 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
             </>
           ) : (
             <label className="bud-field">
-              <span>Database file</span>
-              <input value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="C:\\path\\to\\db.sqlite" />
+              <span>Database name</span>
+              <input value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="e.g. analytics" />
+              <span className="bud-field-hint">A real SQLite database, stored locally in your browser and saved between visits.</span>
             </label>
           )}
         </div>

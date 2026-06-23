@@ -1,4 +1,4 @@
-import { mockBackend } from "./mock";
+import { localBackend } from "./local";
 import { tauriBackend } from "./tauri";
 import type {
   ColumnDef,
@@ -50,8 +50,8 @@ export function isTauri(): boolean {
 
 let active: Backend | null = null;
 
-/** Returns the Tauri backend under Tauri, else the in-memory browser mock. */
+/** Tauri backend on the desktop; a real local SQLite (WASM) backend in the browser. */
 export function getBackend(): Backend {
-  if (!active) active = isTauri() ? tauriBackend : mockBackend;
+  if (!active) active = isTauri() ? tauriBackend : localBackend;
   return active;
 }
