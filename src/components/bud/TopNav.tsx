@@ -1,5 +1,4 @@
 import {
-  IconChartBar,
   IconDeviceFloppy,
   IconFilePlus,
   IconFolderOpen,
@@ -7,9 +6,10 @@ import {
   IconPlayerPlay,
   IconPlugConnected,
   IconRefresh,
-  IconScript,
   IconSettings,
 } from "@tabler/icons-react";
+import { useRef } from "react";
+import { promptDialog } from "../../state/dialog";
 import { useStore } from "../../state/store";
 
 /** Mac-style window controls (decorative, matches DbVisualizer on macOS). */
@@ -25,44 +25,56 @@ function TrafficLights() {
 
 export function TopNav({ onAddServer }: { onAddServer: () => void }) {
   const active = useStore((s) => s.connections.find((c) => c.id === s.activeConnectionId));
+  const activeId = useStore((s) => s.activeConnectionId);
+  const sql = useStore((s) => s.sql);
   const setTopView = useStore((s) => s.setTopView);
   const setView = useStore((s) => s.setView);
+  const loadSql = useStore((s) => s.loadSql);
+  const saveScript = useStore((s) => s.saveScript);
+  const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const run = useStore((s) => s.run);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const engineName = active ? (active.engine === "postgres" ? "PostgreSQL" : active.engine === "mysql" ? "MySQL" : "SQLite") : null;
   const title = active ? `DbVisualizer Pro — ${engineName} — ${active.name}` : "DbVisualizer Pro — Untitled";
+
+  const openFile = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => loadSql(String(reader.result ?? ""));
+    reader.readAsText(file);
+  };
+
+  const save = async () => {
+    if (!sql.trim()) return;
+    const name = await promptDialog({ title: "Save SQL script", label: "Name", placeholder: "e.g. monthly report" });
+    if (name?.trim()) saveScript(name.trim(), sql);
+  };
 
   return (
     <div className="bud-titlebar">
       <TrafficLights />
       <div className="bud-tb-tools">
-        <button title="New SQL file" onClick={() => { setTopView("data"); setView("sql"); }}>
+        <button title="New SQL" onClick={() => loadSql("")}>
           <IconFilePlus size={16} stroke={1.6} />
         </button>
-        <button title="New script" onClick={() => { setTopView("data"); setView("sql"); }}>
-          <IconScript size={16} stroke={1.6} />
-        </button>
-        <button title="Open file">
+        <button title="Open .sql file" onClick={() => fileRef.current?.click()}>
           <IconFolderOpen size={16} stroke={1.6} />
         </button>
-        <button title="Save">
+        <button title="Save as script" onClick={() => void save()}>
           <IconDeviceFloppy size={16} stroke={1.6} />
         </button>
         <span className="bud-tb-divider" />
         <button title="New connection" onClick={onAddServer}>
           <IconPlugConnected size={16} stroke={1.6} />
         </button>
-        <button title="Reconnect">
+        <button title="Reconnect" onClick={() => activeId && void openAndIntrospect(activeId)} disabled={!activeId}>
           <IconRefresh size={16} stroke={1.6} />
         </button>
         <span className="bud-tb-divider" />
-        <button className="bud-tb-run" title="Execute (⌘↵)" onClick={() => void run()}>
+        <button className="bud-tb-run" title="Execute (⌘↵)" onClick={() => void run()} disabled={!activeId}>
           <IconPlayerPlay size={16} stroke={1.7} />
         </button>
         <span className="bud-tb-divider" />
-        <button title="Monitor">
-          <IconChartBar size={16} stroke={1.6} />
-        </button>
         <button title="SQL history" onClick={() => setView("history")}>
           <IconHistory size={16} stroke={1.6} />
         </button>
@@ -71,6 +83,17 @@ export function TopNav({ onAddServer }: { onAddServer: () => void }) {
         </button>
       </div>
       <div className="bud-tb-title">{title}</div>
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".sql,text/plain"
+        style={{ display: "none" }}
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) openFile(f);
+          e.target.value = "";
+        }}
+      />
     </div>
   );
 }

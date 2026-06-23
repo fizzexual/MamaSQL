@@ -6,6 +6,7 @@ import {
   IconDatabase,
   IconDatabaseCog,
   IconEye,
+  IconFileText,
   IconFilter,
   IconFolderOpen,
   IconLayoutSidebar,
@@ -14,6 +15,7 @@ import {
   IconRefresh,
   IconSearch,
   IconSettings,
+  IconStar,
   IconTable,
   IconTablePlus,
   IconTrash,
@@ -156,10 +158,55 @@ export function Sources({
             )}
           </>
         ) : (
-          <div className="bud-ds-empty">{panel === "Scripts" ? "No scripts yet." : "No favorites yet."}</div>
+          <SavedList kind={panel} />
         )}
       </div>
     </aside>
+  );
+}
+
+/** The Scripts / Favorites panels: saved SQL snippets, click to load, ✕ to delete. */
+function SavedList({ kind }: { kind: "Scripts" | "Favorites" }) {
+  const scripts = useStore((s) => s.scripts);
+  const favorites = useStore((s) => s.favorites);
+  const loadSql = useStore((s) => s.loadSql);
+  const deleteScript = useStore((s) => s.deleteScript);
+  const deleteFavorite = useStore((s) => s.deleteFavorite);
+  const items = kind === "Scripts" ? scripts : favorites;
+  const del = kind === "Scripts" ? deleteScript : deleteFavorite;
+  const Icon = kind === "Scripts" ? IconFileText : IconStar;
+
+  if (items.length === 0) {
+    return (
+      <div className="bud-ds-empty">
+        {kind === "Scripts"
+          ? "No saved scripts. Use the Save icon in the editor toolbar."
+          : "No favorites. Use the ★ icon in the editor toolbar."}
+      </div>
+    );
+  }
+
+  return (
+    <div className="bud-saved-list">
+      {items.map((it) => (
+        <div key={it.id} className="bud-saved-row" onClick={() => loadSql(it.sql)} title={it.sql}>
+          <span className="bud-saved-ic">
+            <Icon size={14} stroke={1.7} />
+          </span>
+          <span className="bud-saved-name">{it.name}</span>
+          <button
+            className="bud-saved-del"
+            title="Delete"
+            onClick={(e) => {
+              e.stopPropagation();
+              del(it.id);
+            }}
+          >
+            <IconTrash size={13} stroke={1.7} />
+          </button>
+        </div>
+      ))}
+    </div>
   );
 }
 

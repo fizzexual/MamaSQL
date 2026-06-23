@@ -32,6 +32,34 @@ export interface ViewDef {
   filter: ViewFilter | null;
 }
 
+/** A saved SQL snippet — used for both the Scripts and Favorites panels. */
+export interface SavedItem {
+  id: string;
+  name: string;
+  sql: string;
+  savedAt: string;
+}
+
+const SCRIPTS_KEY = "mamasql.scripts";
+const FAVS_KEY = "mamasql.favorites";
+
+function loadSaved(key: string): SavedItem[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(key) ?? "[]");
+    return Array.isArray(raw) ? (raw as SavedItem[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistSaved(key: string, items: SavedItem[]): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(items));
+  } catch {
+    /* storage unavailable — keep in memory only */
+  }
+}
+
 /** Apply a saved view's single-condition filter to a row set (client-side). */
 function applyViewFilter(rows: unknown[][], columns: { name: string }[], filter: ViewFilter | null): unknown[][] {
   if (!filter) return rows;
@@ -79,6 +107,8 @@ export interface AppStore {
   views: ViewDef[];
   activeViewId: string | null;
   selection: number[];
+  scripts: SavedItem[];
+  favorites: SavedItem[];
 
   loadConnections: () => Promise<void>;
   saveConnection: (cfg: ConnectionConfig, password?: string | null) => Promise<void>;
@@ -118,6 +148,11 @@ export interface AppStore {
   clearSelection: () => void;
   deleteSelected: () => Promise<void>;
   duplicateSelected: () => Promise<void>;
+  loadSql: (sql: string) => void;
+  saveScript: (name: string, sql: string) => void;
+  deleteScript: (id: string) => void;
+  saveFavorite: (name: string, sql: string) => void;
+  deleteFavorite: (id: string) => void;
 }
 
 const backend = getBackend();
@@ -143,6 +178,8 @@ export const useStore = create<AppStore>((set, get) => ({
   views: [],
   activeViewId: null,
   selection: [],
+  scripts: loadSaved(SCRIPTS_KEY),
+  favorites: loadSaved(FAVS_KEY),
 
   loadConnections: async () => {
     set({ connections: await backend.listConnections() });
@@ -178,6 +215,24 @@ export const useStore = create<AppStore>((set, get) => ({
       await backend.openConnection(id);
       const tables = await backend.listTables(id);
       set({ schema: { tables, columnsByTable: {} }, loadingTables: false });
+      // Eagerly cache columns for small schemas so SQL autocomplete has them.
+      if (tables.length <= 40) {
+        void (async () => {
+          const cols: Record<string, ColumnInfo[]> = {};
+          for (const t of tables) {
+            try {
+              cols[t.name] = await backend.listColumns(id, t.name);
+            } catch {
+              /* best-effort */
+            }
+          }
+          if (get().activeConnectionId === id) {
+            set((s) => ({
+              schema: { ...s.schema, columnsByTable: { ...s.schema.columnsByTable, ...cols } },
+            }));
+          }
+        })();
+      }
     } catch (e) {
       set({ error: normalizeError(e), loadingTables: false });
     }
@@ -572,6 +627,38 @@ export const useStore = create<AppStore>((set, get) => ({
       set({ error: normalizeError(e) });
     }
   },
+
+  loadSql: (sql) => set({ sql, view: "sql", topView: "data" }),
+
+  saveScript: (name, sql) =>
+    set((s) => {
+      const item: SavedItem = { id: `s-${Date.now()}-${s.scripts.length}`, name, sql, savedAt: new Date().toISOString() };
+      const scripts = [item, ...s.scripts];
+      persistSaved(SCRIPTS_KEY, scripts);
+      return { scripts };
+    }),
+
+  deleteScript: (id) =>
+    set((s) => {
+      const scripts = s.scripts.filter((x) => x.id !== id);
+      persistSaved(SCRIPTS_KEY, scripts);
+      return { scripts };
+    }),
+
+  saveFavorite: (name, sql) =>
+    set((s) => {
+      const item: SavedItem = { id: `f-${Date.now()}-${s.favorites.length}`, name, sql, savedAt: new Date().toISOString() };
+      const favorites = [item, ...s.favorites];
+      persistSaved(FAVS_KEY, favorites);
+      return { favorites };
+    }),
+
+  deleteFavorite: (id) =>
+    set((s) => {
+      const favorites = s.favorites.filter((x) => x.id !== id);
+      persistSaved(FAVS_KEY, favorites);
+      return { favorites };
+    }),
 }));
 
 function normalizeError(e: unknown): AppError {

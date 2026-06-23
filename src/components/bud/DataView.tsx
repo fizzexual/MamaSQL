@@ -1,5 +1,6 @@
 import {
   IconBolt,
+  IconClock,
   IconCode,
   IconCopy,
   IconDownload,
@@ -8,7 +9,7 @@ import {
   IconUpload,
   IconX,
 } from "@tabler/icons-react";
-import { type ComponentType, type MouseEvent, useRef, useState } from "react";
+import { type ComponentType, type MouseEvent, useEffect, useRef, useState } from "react";
 import { download, fromCsv, toCsv } from "../../lib/csv";
 import { useStore } from "../../state/store";
 import { DataGrid } from "./DataGrid";
@@ -108,10 +109,19 @@ export function DataView() {
           </span>
         </button>
         {editTable && (
-          <button className={`bud-qtab ${view !== "sql" ? "on" : ""}`} onClick={() => setView("data")}>
+          <button className={`bud-qtab ${view === "data" ? "on" : ""}`} onClick={() => setView("data")}>
             <IconTable size={14} stroke={1.7} className="bud-qtab-ic" />
             <span>{editTable.table}</span>
             <span className="bud-qtab-x">
+              <IconX size={12} stroke={2} />
+            </span>
+          </button>
+        )}
+        {view === "history" && (
+          <button className="bud-qtab on" onClick={() => setView("history")}>
+            <IconClock size={14} stroke={1.7} className="bud-qtab-ic" />
+            <span>SQL History</span>
+            <span className="bud-qtab-x" onClick={(e) => { e.stopPropagation(); setView("sql"); }}>
               <IconX size={12} stroke={2} />
             </span>
           </button>
@@ -135,6 +145,8 @@ export function DataView() {
 
       {!activeId ? (
         <div className="bud-empty">Add a server, then pick a source on the left.</div>
+      ) : view === "history" ? (
+        <HistoryView />
       ) : view === "sql" ? (
         <SqlPanel />
       ) : !editTable ? (
@@ -198,5 +210,31 @@ export function DataView() {
       )}
 
     </main>
+  );
+}
+
+/** SQL history: every executed statement, newest first, click to reload. */
+function HistoryView() {
+  const history = useStore((s) => s.history);
+  const loadHistory = useStore((s) => s.loadHistory);
+  const loadSql = useStore((s) => s.loadSql);
+
+  useEffect(() => {
+    void loadHistory();
+  }, [loadHistory]);
+
+  return (
+    <div className="bud-history">
+      {history.length === 0 ? (
+        <div className="bud-empty">No SQL has been run yet.</div>
+      ) : (
+        history.map((h) => (
+          <button key={h.id} className="bud-hist-item" onClick={() => loadSql(h.sql)}>
+            <span className="bud-hist-sql">{h.sql.replace(/\s+/g, " ").trim()}</span>
+            <span className="bud-hist-time">{new Date(h.ranAt).toLocaleString()}</span>
+          </button>
+        ))
+      )}
+    </div>
   );
 }

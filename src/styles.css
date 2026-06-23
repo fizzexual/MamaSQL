@@ -2693,3 +2693,68 @@ select.bud-cb-select {
 
 /* keep app-builder data toolbar hidden (no place in an IDE) */
 .bud-toolbar { display: none; }
+
+/* ============================================================
+   Functional additions: autocomplete, splitter, result tools,
+   sortable headers, log, saved scripts/favorites
+   ============================================================ */
+
+/* SQL autocomplete popup */
+.bud-ac {
+  position: fixed; z-index: 90; min-width: 220px; max-width: 380px; max-height: 236px; overflow: auto;
+  background: var(--panel-2); border: 1px solid var(--border-strong); border-radius: 5px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55); padding: 3px;
+}
+.bud-ac-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; text-align: left;
+  background: none; border: none; color: var(--text); font: inherit; font-size: 12.5px;
+  padding: 5px 8px; border-radius: 4px; cursor: pointer;
+}
+.bud-ac-item.on { background: var(--accent); color: #fff; }
+.bud-ac-kind { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 3px; font-size: 9px; font-weight: 700; flex: none; }
+.bud-ac-kind.column { background: rgba(127, 168, 208, 0.25); color: #9cc4e8; }
+.bud-ac-kind.table { background: rgba(216, 165, 72, 0.22); color: #e0bd6a; }
+.bud-ac-kind.keyword { background: rgba(79, 156, 214, 0.22); color: #6fb0e8; }
+.bud-ac-item.on .bud-ac-kind { background: rgba(255, 255, 255, 0.22); color: #fff; }
+.bud-ac-label { flex: 1; font-family: var(--mono); }
+.bud-ac-detail { color: var(--faint); font-size: 11px; font-family: var(--mono); white-space: nowrap; }
+.bud-ac-item.on .bud-ac-detail { color: rgba(255, 255, 255, 0.8); }
+
+/* draggable editor / results splitter */
+.bud-vsplit { height: 6px; flex: none; background: var(--bg-2); cursor: row-resize; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+.bud-vsplit:hover { background: var(--accent-soft); }
+
+/* results toolbar (refresh / export / meta) */
+.bud-res-toolbar { display: flex; align-items: center; gap: 6px; padding: 4px 8px; background: var(--bg-2); border-bottom: 1px solid var(--border); flex: 0 0 auto; }
+.bud-res-toolbar button {
+  display: inline-flex; align-items: center; gap: 5px; background: none; border: 1px solid transparent;
+  color: var(--muted); font-size: 11.5px; padding: 3px 8px; border-radius: 4px; cursor: pointer;
+}
+.bud-res-toolbar button:hover:not(:disabled) { background: var(--panel-2); color: var(--text); }
+.bud-res-toolbar button:disabled { opacity: 0.4; cursor: default; }
+.bud-res-meta { margin-left: auto; color: var(--faint); font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.bud-sql-results .bud-results-body { display: flex; flex-direction: column; }
+.bud-sql-results .bud-grid-wrap { flex: 1; min-height: 0; }
+
+/* sortable result header */
+.bud-th-sort { display: inline-flex; align-items: center; gap: 5px; background: none; border: none; font: inherit; color: inherit; cursor: pointer; padding: 0; }
+.bud-th-sort:hover { color: var(--text); }
+.bud-grid thead th.sorted { color: var(--text); background: rgba(74, 136, 199, 0.12); }
+.bud-th-arrow { color: var(--accent-2); font-size: 11px; font-weight: 700; }
+
+/* Log tab: real query history */
+.bud-results-log { padding: 8px 12px; display: flex; flex-direction: column; gap: 3px; }
+.bud-log-line { display: flex; gap: 10px; font-family: var(--mono); font-size: 12px; color: var(--muted); white-space: nowrap; }
+.bud-log-line.err { color: var(--danger); }
+.bud-log-time { color: var(--faint); flex: none; }
+.bud-log-sql { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+
+/* Scripts / Favorites lists */
+.bud-saved-list { display: flex; flex-direction: column; padding: 2px 0; }
+.bud-saved-row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 13px; color: var(--text); cursor: pointer; }
+.bud-saved-row:hover { background: var(--panel-2); }
+.bud-saved-ic { color: #d8a548; flex: none; display: inline-flex; }
+.bud-saved-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bud-saved-del { background: none; border: none; color: var(--faint); display: inline-flex; padding: 2px; border-radius: 4px; opacity: 0; cursor: pointer; }
+.bud-saved-row:hover .bud-saved-del { opacity: 1; }
+.bud-saved-del:hover { color: var(--danger); }
