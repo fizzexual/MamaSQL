@@ -2,6 +2,8 @@ import {
   IconBrandMysql,
   IconChevronDown,
   IconChevronRight,
+  IconCode,
+  IconColumnInsertRight,
   IconCopy,
   IconDatabase,
   IconDatabaseCog,
@@ -9,6 +11,7 @@ import {
   IconFileText,
   IconFilter,
   IconFolderOpen,
+  IconHash,
   IconLayoutSidebar,
   IconPencil,
   IconPlus,
@@ -48,17 +51,31 @@ function ObjectGroup({
   label,
   count,
   defaultOpen = false,
+  menu,
   children,
 }: {
   label: string;
   count: number;
   defaultOpen?: boolean;
+  menu?: MenuItem[];
   children?: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const [ctx, setCtx] = useState<CtxAnchor | null>(null);
   return (
     <div className="bud-objgroup">
-      <div className="bud-objgroup-head" onClick={() => setOpen((v) => !v)}>
+      <div
+        className="bud-objgroup-head"
+        onClick={() => setOpen((v) => !v)}
+        onContextMenu={
+          menu
+            ? (e) => {
+                e.preventDefault();
+                setCtx({ x: e.clientX, y: e.clientY, items: menu });
+              }
+            : undefined
+        }
+      >
         <span className="bud-ds-arrow">
           {open ? <IconChevronDown size={12} stroke={2} /> : <IconChevronRight size={12} stroke={2} />}
         </span>
@@ -67,6 +84,7 @@ function ObjectGroup({
         <span className="bud-objgroup-count">{count}</span>
       </div>
       {open && children && <div className="bud-objgroup-body">{children}</div>}
+      {ctx && <ContextMenu anchor={ctx} onClose={() => setCtx(null)} />}
     </div>
   );
 }
@@ -85,6 +103,12 @@ export function Sources({
   const [searchOpen, setSearchOpen] = useState(false);
   const [panel, setPanel] = useState<(typeof PANELS)[number]>("Databases");
   const [rootOpen, setRootOpen] = useState(true);
+  const [rootCtx, setRootCtx] = useState<CtxAnchor | null>(null);
+
+  const rootMenu: MenuItem[] = [
+    { label: "New connection…", icon: (<IconPlus size={15} stroke={1.7} />), onClick: onAddServer },
+    { label: "Refresh all", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: () => { void loadConnections(); void scanLocal(); } },
+  ];
 
   useEffect(() => {
     loadConnections();
@@ -138,13 +162,21 @@ export function Sources({
       <div className="bud-sources-list">
         {panel === "Databases" ? (
           <>
-            <div className="bud-tnode root" onClick={() => setRootOpen((v) => !v)}>
+            <div
+              className="bud-tnode root"
+              onClick={() => setRootOpen((v) => !v)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setRootCtx({ x: e.clientX, y: e.clientY, items: rootMenu });
+              }}
+            >
               <span className="bud-tnode-arrow">
                 {rootOpen ? <IconChevronDown size={13} stroke={2} /> : <IconChevronRight size={13} stroke={2} />}
               </span>
               <IconFolderOpen size={14} stroke={1.7} className="bud-tnode-ic" />
               <span className="bud-tnode-label">Demo Databases</span>
             </div>
+            {rootCtx && <ContextMenu anchor={rootCtx} onClose={() => setRootCtx(null)} />}
             {rootOpen && (
               <div className="bud-tree-children">
                 {connections.length === 0 ? (
@@ -292,6 +324,19 @@ function Datasource({
     { label: "Remove data source", icon: (<IconTrash size={15} stroke={1.7} />), danger: true, onClick: remove },
   ];
 
+  const refresh = () => void openAndIntrospect(conn.id);
+  const refreshMenu: MenuItem[] = [{ label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: refresh }];
+  const folderMenu = (singular: string): MenuItem[] => [
+    { label: `New ${singular}…`, icon: (<IconPlus size={15} stroke={1.7} />), disabled: true },
+    { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: refresh },
+  ];
+  const tablesMenu: MenuItem[] = [
+    { label: "New table…", icon: (<IconTablePlus size={15} stroke={1.7} />), onClick: () => void newTable() },
+    { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: refresh },
+    { divider: true },
+    { label: "Reload schema", icon: (<IconDatabaseCog size={15} stroke={1.7} />), onClick: refresh },
+  ];
+
   return (
     <div className={`bud-ds ${isActive ? "connected" : ""}`}>
       <div
@@ -315,22 +360,22 @@ function Datasource({
           {loadingTables ? (
             <div className="bud-ds-empty">Loading…</div>
           ) : (
-            <ObjectGroup label="Databases" count={1} defaultOpen>
-              <ObjectGroup label={`${dbName} (Default)`} count={1} defaultOpen>
-                <ObjectGroup label="Schemas" count={1} defaultOpen>
-                  <ObjectGroup label={schemaName} count={shownTables.length} defaultOpen>
-                    <ObjectGroup label="Tables" count={shownTables.length} defaultOpen>
+            <ObjectGroup label="Databases" count={1} defaultOpen menu={refreshMenu}>
+              <ObjectGroup label={`${dbName} (Default)`} count={1} defaultOpen menu={refreshMenu}>
+                <ObjectGroup label="Schemas" count={1} defaultOpen menu={refreshMenu}>
+                  <ObjectGroup label={schemaName} count={shownTables.length} defaultOpen menu={refreshMenu}>
+                    <ObjectGroup label="Tables" count={shownTables.length} defaultOpen menu={tablesMenu}>
                       {shownTables.length === 0 ? (
                         <div className="bud-ds-empty">{filter ? "No match" : "No tables"}</div>
                       ) : (
                         shownTables.map((t) => <TableRow key={t.name} table={t.name} connectionId={conn.id} />)
                       )}
                     </ObjectGroup>
-                    <ObjectGroup label="Views" count={0} />
-                    <ObjectGroup label="Indexes" count={0} />
-                    <ObjectGroup label="Sequences" count={0} />
-                    <ObjectGroup label="Procedures" count={0} />
-                    <ObjectGroup label="Functions" count={0} />
+                    <ObjectGroup label="Views" count={0} menu={folderMenu("view")} />
+                    <ObjectGroup label="Indexes" count={0} menu={folderMenu("index")} />
+                    <ObjectGroup label="Sequences" count={0} menu={folderMenu("sequence")} />
+                    <ObjectGroup label="Procedures" count={0} menu={folderMenu("procedure")} />
+                    <ObjectGroup label="Functions" count={0} menu={folderMenu("function")} />
                   </ObjectGroup>
                 </ObjectGroup>
               </ObjectGroup>
@@ -354,6 +399,8 @@ function TableRow({ table, connectionId }: { table: string; connectionId: string
   const editTable = useStore((s) => s.editTable);
   const activeViewId = useStore((s) => s.activeViewId);
   const views = useStore((s) => s.views);
+  const loadSql = useStore((s) => s.loadSql);
+  const addColumn = useStore((s) => s.addColumn);
   const myViews = views.filter((v) => v.connectionId === connectionId && v.table === table);
   const tableActive = editTable?.table === table && activeViewId === null;
 
@@ -375,13 +422,28 @@ function TableRow({ table, connectionId }: { table: string; connectionId: string
     }
   };
 
+  const addColumnTo = async () => {
+    const name = await promptDialog({ title: "New column", label: "Column name", placeholder: "e.g. created_at" });
+    if (!name?.trim()) return;
+    const dataType =
+      (await promptDialog({ title: "Column type", label: "Type (TEXT, INTEGER, REAL, DATE, …)", defaultValue: "TEXT" }))?.trim() ||
+      "TEXT";
+    void addColumn(table, { name: name.trim(), dataType, nullable: true, primaryKey: false });
+  };
+  const copyName = () => void navigator.clipboard?.writeText(table).catch(() => {});
+
   const items: MenuItem[] = [
     { label: "Open", icon: (<IconFolderOpen size={15} stroke={1.7} />), onClick: () => void openTableData(table) },
     { label: "View data", icon: (<IconEye size={15} stroke={1.7} />), onClick: () => void openTableData(table) },
     { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: () => void reload(table) },
     { divider: true },
+    { label: "Generate SELECT", icon: (<IconCode size={15} stroke={1.7} />), onClick: () => loadSql(`SELECT * FROM ${table} LIMIT 100;`) },
+    { label: "Count rows", icon: (<IconHash size={15} stroke={1.7} />), onClick: () => loadSql(`SELECT count(*) FROM ${table};`) },
+    { label: "Add column…", icon: (<IconColumnInsertRight size={15} stroke={1.7} />), onClick: () => void addColumnTo() },
+    { label: "Copy name", icon: (<IconCopy size={15} stroke={1.7} />), onClick: copyName },
+    { divider: true },
     { label: "Rename table", icon: (<IconPencil size={15} stroke={1.7} />), onClick: () => void rename() },
-    { label: "Drop table", icon: (<IconTrash size={15} stroke={1.7} />), danger: true, onClick: drop },
+    { label: "Drop table", icon: (<IconTrash size={15} stroke={1.7} />), danger: true, onClick: () => void drop() },
   ];
 
   return (

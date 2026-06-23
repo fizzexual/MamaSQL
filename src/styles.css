@@ -2758,3 +2758,19 @@ select.bud-cb-select {
 .bud-saved-del { background: none; border: none; color: var(--faint); display: inline-flex; padding: 2px; border-radius: 4px; opacity: 0; cursor: pointer; }
 .bud-saved-row:hover .bud-saved-del { opacity: 1; }
 .bud-saved-del:hover { color: var(--danger); }
+
+/* custom add-row / add-column buttons in the data grid */
+.bud-addrow-btn,
+.bud-addcol-btn {
+  display: inline-grid; place-items: center; width: 24px; height: 21px;
+  border: 1px solid var(--border-strong); background: var(--input-bg); color: var(--muted);
+  border-radius: 4px; cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease, transform 0.08s ease;
+}
+.bud-addrow-btn:hover,
+.bud-addcol-btn:hover { border-color: var(--green); color: var(--green-bright); background: rgba(78, 157, 81, 0.16); }
+.bud-addrow-btn:active,
+.bud-addcol-btn:active { transform: translateY(1px); }
+.bud-newrow-num { color: var(--green-bright); }
+.bud-rowx { color: var(--faint); }
+.bud-rowx:hover { color: var(--danger); }

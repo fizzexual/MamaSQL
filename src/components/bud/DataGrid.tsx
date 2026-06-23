@@ -1,3 +1,4 @@
+import { IconPlus, IconX } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import { promptDialog } from "../../state/dialog";
 import type { ColumnInfo } from "../../ipc/types";
@@ -200,8 +201,8 @@ export function DataGrid() {
               </th>
             ))}
             <th className="bud-addcol">
-              <button title="Add column" onClick={addColumnPrompt}>
-                ＋
+              <button className="bud-addcol-btn" title="Add column" onClick={addColumnPrompt}>
+                <IconPlus size={14} stroke={2} />
               </button>
             </th>
           </tr>
@@ -211,10 +212,12 @@ export function DataGrid() {
             <tr className="bud-newrow">
               <td className="bud-checkcol">
                 <button className="bud-rowx" onClick={() => setNewRow(null)}>
-                  ✕
+                  <IconX size={13} stroke={2} />
                 </button>
               </td>
-              <td className="bud-rownum">＋</td>
+              <td className="bud-rownum bud-newrow-num">
+                <IconPlus size={13} stroke={2} />
+              </td>
               {result.columns.map((c, i) => (
                 <td key={i}>
                   <input
@@ -287,8 +290,8 @@ export function DataGrid() {
           })}
           <tr className="bud-addrow">
             <td className="bud-checkcol">
-              <button onClick={() => setNewRow(result.columns.map(() => ""))} title="Add row">
-                ＋
+              <button className="bud-addrow-btn" onClick={() => setNewRow(result.columns.map(() => ""))} title="Add row">
+                <IconPlus size={15} stroke={2} />
               </button>
             </td>
             <td className="bud-rownum bud-kbd">
