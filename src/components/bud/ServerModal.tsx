@@ -5,6 +5,7 @@ import { bridgeHealthy } from "../../ipc/http";
 import type { ConnectionConfig, Engine } from "../../ipc/types";
 import { promptDialog } from "../../state/dialog";
 import { useStore } from "../../state/store";
+import { toast } from "../../state/toast";
 
 const SYSTEM_DBS = new Set([
   "information_schema",
@@ -107,6 +108,7 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
       const cfg = draftCfg(database.trim());
       await saveConnection(cfg, password || null);
       await openAndIntrospect(cfg.id);
+      toast(`Connected to ${cfg.name}`, "success");
       onClose();
     } catch (e) {
       setStatus({ kind: "error", msg: errMsg(e) });

@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getBackend } from "../../ipc/backend";
 import { download, toCsv, toJson } from "../../lib/csv";
 import { promptDialog } from "../../state/dialog";
+import { toast } from "../../state/toast";
 import type { AppError, Column, QueryResult } from "../../ipc/types";
 import { useStore } from "../../state/store";
 
@@ -345,6 +346,7 @@ export function SqlPanel() {
       ?.writeText([head, sep, body].join("\n"))
       .then(() => {
         setCopied(true);
+        toast("Copied result as Markdown", "success");
         setTimeout(() => setCopied(false), 1200);
       })
       .catch(() => {});
@@ -675,6 +677,7 @@ export function SqlPanel() {
                 title="Copy"
                 onClick={() => {
                   void navigator.clipboard?.writeText(cellDetail.value).catch(() => {});
+                  toast("Copied cell value", "success");
                   setCellDetail(null);
                 }}
               >

@@ -46,9 +46,6 @@ export function TopNav({
   const run = useStore((s) => s.run);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const engineName = active ? (active.engine === "postgres" ? "PostgreSQL" : active.engine === "mysql" ? "MySQL" : "SQLite") : null;
-  const title = active ? `DbVisualizer Pro — ${engineName} — ${active.name}` : "DbVisualizer Pro — Untitled";
-
   const openFile = (file: File) => {
     const reader = new FileReader();
     reader.onload = () => loadSql(String(reader.result ?? ""));
@@ -113,9 +110,11 @@ export function TopNav({
 
       <div className={`bud-tb-conn ${active ? "on" : ""}`} title={active ? `Connected to ${active.name}` : "No active connection"}>
         <span className="bud-tb-conn-dot" />
-        <span>{active ? "Connected" : "Disconnected"}</span>
+        <span>{active ? `Connected · ${active.name}` : "Disconnected"}</span>
       </div>
-      <div className="bud-tb-title">{title}</div>
+      <div className="bud-tb-brand">
+        Mama<span>SQL</span>
+      </div>
 
       <input
         ref={fileRef}

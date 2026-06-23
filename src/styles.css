@@ -2868,3 +2868,36 @@ select.bud-cb-select {
 .bud-conn-hint.warn { background: rgba(232, 160, 75, 0.12); border-color: rgba(232, 160, 75, 0.35); }
 .bud-conn-hint.warn svg { color: #e8a04b; }
 .bud-field-hint { font-size: 11px; color: var(--faint); font-weight: 400; line-height: 1.4; }
+
+/* ============================================================
+   QoL: MamaSQL wordmark, resizable sidebar, toast notifications
+   ============================================================ */
+
+/* wordmark (replaces the product title, top-right) */
+.bud-tb-brand { margin-left: 14px; font-size: 13.5px; font-weight: 800; letter-spacing: 0.4px; color: var(--text); white-space: nowrap; -webkit-app-region: no-drag; }
+.bud-tb-brand span { color: var(--green-bright); }
+
+/* resizable sidebar */
+.bud-app { position: relative; }
+.bud-body { grid-template-columns: var(--sidebar-w, 270px) 1fr; }
+.bud-hsplit { position: absolute; top: 38px; bottom: 24px; left: var(--sidebar-w, 270px); width: 7px; margin-left: -3px; cursor: col-resize; z-index: 30; }
+.bud-hsplit:hover { background: var(--accent-soft); }
+.bud-app.sidebar-hidden .bud-hsplit { display: none; }
+
+/* toast notifications */
+.bud-toasts { position: fixed; right: 16px; bottom: 34px; z-index: 100; display: flex; flex-direction: column; gap: 8px; align-items: flex-end; }
+.bud-toast {
+  display: flex; align-items: center; gap: 9px; min-width: 200px; max-width: 380px; padding: 10px 12px;
+  border-radius: 7px; background: var(--panel-2); border: 1px solid var(--border-strong);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5); color: var(--text); font-size: 13px; animation: toast-in 0.18s ease;
+}
+@keyframes toast-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.bud-toast-ic { display: inline-flex; flex: none; }
+.bud-toast.success { border-color: rgba(95, 184, 95, 0.35); }
+.bud-toast.success .bud-toast-ic { color: var(--green-bright); }
+.bud-toast.error { border-color: rgba(240, 97, 109, 0.4); }
+.bud-toast.error .bud-toast-ic { color: var(--danger); }
+.bud-toast.info .bud-toast-ic { color: var(--accent-2); }
+.bud-toast-msg { flex: 1; }
+.bud-toast-x { background: none; border: none; color: var(--faint); display: inline-flex; cursor: pointer; padding: 2px; border-radius: 4px; }
+.bud-toast-x:hover { color: var(--text); }

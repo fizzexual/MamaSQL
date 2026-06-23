@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getBackend } from "../ipc/backend";
+import { toast } from "./toast";
 import type {
   AppError,
   ColumnDef,
@@ -60,6 +61,26 @@ function persistSaved(key: string, items: SavedItem[]): void {
   }
 }
 
+const EDITOR_KEY = "mamasql.editor";
+const LASTCONN_KEY = "mamasql.lastConn";
+const DEFAULT_SQL =
+  "-- Create a connection, then write SQL here.\n-- e.g. CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT);\nSELECT 1;";
+
+function loadInitialSql(): string {
+  try {
+    return localStorage.getItem(EDITOR_KEY) ?? DEFAULT_SQL;
+  } catch {
+    return DEFAULT_SQL;
+  }
+}
+function persistLocal(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* ignore */
+  }
+}
+
 /** Apply a saved view's single-condition filter to a row set (client-side). */
 function applyViewFilter(rows: unknown[][], columns: { name: string }[], filter: ViewFilter | null): unknown[][] {
   if (!filter) return rows;
@@ -111,6 +132,7 @@ export interface AppStore {
   favorites: SavedItem[];
 
   loadConnections: () => Promise<void>;
+  restoreSession: () => Promise<void>;
   saveConnection: (cfg: ConnectionConfig, password?: string | null) => Promise<void>;
   deleteConnection: (id: string) => Promise<void>;
   openAndIntrospect: (id: string) => Promise<void>;
@@ -161,7 +183,7 @@ export const useStore = create<AppStore>((set, get) => ({
   connections: [],
   activeConnectionId: null,
   schema: { tables: [], columnsByTable: {} },
-  sql: "-- Create a connection, then write SQL here.\n-- e.g. CREATE TABLE notes (id INTEGER PRIMARY KEY, body TEXT);\nSELECT 1;",
+  sql: loadInitialSql(),
   result: null,
   error: null,
   running: false,
@@ -185,6 +207,19 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ connections: await backend.listConnections() });
   },
 
+  restoreSession: async () => {
+    await get().loadConnections();
+    let lastId: string | null = null;
+    try {
+      lastId = localStorage.getItem(LASTCONN_KEY);
+    } catch {
+      /* ignore */
+    }
+    if (lastId && get().activeConnectionId == null && get().connections.some((c) => c.id === lastId)) {
+      await get().openAndIntrospect(lastId);
+    }
+  },
+
   saveConnection: async (cfg, password = null) => {
     await backend.saveConnection(cfg, password);
     await get().loadConnections();
@@ -197,6 +232,7 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   openAndIntrospect: async (id) => {
+    persistLocal(LASTCONN_KEY, id);
     // Reset everything tied to the previous source so its tables/data don't
     // bleed through while the new source introspects (or if it errors).
     set({
@@ -234,7 +270,9 @@ export const useStore = create<AppStore>((set, get) => ({
         })();
       }
     } catch (e) {
-      set({ error: normalizeError(e), loadingTables: false });
+      const err = normalizeError(e);
+      set({ error: err, loadingTables: false });
+      toast(err.message ?? "Could not open connection", "error");
     }
   },
 
@@ -250,7 +288,10 @@ export const useStore = create<AppStore>((set, get) => ({
     }));
   },
 
-  setSql: (sql) => set({ sql }),
+  setSql: (sql) => {
+    persistLocal(EDITOR_KEY, sql);
+    set({ sql });
+  },
 
   run: async () => {
     const { activeConnectionId, sql } = get();
@@ -264,7 +305,9 @@ export const useStore = create<AppStore>((set, get) => ({
       set({ result, running: false, editTable: null });
       await get().loadHistory();
     } catch (e) {
-      set({ error: normalizeError(e), result: null, running: false });
+      const err = normalizeError(e);
+      set({ error: err, result: null, running: false });
+      toast(err.message ?? "Query failed", "error");
     }
   },
 
@@ -635,6 +678,7 @@ export const useStore = create<AppStore>((set, get) => ({
       const item: SavedItem = { id: `s-${Date.now()}-${s.scripts.length}`, name, sql, savedAt: new Date().toISOString() };
       const scripts = [item, ...s.scripts];
       persistSaved(SCRIPTS_KEY, scripts);
+      toast(`Saved script “${name}”`, "success");
       return { scripts };
     }),
 
@@ -650,6 +694,7 @@ export const useStore = create<AppStore>((set, get) => ({
       const item: SavedItem = { id: `f-${Date.now()}-${s.favorites.length}`, name, sql, savedAt: new Date().toISOString() };
       const favorites = [item, ...s.favorites];
       persistSaved(FAVS_KEY, favorites);
+      toast(`Added “${name}” to favorites`, "success");
       return { favorites };
     }),
 
