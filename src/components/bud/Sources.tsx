@@ -496,6 +496,8 @@ function TableRow({
   const clearTables = useStore((s) => s.clearTables);
   const editTable = useStore((s) => s.editTable);
   const activeViewId = useStore((s) => s.activeViewId);
+  const currentView = useStore((s) => s.view);
+  const setView = useStore((s) => s.setView);
   const views = useStore((s) => s.views);
   const loadSql = useStore((s) => s.loadSql);
   const addColumn = useStore((s) => s.addColumn);
@@ -577,7 +579,14 @@ function TableRow({
             return;
           }
           const handled = onActivate?.(table, e) ?? false;
-          if (!handled) void openTableData(table);
+          if (handled) return;
+          // Clicking the already-selected table shouldn't reload it — just bring
+          // its tab back into view if you'd navigated away to the editor.
+          if (tableActive) {
+            if (currentView !== "data") setView("data");
+            return;
+          }
+          void openTableData(table);
         }}
         onContextMenu={(e) => {
           e.preventDefault();
@@ -593,7 +602,13 @@ function TableRow({
         <div
           key={v.id}
           className={`bud-table bud-view ${activeViewId === v.id ? "active" : ""}`}
-          onClick={() => openView(v)}
+          onClick={() => {
+            if (activeViewId === v.id) {
+              if (currentView !== "data") setView("data");
+              return;
+            }
+            openView(v);
+          }}
         >
           <span className="bud-table-ic">
             <IconFilter size={14} stroke={1.7} />
