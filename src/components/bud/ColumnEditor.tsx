@@ -1,15 +1,36 @@
-import { IconBoltFilled, IconChevronDown, IconMenu2 } from "@tabler/icons-react";
+import {
+  IconAlignLeft,
+  IconBoltFilled,
+  IconBraces,
+  IconCalendar,
+  IconCheck,
+  IconCheckbox,
+  IconChevronDown,
+  IconHash,
+  IconLetterCase,
+} from "@tabler/icons-react";
 import { useState } from "react";
 import { confirmDialog } from "../../state/dialog";
 import type { ColumnInfo } from "../../ipc/types";
 import { useStore } from "../../state/store";
 
+const FIELD_TYPES = [
+  { label: "Single line text", Icon: IconLetterCase },
+  { label: "Long form text", Icon: IconAlignLeft },
+  { label: "Number", Icon: IconHash },
+  { label: "Date & time", Icon: IconCalendar },
+  { label: "Boolean", Icon: IconCheckbox },
+  { label: "JSON", Icon: IconBraces },
+] as const;
+
 function guessType(t: string): string {
   const u = t.toUpperCase();
-  if (/INT|SERIAL|NUM|DEC|REAL|FLOAT|DOUBLE/.test(u)) return "Number";
-  if (/DATE|TIME/.test(u)) return "Date/Time";
   if (/BOOL/.test(u)) return "Boolean";
+  if (/INT|SERIAL|NUM|DEC|REAL|FLOAT|DOUBLE/.test(u)) return "Number";
+  if (/JSON/.test(u)) return "JSON";
+  if (/DATE|TIME/.test(u)) return "Date & time";
   if (/TEXT|CLOB|LONG/.test(u)) return "Long form text";
+  if (/CHAR|STRING/.test(u)) return "Single line text";
   return "Single line text";
 }
 
@@ -37,10 +58,13 @@ export function ColumnEditor({
   const [name, setName] = useState(column.name);
   const [required, setRequired] = useState(!column.nullable);
   const [markdown, setMarkdown] = useState(false);
+  const [fieldType, setFieldType] = useState(guessType(column.dataType));
+  const [typeOpen, setTypeOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const left = Math.min(anchor.x, window.innerWidth - 340);
   const top = Math.min(anchor.y + 4, window.innerHeight - 380);
+  const CurIcon = FIELD_TYPES.find((f) => f.label === fieldType)?.Icon ?? IconLetterCase;
 
   const save = async () => {
     const next = name.trim();
@@ -80,12 +104,38 @@ export function ColumnEditor({
             if (e.key === "Escape") onClose();
           }}
         />
-        <div className="bud-ce-type" title={column.dataType}>
-          <span className="bud-ce-type-ic">
-            <IconMenu2 size={15} stroke={1.7} />
-          </span>
-          <span className="bud-ce-type-label">{guessType(column.dataType)}</span>
-          <IconChevronDown size={15} stroke={1.7} className="bud-ce-type-caret" />
+        <div className="bud-ce-typewrap">
+          <button
+            type="button"
+            className={`bud-ce-type ${typeOpen ? "open" : ""}`}
+            title={`SQL type: ${column.dataType}`}
+            onClick={() => setTypeOpen((v) => !v)}
+          >
+            <span className="bud-ce-type-ic">
+              <CurIcon size={15} stroke={1.7} />
+            </span>
+            <span className="bud-ce-type-label">{fieldType}</span>
+            <IconChevronDown size={15} stroke={1.7} className="bud-ce-type-caret" />
+          </button>
+          {typeOpen && (
+            <div className="bud-ce-type-menu">
+              {FIELD_TYPES.map((ft) => (
+                <button
+                  type="button"
+                  key={ft.label}
+                  className={`bud-ce-type-opt ${ft.label === fieldType ? "sel" : ""}`}
+                  onClick={() => {
+                    setFieldType(ft.label);
+                    setTypeOpen(false);
+                  }}
+                >
+                  <ft.Icon size={15} stroke={1.7} />
+                  <span>{ft.label}</span>
+                  {ft.label === fieldType && <IconCheck size={14} stroke={2} className="bud-ce-type-check" />}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="bud-ce-section">
           Formatting <span className="bud-info">ⓘ</span>

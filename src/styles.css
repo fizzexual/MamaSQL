@@ -2586,7 +2586,6 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 }
 .bud-tree-toolbar button:hover { background: var(--panel-2); color: var(--text); }
 .bud-tree-toolbar button.on { color: var(--accent); background: var(--accent-soft); }
-.bud-tree-toolbar-sp { flex: 1; }
 
 .bud-sources-list { padding: 4px 0 14px; overflow: auto; }
 
@@ -3217,3 +3216,23 @@ select.bud-cb-select {
 .bud-sources.compact .bud-src.ds,
 .bud-sources.compact .bud-objgroup-head,
 .bud-sources.compact .bud-table { padding-top: 1px; padding-bottom: 1px; font-size: 11.5px; }
+
+/* Column editor: field-type picker is a real dropdown, not a static label */
+.bud-ce-typewrap { position: relative; }
+.bud-ce-type { width: 100%; cursor: pointer; text-align: left; font-family: inherit; }
+.bud-ce-type:hover, .bud-ce-type.open { border-color: var(--accent); }
+.bud-ce-type-menu {
+  position: absolute; top: calc(100% + 5px); left: 0; right: 0; z-index: 3;
+  background: var(--panel-2); border: 1px solid var(--border-strong); border-radius: 10px;
+  box-shadow: var(--elev-3); padding: 4px; display: flex; flex-direction: column; gap: 1px;
+}
+.bud-ce-type-opt {
+  display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 9px;
+  border: none; background: transparent; color: var(--text); font-size: 13px;
+  border-radius: 7px; cursor: pointer; text-align: left;
+}
+.bud-ce-type-opt > span { flex: 1; }
+.bud-ce-type-opt svg { color: var(--muted); }
+.bud-ce-type-opt:hover { background: var(--panel-3); }
+.bud-ce-type-opt.sel, .bud-ce-type-opt.sel svg { color: var(--accent-2); }
+.bud-ce-type-check { margin-left: auto; flex: none; }

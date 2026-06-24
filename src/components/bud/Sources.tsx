@@ -157,7 +157,6 @@ export function Sources({
         <button title="Schema diff (compare connections)" onClick={() => window.dispatchEvent(new Event("mamasql:schema-diff"))}>
           <IconGitCompare size={15} stroke={1.7} />
         </button>
-        <span className="bud-tree-toolbar-sp" />
         <button
           className={compact ? "on" : ""}
           title={compact ? "Comfortable spacing" : "Compact spacing"}
