@@ -579,6 +579,16 @@ function sendJson(res, status, obj) {
   res.end(body);
 }
 
+// A DB connection dropped out from under us (idle timeout, server restart, …)?
+// Distinct from "can't reach the DB at all" (ECONNREFUSED), which reopening
+// won't fix.
+function isConnLost(e) {
+  if (!e) return false;
+  if (e.fatal) return true;
+  if (["PROTOCOL_CONNECTION_LOST", "ECONNRESET", "EPIPE"].includes(e.code)) return true;
+  return /closed state|server has gone away|connection lost|connection terminated|terminating connection/i.test(String(e.message || ""));
+}
+
 const server = createServer((req, res) => {
   if (req.method === "OPTIONS") {
     cors(res);
@@ -610,6 +620,20 @@ const server = createServer((req, res) => {
       const out = await handler(body);
       sendJson(res, 200, out);
     } catch (e) {
+      // A dropped DB connection: forget it and report notConnected so the client
+      // transparently reopens + retries (self-heals idle timeouts).
+      if (isConnLost(e) && body && body.id) {
+        const ent = pools.get(body.id);
+        if (ent) {
+          try {
+            await closeConn(ent);
+          } catch {
+            /* ignore */
+          }
+          pools.delete(body.id);
+        }
+        return sendJson(res, 400, appError("notConnected", errMessage(e)));
+      }
       sendJson(res, 400, appError(e.kind || (e.code ? "connectionError" : "queryError"), errMessage(e)));
     }
   });
