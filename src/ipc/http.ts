@@ -4,6 +4,7 @@
 // kept in a separate localStorage key so connections can be re-opened after a
 // reload or a bridge restart.
 import type { Backend } from "./backend";
+import { displayRows } from "../lib/cell";
 import type { AppError, ConnectionConfig, QueryResult } from "./types";
 
 // Same-origin by default: the dev server (vite proxy) and the Docker web
@@ -195,57 +196,12 @@ export async function bridgeHealthy(): Promise<boolean> {
   }
 }
 
-// Postgres/MySQL JSON(B) columns come back over the wire as parsed objects/
-// arrays (and binary as Buffer-shaped objects). Render those as text so the grid
-// shows the actual value — and the cell viewer can re-parse the JSON — instead of
-// "[object Object]". Primitives and nulls pass through untouched.
-function bufferBytes(v: unknown): number[] | null {
-  if (v instanceof Uint8Array) return Array.from(v);
-  const o = v as { type?: unknown; data?: unknown };
-  if (o && o.type === "Buffer" && Array.isArray(o.data)) return o.data as number[];
-  return null;
-}
-function isPrintable(s: string): boolean {
-  for (let i = 0; i < s.length; i++) {
-    const c = s.charCodeAt(i);
-    if (c === 0xfffd) return false; // invalid UTF-8 (replacement char) -> binary
-    if (c < 0x20 && c !== 9 && c !== 10 && c !== 13) return false; // control char (allow tab/LF/CR)
-  }
-  return true;
-}
-function bytesToText(bytes: number[]): string {
-  // Binary columns usually hold text/JSON stored as bytes — decode and show it
-  // when it's printable; otherwise fall back to a hex dump.
-  try {
-    const text = new TextDecoder("utf-8", { fatal: false }).decode(Uint8Array.from(bytes));
-    if (text.length && isPrintable(text)) return text;
-  } catch {
-    /* fall through to hex */
-  }
-  const hex = bytes.slice(0, 64).map((b) => (b & 0xff).toString(16).padStart(2, "0")).join("");
-  return bytes.length > 64 ? `0x${hex}… (${bytes.length} bytes)` : `0x${hex}`;
-}
-function cellToText(v: unknown): unknown {
-  if (v === null || typeof v !== "object") return v;
-  const bytes = bufferBytes(v);
-  if (bytes) return bytesToText(bytes);
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return String(v);
-  }
-}
+// Normalize JSON/binary cells to display text at the data boundary (the grid also
+// does this defensively). See lib/cell.
 function textifyCells(r: QueryResult): QueryResult {
   if (!r?.rows?.length) return r;
-  let touched = false;
-  const rows = r.rows.map((row) =>
-    row.map((cell) => {
-      const t = cellToText(cell);
-      if (t !== cell) touched = true;
-      return t;
-    }),
-  );
-  return touched ? { ...r, rows } : r;
+  const rows = displayRows(r.rows);
+  return rows === r.rows ? r : { ...r, rows };
 }
 
 /** Backend over the bridge. Connection-registry methods are no-ops — the web

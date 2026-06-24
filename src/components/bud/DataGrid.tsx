@@ -1,6 +1,7 @@
 import { IconArrowUpRight, IconChevronLeft, IconChevronRight, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import { getBackend } from "../../ipc/backend";
+import { displayRows } from "../../lib/cell";
 import { promptDialog } from "../../state/dialog";
 import { toast } from "../../state/toast";
 import type { ColumnInfo } from "../../ipc/types";
@@ -74,7 +75,14 @@ function GridSkeleton({ columns }: { columns?: ColumnInfo[] }) {
 }
 
 export function DataGrid() {
-  const result = useStore((s) => s.result);
+  const rawResult = useStore((s) => s.result);
+  // Defensively normalize cells for display (pg/mysql JSON -> objects, binary ->
+  // Buffer). Idempotent with the data-layer pass in lib/cell, so already-clean
+  // rows are returned as-is.
+  const result = useMemo(
+    () => (rawResult ? { ...rawResult, rows: displayRows(rawResult.rows) } : rawResult),
+    [rawResult],
+  );
   const editTable = useStore((s) => s.editTable);
   const loadingResult = useStore((s) => s.loadingResult);
   const editCell = useStore((s) => s.editCell);
