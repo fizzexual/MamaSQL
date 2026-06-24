@@ -2993,6 +2993,27 @@ select.bud-cb-select {
 .bud-import-preview td { padding: 5px 9px; border-bottom: 1px solid var(--border); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); }
 .bud-import-more { padding: 6px 9px; font-size: 11px; color: var(--faint); background: var(--bg-2); }
 
+/* Schema diff overlay */
+.bud-diff { width: min(760px, 92vw); max-height: 84vh; display: flex; flex-direction: column; background: var(--bg-1); border: 1px solid var(--border-strong); border-radius: 10px; box-shadow: 0 20px 70px rgba(0,0,0,.6); overflow: hidden; }
+.bud-diff-bar { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg-2); border-bottom: 1px solid var(--border); }
+.bud-diff-bar select { flex: 1; min-width: 0; background: var(--input-bg); border: 1px solid var(--border-strong); color: var(--text); border-radius: 5px; padding: 5px 9px; font-size: 12.5px; }
+.bud-diff-bar > svg { color: var(--faint); flex: none; }
+.bud-diff-go { background: var(--accent); color: #04120b; border: none; border-radius: 5px; padding: 6px 16px; font-size: 12.5px; font-weight: 600; cursor: pointer; flex: none; }
+.bud-diff-go:disabled { opacity: .5; cursor: default; }
+.bud-diff-body { overflow: auto; padding: 12px 14px; }
+.bud-diff-summary { font-size: 12px; color: var(--muted); margin-bottom: 12px; font-variant-numeric: tabular-nums; }
+.bud-diff-insync { color: #4ade80; font-size: 13px; padding: 8px 0; }
+.bud-diff-sec { margin-bottom: 14px; }
+.bud-diff-sec-h { font-size: 12px; font-weight: 600; padding: 4px 0; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.bud-diff-sec-h.del { color: #f87171; }
+.bud-diff-sec-h.add { color: #4ade80; }
+.bud-diff-sec-h.chg { color: #fbbf24; }
+.bud-diff-row { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 3px; }
+.bud-diff-row.del { color: #f87171; background: rgba(239,68,68,.08); }
+.bud-diff-row.add { color: #4ade80; background: rgba(34,197,94,.08); }
+.bud-diff-row.chg { color: #fbbf24; background: rgba(245,158,11,.08); }
+.bud-diff-note { color: var(--muted); }
+
 .bud-fk-cell { position: relative; }
 .bud-fk-jump { display: none; align-items: center; justify-content: center; background: var(--accent-soft); border: none; color: var(--accent-2); border-radius: 3px; width: 16px; height: 16px; margin-left: 6px; cursor: pointer; vertical-align: middle; }
 .bud-grid tbody tr:hover .bud-fk-jump { display: inline-flex; }

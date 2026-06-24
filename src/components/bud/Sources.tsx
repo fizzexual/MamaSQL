@@ -19,6 +19,7 @@ import {
   IconPlus,
   IconRefresh,
   IconFileImport,
+  IconGitCompare,
   IconSchema,
   IconSearch,
   IconSettings,
@@ -150,6 +151,9 @@ export function Sources({
         </button>
         <button title="Import CSV" onClick={() => window.dispatchEvent(new Event("mamasql:import-csv"))}>
           <IconFileImport size={15} stroke={1.7} />
+        </button>
+        <button title="Schema diff (compare connections)" onClick={() => window.dispatchEvent(new Event("mamasql:schema-diff"))}>
+          <IconGitCompare size={15} stroke={1.7} />
         </button>
         <span className="bud-tree-toolbar-sp" />
         <button title="Tree layout">

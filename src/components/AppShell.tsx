@@ -5,6 +5,7 @@ import { DataView } from "./bud/DataView";
 import { DialogHost } from "./bud/DialogHost";
 import { ErDiagram } from "./bud/ErDiagram";
 import { ImportCsvModal } from "./bud/ImportCsvModal";
+import { SchemaDiff } from "./bud/SchemaDiff";
 import { ServerModal } from "./bud/ServerModal";
 import { ShortcutsOverlay } from "./bud/ShortcutsOverlay";
 import { Sources } from "./bud/Sources";
@@ -76,6 +77,7 @@ export function AppShell() {
       <ShortcutsOverlay />
       <ErDiagram />
       <ImportCsvModal />
+      <SchemaDiff />
       <ToastHost />
       <DialogHost />
     </div>
