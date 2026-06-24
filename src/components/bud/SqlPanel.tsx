@@ -604,6 +604,16 @@ export function SqlPanel() {
                   }
                   return;
                 }
+                if (!e.ctrlKey && !e.metaKey && !e.altKey && (e.key === ")" || e.key === "]" || e.key === "}")) {
+                  // Overtype: typing a closer when it's already the next char just steps past it.
+                  const ta = taRef.current;
+                  if (ta && ta.selectionStart === ta.selectionEnd && sql[ta.selectionStart] === e.key) {
+                    e.preventDefault();
+                    ta.selectionStart = ta.selectionEnd = ta.selectionStart + 1;
+                    updateCaret();
+                    return;
+                  }
+                }
                 if (!e.ctrlKey && !e.metaKey && !e.altKey && PAIRS[e.key] && handlePair(e.key)) {
                   e.preventDefault();
                   setAc(null);
