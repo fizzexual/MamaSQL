@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { getBackend } from "../ipc/backend";
 import { resolveParams } from "../lib/params";
-import { confirmIfDestructive, isWrite } from "./safety";
+import { confirmIfDestructive, confirmProdWrite, isWrite } from "./safety";
 import { toast } from "./toast";
 
 const READONLY_KEY = "mamasql.readonly";
@@ -467,6 +467,8 @@ export const useStore = create<AppStore>((set, get) => ({
       toast("Connection is read-only — writes are blocked.", "error");
       return;
     }
+    const conn = get().connections.find((c) => c.id === activeConnectionId);
+    if (!(await confirmProdWrite(conn, sql))) return;
     const finalSql = await resolveParams(sql);
     if (finalSql == null) return; // a parameter prompt was cancelled
     if (!(await confirmIfDestructive(finalSql))) return;

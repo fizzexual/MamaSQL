@@ -30,6 +30,11 @@ export function StatusBar() {
             Not connected
           </span>
         )}
+        {conn?.env && (
+          <span className={`bud-status-env ${conn.env}`} title={`${conn.env} environment`}>
+            {conn.env === "prod" ? "PRODUCTION" : conn.env.toUpperCase()}
+          </span>
+        )}
         {readOnly && (
           <span className="bud-status-ro" title="This connection is read-only">
             <IconLock size={12} stroke={1.9} /> Read-only

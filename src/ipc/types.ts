@@ -2,6 +2,9 @@
 
 export type Engine = "postgres" | "mysql" | "sqlite";
 
+/** Environment tag for a connection — drives the colour dot and the prod guard. */
+export type ConnEnv = "dev" | "staging" | "prod";
+
 export interface ConnectionConfig {
   id: string;
   name: string;
@@ -10,6 +13,7 @@ export interface ConnectionConfig {
   port?: number | null;
   database: string;
   username?: string | null;
+  env?: ConnEnv | null;
 }
 
 export interface Column {

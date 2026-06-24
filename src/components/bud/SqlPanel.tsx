@@ -22,7 +22,7 @@ import { formatSql } from "../../lib/sqlformat";
 import { CellViewer } from "./CellViewer";
 import { ExportMenu } from "./ExportMenu";
 import { promptDialog } from "../../state/dialog";
-import { confirmIfDestructive, isWrite } from "../../state/safety";
+import { confirmIfDestructive, confirmProdWrite, isWrite } from "../../state/safety";
 import { toast } from "../../state/toast";
 import type { AppError, Column } from "../../ipc/types";
 import { useStore } from "../../state/store";
@@ -145,6 +145,7 @@ export function SqlPanel() {
       toast("Connection is read-only — writes are blocked.", "error");
       return;
     }
+    if (!(await confirmProdWrite(conn, text))) return;
     const finalText = await resolveParams(text);
     if (finalText == null) return; // a parameter prompt was cancelled
     if (!(await confirmIfDestructive(finalText))) return;

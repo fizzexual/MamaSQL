@@ -34,3 +34,20 @@ export async function confirmIfDestructive(sql: string): Promise<boolean> {
   }
   return true;
 }
+
+/**
+ * Extra guard for connections tagged `prod`: any write gets an explicit
+ * "you're on production" confirm. Returns true when it's safe to proceed.
+ */
+export async function confirmProdWrite(
+  conn: { name: string; env?: string | null } | undefined,
+  sql: string,
+): Promise<boolean> {
+  if (!conn || conn.env !== "prod" || !isWrite(sql)) return true;
+  return confirmDialog({
+    title: "Write to PRODUCTION?",
+    message: `“${conn.name}” is flagged as a production connection. This statement modifies data and can't be undone. Run it on production?`,
+    confirmLabel: "Run on production",
+    danger: true,
+  });
+}

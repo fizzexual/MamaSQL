@@ -366,6 +366,7 @@ function Datasource({
         <span className="bud-src-ic ds-engine">
           <EngineIcon engine={conn.engine} />
         </span>
+        {conn.env && <span className={`bud-ds-env ${conn.env}`} title={`${conn.env} environment`} />}
         <span className="bud-src-name">{conn.name}</span>
         {isReadOnly && <IconLock size={12} stroke={1.9} className="bud-ds-ro" />}
       </div>

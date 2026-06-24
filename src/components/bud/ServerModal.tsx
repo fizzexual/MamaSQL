@@ -2,7 +2,7 @@ import { IconAlertTriangle, IconCheck, IconInfoCircle, IconPlus, IconRefresh } f
 import { useEffect, useState } from "react";
 import { getBackend, isTauri } from "../../ipc/backend";
 import { bridgeHealthy } from "../../ipc/http";
-import type { ConnectionConfig, Engine } from "../../ipc/types";
+import type { ConnEnv, ConnectionConfig, Engine } from "../../ipc/types";
 import { promptDialog } from "../../state/dialog";
 import { useStore } from "../../state/store";
 import { toast } from "../../state/toast";
@@ -42,6 +42,7 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
     };
   }, [remoteInBrowser]);
   const [name, setName] = useState(existing?.name ?? "");
+  const [env, setEnv] = useState<ConnEnv | "">(existing?.env ?? "");
   const [host, setHost] = useState(existing?.host ?? "localhost");
   const [port, setPort] = useState(existing?.port != null ? String(existing.port) : "");
   const [database, setDatabase] = useState(existing?.database ?? "");
@@ -62,6 +63,7 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
     port: engine === "sqlite" ? null : Number(port || defaultPort) || null,
     database: db,
     username: engine === "sqlite" ? null : username.trim() || null,
+    env: env || null,
   });
 
   const testAndList = async () => {
@@ -144,10 +146,27 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
               </span>
             </div>
           )}
-          <label className="bud-field">
-            <span>Name</span>
-            <input value={name} onChange={(e) => setName(e.target.value)} placeholder="My database" />
-          </label>
+          <div className="bud-field-row">
+            <label className="bud-field grow">
+              <span>Name</span>
+              <input value={name} onChange={(e) => setName(e.target.value)} placeholder="My database" />
+            </label>
+            <label className="bud-field env">
+              <span>Environment</span>
+              <select value={env} onChange={(e) => setEnv(e.target.value as ConnEnv | "")}>
+                <option value="">None</option>
+                <option value="dev">Development</option>
+                <option value="staging">Staging</option>
+                <option value="prod">Production</option>
+              </select>
+            </label>
+          </div>
+          {env === "prod" && (
+            <div className="bud-conn-hint warn">
+              <IconAlertTriangle size={15} stroke={1.8} />
+              <span>Production: writes will ask for an extra confirmation before running.</span>
+            </div>
+          )}
 
           {engine !== "sqlite" ? (
             <>
