@@ -7,6 +7,7 @@
     "dev": "vite",
     "bridge": "node server/bridge.mjs",
     "dev:all": "concurrently -n web,bridge -c blue,green \"vite\" \"node server/bridge.mjs\"",
+    "start": "concurrently -n web,bridge -c blue,green \"vite --port 5001 --strictPort\" \"node server/bridge.mjs\"",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
