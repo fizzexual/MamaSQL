@@ -2881,6 +2881,10 @@ select.bud-cb-select {
 .bud-sql-exec svg { flex: none; }
 .bud-sql-exec .bud-kbd { display: inline-flex; gap: 2px; }
 .bud-sql-exec .bud-kbd kbd { background: rgba(255, 255, 255, 0.22); border: none; color: #fff; font-size: 10px; font-family: var(--mono); border-radius: 3px; padding: 0 4px; }
+
+/* new-editor tab button */
+.bud-qtab-new { display: inline-flex; align-items: center; justify-content: center; width: 30px; flex: none; border: none; border-right: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
+.bud-qtab-new:hover { background: var(--panel-2); color: var(--text); }
 .bud-field-hint { font-size: 11px; color: var(--faint); font-weight: 400; line-height: 1.4; }
 
 /* ============================================================

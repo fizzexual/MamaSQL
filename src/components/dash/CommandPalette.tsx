@@ -36,6 +36,7 @@ export function CommandPalette({ onAddServer }: { onAddServer: () => void }) {
   const setView = useStore((s) => s.setView);
   const setSql = useStore((s) => s.setSql);
   const loadSql = useStore((s) => s.loadSql);
+  const newEditor = useStore((s) => s.newEditor);
   const run = useStore((s) => s.run);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const openTableData = useStore((s) => s.openTableData);
@@ -79,7 +80,7 @@ export function CommandPalette({ onAddServer }: { onAddServer: () => void }) {
       setView("sql");
     };
     const list: Cmd[] = [
-      { id: "a-query", group: "Actions", label: "New query", hint: "SQL", Icon: IconBolt, run: act(() => loadSql("")) },
+      { id: "a-query", group: "Actions", label: "New query tab", hint: "SQL", Icon: IconBolt, run: act(newEditor) },
       { id: "a-conn", group: "Actions", label: "New connection", Icon: IconPlus, run: act(onAddServer) },
       {
         id: "a-run",

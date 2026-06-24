@@ -41,6 +41,7 @@ export function TopNav({
   const setTopView = useStore((s) => s.setTopView);
   const setView = useStore((s) => s.setView);
   const loadSql = useStore((s) => s.loadSql);
+  const newEditor = useStore((s) => s.newEditor);
   const saveScript = useStore((s) => s.saveScript);
   const openAndIntrospect = useStore((s) => s.openAndIntrospect);
   const run = useStore((s) => s.run);
@@ -66,7 +67,7 @@ export function TopNav({
           <IconLayoutSidebar size={16} stroke={1.6} />
         </button>
         <span className="bud-tb-divider" />
-        <button title="New SQL" onClick={() => loadSql("")}>
+        <button title="New SQL editor" onClick={newEditor}>
           <IconFilePlus size={16} stroke={1.6} />
         </button>
         <button title="Open .sql file" onClick={() => fileRef.current?.click()}>

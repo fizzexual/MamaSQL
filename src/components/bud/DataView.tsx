@@ -4,6 +4,7 @@ import {
   IconCode,
   IconCopy,
   IconDownload,
+  IconPlus,
   IconTable,
   IconTrash,
   IconUpload,
@@ -38,6 +39,11 @@ export function DataView() {
   const deleteSelected = useStore((s) => s.deleteSelected);
   const duplicateSelected = useStore((s) => s.duplicateSelected);
   const clearSelection = useStore((s) => s.clearSelection);
+  const editors = useStore((s) => s.editors);
+  const activeEditorId = useStore((s) => s.activeEditorId);
+  const selectEditor = useStore((s) => s.selectEditor);
+  const closeEditor = useStore((s) => s.closeEditor);
+  const newEditor = useStore((s) => s.newEditor);
   const [menu, setMenu] = useState<MenuState>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -101,12 +107,28 @@ export function DataView() {
   return (
     <main className="bud-main">
       <div className="bud-qtabs">
-        <button className={`bud-qtab ${view === "sql" ? "on" : ""}`} onClick={() => setView("sql")}>
-          <IconCode size={14} stroke={1.7} className="bud-qtab-ic sql" />
-          <span>SQL Editor</span>
-          <span className="bud-qtab-x">
-            <IconX size={12} stroke={2} />
-          </span>
+        {editors.map((ed) => (
+          <button
+            key={ed.id}
+            className={`bud-qtab ${view === "sql" && activeEditorId === ed.id ? "on" : ""}`}
+            onClick={() => selectEditor(ed.id)}
+          >
+            <IconCode size={14} stroke={1.7} className="bud-qtab-ic sql" />
+            <span>{ed.name}</span>
+            <span
+              className="bud-qtab-x"
+              title="Close editor"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeEditor(ed.id);
+              }}
+            >
+              <IconX size={12} stroke={2} />
+            </span>
+          </button>
+        ))}
+        <button className="bud-qtab-new" title="New SQL editor" onClick={newEditor}>
+          <IconPlus size={15} stroke={2} />
         </button>
         {editTable && (
           <button className={`bud-qtab ${view === "data" ? "on" : ""}`} onClick={() => setView("data")}>
@@ -148,7 +170,7 @@ export function DataView() {
       ) : view === "history" ? (
         <HistoryView />
       ) : view === "sql" ? (
-        <SqlPanel />
+        <SqlPanel key={activeEditorId} />
       ) : !editTable ? (
         <div className="bud-empty">Pick a table on the left to view and edit its data.</div>
       ) : (

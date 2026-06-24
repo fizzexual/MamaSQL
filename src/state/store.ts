@@ -81,6 +81,49 @@ function persistLocal(key: string, value: string): void {
   }
 }
 
+/** One open SQL editor tab. */
+export interface EditorTab {
+  id: string;
+  name: string;
+  sql: string;
+}
+const EDITORS_KEY = "mamasql.editors";
+const ACTIVE_EDITOR_KEY = "mamasql.activeEditor";
+
+function loadEditors(): EditorTab[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(EDITORS_KEY) ?? "null");
+    if (Array.isArray(raw) && raw.length) {
+      return raw.map((e, i) => ({
+        id: String(e.id ?? `ed-${i + 1}`),
+        name: String(e.name ?? `Query ${i + 1}`),
+        sql: String(e.sql ?? ""),
+      }));
+    }
+  } catch {
+    /* fall through to the migrated single editor */
+  }
+  return [{ id: "ed-1", name: "Query 1", sql: loadInitialSql() }];
+}
+function persistEditors(editors: EditorTab[], activeId: string): void {
+  try {
+    localStorage.setItem(EDITORS_KEY, JSON.stringify(editors));
+    localStorage.setItem(ACTIVE_EDITOR_KEY, activeId);
+  } catch {
+    /* ignore */
+  }
+}
+const INITIAL_EDITORS = loadEditors();
+const INITIAL_ACTIVE_EDITOR = (() => {
+  try {
+    const id = localStorage.getItem(ACTIVE_EDITOR_KEY);
+    if (id && INITIAL_EDITORS.some((e) => e.id === id)) return id;
+  } catch {
+    /* ignore */
+  }
+  return INITIAL_EDITORS[0].id;
+})();
+
 /** Apply a saved view's single-condition filter to a row set (client-side). */
 function applyViewFilter(rows: unknown[][], columns: { name: string }[], filter: ViewFilter | null): unknown[][] {
   if (!filter) return rows;
@@ -112,6 +155,10 @@ export interface AppStore {
   activeConnectionId: string | null;
   schema: SchemaState;
   sql: string;
+  editors: EditorTab[];
+  activeEditorId: string;
+  editorResults: Record<string, QueryResult | null>;
+  editorErrors: Record<string, AppError | null>;
   result: QueryResult | null;
   error: AppError | null;
   running: boolean;
@@ -138,6 +185,10 @@ export interface AppStore {
   openAndIntrospect: (id: string) => Promise<void>;
   expandTable: (table: string) => Promise<void>;
   setSql: (sql: string) => void;
+  newEditor: () => void;
+  closeEditor: (id: string) => void;
+  selectEditor: (id: string) => void;
+  setEditorResult: (id: string, result: QueryResult | null, error: AppError | null) => void;
   run: () => Promise<void>;
   loadHistory: () => Promise<void>;
   openTableData: (table: string) => Promise<void>;
@@ -183,7 +234,11 @@ export const useStore = create<AppStore>((set, get) => ({
   connections: [],
   activeConnectionId: null,
   schema: { tables: [], columnsByTable: {} },
-  sql: loadInitialSql(),
+  sql: INITIAL_EDITORS.find((e) => e.id === INITIAL_ACTIVE_EDITOR)?.sql ?? "",
+  editors: INITIAL_EDITORS,
+  activeEditorId: INITIAL_ACTIVE_EDITOR,
+  editorResults: {},
+  editorErrors: {},
   result: null,
   error: null,
   running: false,
@@ -288,10 +343,60 @@ export const useStore = create<AppStore>((set, get) => ({
     }));
   },
 
-  setSql: (sql) => {
-    persistLocal(EDITOR_KEY, sql);
-    set({ sql });
-  },
+  setSql: (sql) =>
+    set((s) => {
+      const editors = s.editors.map((e) => (e.id === s.activeEditorId ? { ...e, sql } : e));
+      persistEditors(editors, s.activeEditorId);
+      return { sql, editors };
+    }),
+
+  newEditor: () =>
+    set((s) => {
+      const id = `ed-${Date.now().toString(36)}`;
+      const editor: EditorTab = { id, name: `Query ${s.editors.length + 1}`, sql: "" };
+      const editors = [...s.editors, editor];
+      persistEditors(editors, id);
+      return { editors, activeEditorId: id, sql: "", view: "sql", topView: "data" };
+    }),
+
+  selectEditor: (id) =>
+    set((s) => {
+      const ed = s.editors.find((e) => e.id === id);
+      if (!ed) return {};
+      persistEditors(s.editors, id);
+      return { activeEditorId: id, sql: ed.sql, view: "sql", topView: "data" };
+    }),
+
+  closeEditor: (id) =>
+    set((s) => {
+      const idx = s.editors.findIndex((e) => e.id === id);
+      let editors = s.editors.filter((e) => e.id !== id);
+      const editorResults = { ...s.editorResults };
+      const editorErrors = { ...s.editorErrors };
+      delete editorResults[id];
+      delete editorErrors[id];
+      if (editors.length === 0) {
+        const fresh: EditorTab = { id: `ed-${Date.now().toString(36)}`, name: "Query 1", sql: "" };
+        editors = [fresh];
+        persistEditors(editors, fresh.id);
+        return { editors, activeEditorId: fresh.id, sql: "", editorResults, editorErrors };
+      }
+      let activeEditorId = s.activeEditorId;
+      let sql = s.sql;
+      if (id === s.activeEditorId) {
+        const next = editors[Math.min(idx, editors.length - 1)];
+        activeEditorId = next.id;
+        sql = next.sql;
+      }
+      persistEditors(editors, activeEditorId);
+      return { editors, activeEditorId, sql, editorResults, editorErrors };
+    }),
+
+  setEditorResult: (id, result, error) =>
+    set((s) => ({
+      editorResults: { ...s.editorResults, [id]: result },
+      editorErrors: { ...s.editorErrors, [id]: error },
+    })),
 
   run: async () => {
     const { activeConnectionId, sql } = get();
@@ -324,7 +429,6 @@ export const useStore = create<AppStore>((set, get) => ({
       topView: "data",
       loadingResult: true,
       error: null,
-      sql,
       editTable: { table, pkColumn: null },
       inspectorRow: null,
       activeViewId: null,
@@ -582,7 +686,6 @@ export const useStore = create<AppStore>((set, get) => ({
       topView: "data",
       loadingResult: true,
       error: null,
-      sql,
       editTable: { table: view.table, pkColumn: null },
       inspectorRow: null,
       activeViewId: view.id,
@@ -671,7 +774,12 @@ export const useStore = create<AppStore>((set, get) => ({
     }
   },
 
-  loadSql: (sql) => set({ sql, view: "sql", topView: "data" }),
+  loadSql: (sql) =>
+    set((s) => {
+      const editors = s.editors.map((e) => (e.id === s.activeEditorId ? { ...e, sql } : e));
+      persistEditors(editors, s.activeEditorId);
+      return { sql, editors, view: "sql", topView: "data" };
+    }),
 
   saveScript: (name, sql) =>
     set((s) => {

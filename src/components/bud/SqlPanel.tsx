@@ -22,7 +22,7 @@ import { getBackend } from "../../ipc/backend";
 import { download, toCsv, toJson } from "../../lib/csv";
 import { promptDialog } from "../../state/dialog";
 import { toast } from "../../state/toast";
-import type { AppError, Column, QueryResult } from "../../ipc/types";
+import type { AppError, Column } from "../../ipc/types";
 import { useStore } from "../../state/store";
 
 function normalize(e: unknown): AppError {
@@ -112,9 +112,11 @@ export function SqlPanel() {
   const columnsByTable = useStore((s) => s.schema.columnsByTable);
   const saveScript = useStore((s) => s.saveScript);
   const saveFavorite = useStore((s) => s.saveFavorite);
+  const activeEditorId = useStore((s) => s.activeEditorId);
+  const res = useStore((s) => s.editorResults[s.activeEditorId] ?? null);
+  const err = useStore((s) => s.editorErrors[s.activeEditorId] ?? null);
+  const setEditorResult = useStore((s) => s.setEditorResult);
 
-  const [res, setRes] = useState<QueryResult | null>(null);
-  const [err, setErr] = useState<AppError | null>(null);
   const [running, setRunning] = useState(false);
   const [tab, setTab] = useState<Tab>("result");
   const [sticky, setSticky] = useState(false);
@@ -143,19 +145,19 @@ export function SqlPanel() {
   const exec = async (text = sql) => {
     if (!connId || running) return;
     const id = ++runId.current;
+    const edId = activeEditorId;
     setRunning(true);
-    setErr(null);
+    setEditorResult(edId, res, null); // keep current rows visible, clear any prior error
     try {
       const r = await getBackend().runQuery(connId, text);
       if (runId.current !== id) return; // superseded / stopped
-      setRes(r);
+      setEditorResult(edId, r, null);
       setSort(null);
       setTab("result");
       void loadHistory();
     } catch (e) {
       if (runId.current !== id) return;
-      setErr(normalize(e));
-      setRes(null);
+      setEditorResult(edId, null, normalize(e));
       setTab("log");
     } finally {
       if (runId.current === id) setRunning(false);
