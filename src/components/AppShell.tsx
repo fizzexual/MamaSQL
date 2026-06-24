@@ -4,6 +4,7 @@ import { useStore } from "../state/store";
 import { DataView } from "./bud/DataView";
 import { DialogHost } from "./bud/DialogHost";
 import { ErDiagram } from "./bud/ErDiagram";
+import { ImportCsvModal } from "./bud/ImportCsvModal";
 import { ServerModal } from "./bud/ServerModal";
 import { ShortcutsOverlay } from "./bud/ShortcutsOverlay";
 import { Sources } from "./bud/Sources";
@@ -74,6 +75,7 @@ export function AppShell() {
       <CommandPalette onAddServer={openAdd} />
       <ShortcutsOverlay />
       <ErDiagram />
+      <ImportCsvModal />
       <ToastHost />
       <DialogHost />
     </div>

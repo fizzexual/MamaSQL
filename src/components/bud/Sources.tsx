@@ -18,6 +18,7 @@ import {
   IconPencil,
   IconPlus,
   IconRefresh,
+  IconFileImport,
   IconSchema,
   IconSearch,
   IconSettings,
@@ -146,6 +147,9 @@ export function Sources({
         </button>
         <button title="Schema diagram (ER)" onClick={() => window.dispatchEvent(new Event("mamasql:erd"))}>
           <IconSchema size={15} stroke={1.7} />
+        </button>
+        <button title="Import CSV" onClick={() => window.dispatchEvent(new Event("mamasql:import-csv"))}>
+          <IconFileImport size={15} stroke={1.7} />
         </button>
         <span className="bud-tree-toolbar-sp" />
         <button title="Tree layout">

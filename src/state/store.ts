@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getBackend } from "../ipc/backend";
+import { inferColumns } from "../lib/csv";
 import { resolveParams } from "../lib/params";
 import { confirmIfDestructive, confirmProdWrite, isWrite } from "./safety";
 import { toast } from "./toast";
@@ -224,7 +225,7 @@ export interface AppStore {
   dropColumn: (table: string, column: string) => Promise<void>;
   renameColumn: (table: string, from: string, to: string) => Promise<void>;
   renameTable: (from: string, to: string) => Promise<void>;
-  importCsv: (table: string, headers: string[], rows: string[][]) => Promise<void>;
+  importCsv: (table: string, headers: string[], rows: string[][], opts?: { create?: boolean }) => Promise<void>;
   openInspector: (rowIndex: number) => void;
   closeInspector: () => void;
   setTopView: (v: TopView) => void;
@@ -722,15 +723,26 @@ export const useStore = create<AppStore>((set, get) => ({
     }
   },
 
-  importCsv: async (table, headers, rows) => {
+  importCsv: async (table, headers, rows, opts) => {
     const id = get().activeConnectionId;
     if (!id) return;
     if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
+    const conn = get().connections.find((c) => c.id === id);
+    if (!(await confirmProdWrite(conn, "INSERT"))) return;
     try {
+      if (opts?.create) await backend.createTable(id, table, inferColumns(headers, rows));
       for (const r of rows) await backend.insertRow(id, table, headers, r);
-      await get().reload(table);
+      if (opts?.create) {
+        await get().openAndIntrospect(id); // refresh tree + schema so the new table shows
+        await get().openTableData(table);
+      } else {
+        await get().reload(table);
+      }
+      toast(`Imported ${rows.length.toLocaleString()} ${rows.length === 1 ? "row" : "rows"} into ${table}`, "success");
     } catch (e) {
-      set({ error: normalizeError(e) });
+      const err = normalizeError(e);
+      set({ error: err });
+      toast(err.message ?? "Import failed", "error");
     }
   },
 

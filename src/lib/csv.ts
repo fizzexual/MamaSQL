@@ -1,4 +1,4 @@
-import type { QueryResult } from "../ipc/types";
+import type { ColumnDef, QueryResult } from "../ipc/types";
 
 function csvCell(v: unknown): string {
   if (v == null) return "";
@@ -61,6 +61,32 @@ export function download(filename: string, content: string): void {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Guess a column's SQL type from its values: INTEGER, REAL, or TEXT. */
+function inferType(rows: string[][], col: number): string {
+  let int = true;
+  let num = true;
+  let seen = false;
+  for (const r of rows) {
+    const v = (r[col] ?? "").trim();
+    if (v === "") continue;
+    seen = true;
+    if (!/^-?\d+$/.test(v)) int = false;
+    if (!/^-?(\d+\.?\d*|\.\d+)(e[-+]?\d+)?$/i.test(v)) num = false;
+    if (!int && !num) return "TEXT";
+  }
+  return !seen ? "TEXT" : int ? "INTEGER" : num ? "REAL" : "TEXT";
+}
+
+/** Build nullable column defs (with inferred types) for a parsed CSV. */
+export function inferColumns(headers: string[], rows: string[][]): ColumnDef[] {
+  return headers.map((h, i) => ({
+    name: h.trim() || `col${i + 1}`,
+    dataType: inferType(rows, i),
+    nullable: true,
+    primaryKey: false,
+  }));
 }
 
 /** Parse CSV text into headers + rows (handles quoted fields and "" escapes). */
