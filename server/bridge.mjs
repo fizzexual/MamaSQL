@@ -529,10 +529,28 @@ function cors(res) {
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 function sendJson(res, status, obj) {
+  // Serialize BEFORE touching the response, so a serialization failure becomes a
+  // clean error instead of a half-sent 200 (which the proxy turns into a 500).
+  let body;
+  let code = status;
+  try {
+    body = JSON.stringify(obj, (_k, v) => (typeof v === "bigint" ? Number(v) : v));
+  } catch (e) {
+    code = 400;
+    body = JSON.stringify({ error: { kind: "internal", message: `Result not serializable: ${String(e)}` } });
+  }
+  if (res.headersSent) {
+    try {
+      res.end();
+    } catch {
+      /* ignore */
+    }
+    return;
+  }
   cors(res);
   res.setHeader("Content-Type", "application/json");
-  res.writeHead(status);
-  res.end(JSON.stringify(obj));
+  res.writeHead(code);
+  res.end(body);
 }
 
 const server = createServer((req, res) => {
@@ -570,6 +588,10 @@ const server = createServer((req, res) => {
     }
   });
 });
+
+// One bad request must never take the whole bridge down.
+process.on("uncaughtException", (e) => console.error("[bridge] uncaughtException:", e));
+process.on("unhandledRejection", (e) => console.error("[bridge] unhandledRejection:", e));
 
 server.listen(PORT, () => {
   console.log(`MamaSQL engine bridge listening on http://localhost:${PORT}  (PostgreSQL + MySQL)`);
