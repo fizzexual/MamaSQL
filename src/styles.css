@@ -3236,3 +3236,8 @@ select.bud-cb-select {
 .bud-ce-type-opt:hover { background: var(--panel-3); }
 .bud-ce-type-opt.sel, .bud-ce-type-opt.sel svg { color: var(--accent-2); }
 .bud-ce-type-check { margin-left: auto; flex: none; }
+
+/* The sidebar is chrome, not content — its labels shouldn't be text-selectable
+   (no Ctrl+A / double-click / drag highlight). Inputs inside it stay selectable. */
+.bud-sources { user-select: none; -webkit-user-select: none; }
+.bud-sources input, .bud-sources textarea { user-select: text; -webkit-user-select: text; }
