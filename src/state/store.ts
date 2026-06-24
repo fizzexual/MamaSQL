@@ -742,16 +742,18 @@ export const useStore = create<AppStore>((set, get) => ({
     if (!id || names.length === 0) return;
     if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
     const label = names.length === 1 ? `“${names[0]}”` : `${names.length} tables`;
-    const ok = await confirmDialog({
+    const choice = await confirmDelete({
       title: names.length === 1 ? "Drop table?" : `Drop ${names.length} tables?`,
       message: `This permanently deletes ${label} and all rows in ${names.length === 1 ? "it" : "them"}. This can't be undone.`,
       confirmLabel: names.length === 1 ? "Drop" : "Drop all",
-      danger: true,
     });
-    if (!ok) return;
-    if (!(await confirmProdWrite(get().connections.find((c) => c.id === id), "DROP"))) return;
+    if (!choice.ok) return;
+    const conn = get().connections.find((c) => c.id === id);
+    if (!(await confirmProdWrite(conn, "DROP"))) return;
     try {
-      for (const n of names) await backend.dropTable(id, n);
+      await withFkDisabled(id, conn?.engine, choice.skipFk, async () => {
+        for (const n of names) await backend.dropTable(id, n);
+      });
       const tables = await backend.listTables(id);
       set((s) => ({
         schema: { tables, columnsByTable: {} },
@@ -762,7 +764,10 @@ export const useStore = create<AppStore>((set, get) => ({
     } catch (e) {
       const err = normalizeError(e);
       set({ error: err });
-      toast(err.message ?? "Drop failed", "error");
+      toast(
+        isFkError(e) ? "Drop blocked by a foreign key. Try again and tick “Skip foreign-key checks”." : err.message ?? "Drop failed",
+        "error",
+      );
     }
   },
 
@@ -771,25 +776,29 @@ export const useStore = create<AppStore>((set, get) => ({
     if (!id || names.length === 0) return;
     if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
     const label = names.length === 1 ? `“${names[0]}”` : `${names.length} tables`;
-    const ok = await confirmDialog({
+    const choice = await confirmDelete({
       title: names.length === 1 ? "Clear table?" : `Clear ${names.length} tables?`,
       message: `This deletes every row from ${label} but keeps the table structure. This can't be undone.`,
       confirmLabel: "Clear rows",
-      danger: true,
     });
-    if (!ok) return;
+    if (!choice.ok) return;
     const conn = get().connections.find((c) => c.id === id);
     if (!(await confirmProdWrite(conn, "DELETE"))) return;
     const q = (n: string) => (conn?.engine === "mysql" ? `\`${n.replace(/`/g, "``")}\`` : `"${n.replace(/"/g, '""')}"`);
     try {
-      for (const n of names) await backend.runQuery(id, `DELETE FROM ${q(n)}`);
+      await withFkDisabled(id, conn?.engine, choice.skipFk, async () => {
+        for (const n of names) await backend.runQuery(id, `DELETE FROM ${q(n)}`);
+      });
       const et = get().editTable;
       if (et && names.includes(et.table)) await get().reload(et.table);
       toast(`Cleared ${names.length} ${names.length === 1 ? "table" : "tables"}.`, "success");
     } catch (e) {
       const err = normalizeError(e);
       set({ error: err });
-      toast(err.message ?? "Clear failed", "error");
+      toast(
+        isFkError(e) ? "Clear blocked by a foreign key. Try again and tick “Skip foreign-key checks”." : err.message ?? "Clear failed",
+        "error",
+      );
     }
   },
 
