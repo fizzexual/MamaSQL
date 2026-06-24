@@ -1,4 +1,4 @@
-import { IconArrowUpRight, IconChevronLeft, IconChevronRight, IconPlus, IconX } from "@tabler/icons-react";
+import { IconArrowUpRight, IconChevronLeft, IconChevronRight, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
 import { getBackend } from "../../ipc/backend";
 import { promptDialog } from "../../state/dialog";
@@ -93,7 +93,7 @@ export function DataGrid() {
   const [newRow, setNewRow] = useState<string[] | null>(null);
   const [colEditor, setColEditor] = useState<ColumnEditorAnchor | null>(null);
   const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
-  const [colFilters, setColFilters] = useState<Record<number, string>>({});
+  const [gridFilter, setGridFilter] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(100);
   const [fks, setFks] = useState<Record<string, { refTable: string; refColumn: string }>>({});
@@ -143,7 +143,7 @@ export function DataGrid() {
 
   // On table change: reset filters/paging and fetch this table's foreign keys.
   useEffect(() => {
-    setColFilters({});
+    setGridFilter("");
     setPage(0);
     if (!activeId || !editTable) {
       setFks({});
@@ -164,13 +164,13 @@ export function DataGrid() {
     };
   }, [editTable?.table, activeId]);
 
-  // Seed a filter when arriving here by clicking a foreign key.
+  // Seed the filter when arriving here by clicking a foreign key.
   useEffect(() => {
-    if (!pendingColFilter || !result) return;
-    const idx = result.columns.findIndex((c) => c.name === pendingColFilter.column);
-    if (idx >= 0) setColFilters({ [idx]: pendingColFilter.value });
+    if (!pendingColFilter) return;
+    setGridFilter(pendingColFilter.value);
+    setPage(0);
     setPendingColFilter(null);
-  }, [pendingColFilter, result]);
+  }, [pendingColFilter]);
 
   useEffect(() => {
     if (!loadingResult) {
@@ -187,16 +187,11 @@ export function DataGrid() {
   const table = editTable.table;
   const allSelected = result.rows.length > 0 && selection.length === result.rows.length;
 
-  const matchesFilters = (ri: number) => {
-    for (const [ciStr, f] of Object.entries(colFilters)) {
-      if (!f) continue;
-      const cell = result.rows[ri][Number(ciStr)];
-      if (cell == null || !String(cell).toLowerCase().includes(f.toLowerCase())) return false;
-    }
-    return true;
-  };
-  const filteredOrder = order.filter(matchesFilters);
-  const hasFilters = Object.values(colFilters).some((v) => v);
+  const q = gridFilter.trim().toLowerCase();
+  const filteredOrder = q
+    ? order.filter((ri) => result.rows[ri].some((c) => c != null && String(c).toLowerCase().includes(q)))
+    : order;
+  const hasFilters = !!q;
   const pageCount = Math.max(1, Math.ceil(filteredOrder.length / pageSize));
   const curPage = Math.min(page, pageCount - 1);
   const pagedOrder = filteredOrder.slice(curPage * pageSize, curPage * pageSize + pageSize);
@@ -251,6 +246,30 @@ export function DataGrid() {
 
   return (
     <div className="bud-grid-area">
+      <div className="bud-grid-toolbar">
+        <div className="bud-grid-search">
+          <IconSearch size={13} stroke={2} />
+          <input
+            value={gridFilter}
+            placeholder="Filter rows…"
+            aria-label="Filter rows"
+            onChange={(e) => {
+              setGridFilter(e.target.value);
+              setPage(0);
+            }}
+          />
+          {gridFilter && (
+            <button className="bud-grid-search-x" title="Clear filter" onClick={() => setGridFilter("")}>
+              <IconX size={13} stroke={2} />
+            </button>
+          )}
+        </div>
+        {hasFilters && (
+          <span className="bud-grid-toolbar-info">
+            {filteredOrder.length.toLocaleString()} of {result.rows.length.toLocaleString()} match
+          </span>
+        )}
+      </div>
       <div className="bud-grid-wrap">
         <table className="bud-grid">
         <thead>
@@ -283,26 +302,6 @@ export function DataGrid() {
                 <IconPlus size={14} stroke={2} />
               </button>
             </th>
-          </tr>
-          <tr className="bud-filter-row">
-            <th className="bud-checkcol" />
-            <th className="bud-rownum" />
-            {result.columns.map((c, i) => (
-              <th key={i}>
-                <input
-                  className="bud-colfilter"
-                  value={colFilters[i] ?? ""}
-                  placeholder="filter…"
-                  aria-label={`Filter ${c.name}`}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    setColFilters((f) => ({ ...f, [i]: v }));
-                    setPage(0);
-                  }}
-                />
-              </th>
-            ))}
-            <th className="bud-addcol" />
           </tr>
         </thead>
         <tbody>
