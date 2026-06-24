@@ -100,8 +100,8 @@ export function DataGrid() {
   const [selCell, setSelCell] = useState<{ r: number; c: number } | null>(null);
   const [gridFilter, setGridFilter] = useState("");
   const [page, setPage] = useState(0);
-  const [pageSize, setPageSize] = useState(100);
-  const [fks, setFks] = useState<Record<string, { refTable: string; refColumn: string }>>({});
+  const [pageSize, setPageSize] = useState(50);
+  const [allFks, setAllFks] = useState<{ table: string; column: string; refTable: string; refColumn: string }[]>([]);
   // Only show the skeleton if loading actually lingers — avoids a flash on the
   // near-instant in-browser SQLite loads.
   const [showSkel, setShowSkel] = useState(false);
@@ -116,11 +116,21 @@ export function DataGrid() {
   const optionCols = useMemo(() => {
     const set = new Set<number>();
     if (!result) return set;
+    const rows = result.rows;
     result.columns.forEach((c, i) => {
       if (/INT|NUM|REAL|FLOAT|DOUBLE|DATE|TIME/.test(c.dataType.toUpperCase())) return;
-      const vals = new Set(result.rows.map((r) => (r[i] == null ? "" : String(r[i]))));
-      const maxLen = Math.max(0, ...[...vals].map((v) => v.length));
-      if (vals.size > 0 && vals.size <= 12 && maxLen <= 16 && result.rows.length >= vals.size) set.add(i);
+      const vals = new Set<string>();
+      let ok = rows.length > 0;
+      // Stop scanning as soon as a column can't be an option pill (long value or
+      // too many distinct values) — avoids walking all rows of high-cardinality
+      // text columns (ids, emails, JSON) on every table switch.
+      for (let r = 0; r < rows.length; r++) {
+        const v = rows[r][i] == null ? "" : String(rows[r][i]);
+        if (v.length > 16) { ok = false; break; }
+        vals.add(v);
+        if (vals.size > 12) { ok = false; break; }
+      }
+      if (ok && vals.size > 0 && rows.length >= vals.size) set.add(i);
     });
     return set;
   }, [result]);
@@ -146,28 +156,38 @@ export function DataGrid() {
 
   useEffect(() => setSort(null), [editTable?.table]);
 
-  // On table change: reset filters/paging and fetch this table's foreign keys.
+  // Reset filters/paging when the table changes.
   useEffect(() => {
     setGridFilter("");
     setPage(0);
-    if (!activeId || !editTable) {
-      setFks({});
+  }, [editTable?.table]);
+
+  // Foreign keys are per-connection, so fetch them once (not on every table
+  // switch) and derive the current table's map below.
+  useEffect(() => {
+    if (!activeId) {
+      setAllFks([]);
       return;
     }
     let alive = true;
     getBackend()
       .listForeignKeys(activeId)
-      .then((list) => {
-        if (!alive) return;
-        const map: Record<string, { refTable: string; refColumn: string }> = {};
-        for (const fk of list) if (fk.table === editTable.table) map[fk.column] = { refTable: fk.refTable, refColumn: fk.refColumn };
-        setFks(map);
-      })
-      .catch(() => alive && setFks({}));
+      .then((list) => alive && setAllFks(list))
+      .catch(() => alive && setAllFks([]));
     return () => {
       alive = false;
     };
-  }, [editTable?.table, activeId]);
+  }, [activeId]);
+
+  const fks = useMemo(() => {
+    const map: Record<string, { refTable: string; refColumn: string }> = {};
+    if (editTable) {
+      for (const fk of allFks) {
+        if (fk.table === editTable.table) map[fk.column] = { refTable: fk.refTable, refColumn: fk.refColumn };
+      }
+    }
+    return map;
+  }, [allFks, editTable?.table]);
 
   // Seed the filter when arriving here by clicking a foreign key.
   useEffect(() => {
