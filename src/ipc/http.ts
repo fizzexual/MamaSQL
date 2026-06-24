@@ -4,7 +4,7 @@
 // kept in a separate localStorage key so connections can be re-opened after a
 // reload or a bridge restart.
 import type { Backend } from "./backend";
-import type { AppError, ConnectionConfig } from "./types";
+import type { AppError, ConnectionConfig, QueryResult } from "./types";
 
 // Same-origin by default: the dev server (vite proxy) and the Docker web
 // container (nginx) both forward "/api" to the bridge, so no host/port is
@@ -195,6 +195,34 @@ export async function bridgeHealthy(): Promise<boolean> {
   }
 }
 
+// Postgres/MySQL JSON(B) columns come back over the wire as parsed objects/
+// arrays (and binary as Buffer-shaped objects). Render those as text so the grid
+// shows the actual value — and the cell viewer can re-parse the JSON — instead of
+// "[object Object]". Primitives and nulls pass through untouched.
+function cellToText(v: unknown): unknown {
+  if (v === null || typeof v !== "object") return v;
+  const o = v as { type?: unknown; data?: unknown };
+  if (o.type === "Buffer" && Array.isArray(o.data)) return `[${o.data.length} bytes]`;
+  if (v instanceof Uint8Array) return `[${v.byteLength} bytes]`;
+  try {
+    return JSON.stringify(v);
+  } catch {
+    return String(v);
+  }
+}
+function textifyCells(r: QueryResult): QueryResult {
+  if (!r?.rows?.length) return r;
+  let touched = false;
+  const rows = r.rows.map((row) =>
+    row.map((cell) => {
+      const t = cellToText(cell);
+      if (t !== cell) touched = true;
+      return t;
+    }),
+  );
+  return touched ? { ...r, rows } : r;
+}
+
 /** Backend over the bridge. Connection-registry methods are no-ops — the web
  *  router owns the localStorage registry and delegates only engine work here. */
 export const httpBackend: Backend = {
@@ -206,7 +234,7 @@ export const httpBackend: Backend = {
   createDatabase: (cfg, password, name) => rpc<void>("createDatabase", { cfg, password, name }).then(() => {}),
   openConnection: (id) => openById(id),
   closeConnection: (id) => rpc<void>("close", { id }).then(() => {}),
-  runQuery: (id, sql) => withReopen(id, "query", { id, sql }),
+  runQuery: (id, sql) => withReopen<QueryResult>(id, "query", { id, sql }).then(textifyCells),
   listTables: (id) => withReopen(id, "tables", { id }),
   listColumns: (id, table) => withReopen(id, "columns", { id, table }),
   listForeignKeys: (id) => withReopen(id, "foreignKeys", { id }),
