@@ -35,6 +35,8 @@ export function ErDiagram() {
   const activeId = useStore((s) => s.activeConnectionId);
   const conn = useStore((s) => s.connections.find((c) => c.id === s.activeConnectionId));
   const drag = useRef<{ name: string | null; sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const canvasRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef({ zoom: 1, pan: { x: 0, y: 0 } });
 
   const tableNames = useMemo(() => tables.filter((t) => t.kind !== "view").map((t) => t.name), [tables]);
 
@@ -167,6 +169,32 @@ export function ErDiagram() {
     };
   }, [open, zoom]);
 
+  // Keep a live ref of the view so wheel-zoom stays correct across rapid events.
+  useEffect(() => {
+    viewRef.current = { zoom, pan };
+  }, [zoom, pan]);
+
+  // Scroll to zoom, anchored on the cursor.
+  useEffect(() => {
+    if (!open) return;
+    const el = canvasRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const r = el.getBoundingClientRect();
+      const mx = e.clientX - r.left;
+      const my = e.clientY - r.top;
+      const { zoom: z, pan: pn } = viewRef.current;
+      const z2 = Math.min(2, Math.max(0.4, +(z * (e.deltaY < 0 ? 1.12 : 0.89)).toFixed(3)));
+      const next = { x: mx - ((mx - pn.x) / z) * z2, y: my - ((my - pn.y) / z) * z2 };
+      viewRef.current = { zoom: z2, pan: next };
+      setZoom(z2);
+      setPan(next);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [open]);
+
   const resetView = () => {
     setPos(layout);
     setPan({ x: 0, y: 0 });
@@ -272,7 +300,7 @@ export function ErDiagram() {
             <IconX size={16} stroke={1.8} />
           </button>
         </div>
-        <div className="bud-erd-canvas" onMouseDown={onCanvasDown}>
+        <div className="bud-erd-canvas" ref={canvasRef} onMouseDown={onCanvasDown}>
           {tableNames.length === 0 ? (
             <div className="bud-empty">No tables to diagram. Open a connection first.</div>
           ) : (

@@ -3060,8 +3060,10 @@ select.bud-cb-select {
 .bud-status-txn button:hover { border-color: var(--accent); color: var(--accent); }
 
 .bud-fk-cell { position: relative; }
-.bud-fk-jump { display: none; align-items: center; justify-content: center; background: var(--accent-soft); border: none; color: var(--accent-2); border-radius: 3px; width: 16px; height: 16px; margin-left: 6px; cursor: pointer; vertical-align: middle; }
-.bud-grid tbody tr:hover .bud-fk-jump { display: inline-flex; }
+/* Always in layout (reserve its space) and fade in on hover, so the row never
+   shifts when hovered. */
+.bud-fk-jump { display: inline-flex; opacity: 0; pointer-events: none; align-items: center; justify-content: center; background: var(--accent-soft); border: none; color: var(--accent-2); border-radius: 3px; width: 16px; height: 16px; margin-left: 6px; cursor: pointer; vertical-align: middle; transition: opacity .12s ease; }
+.bud-grid tbody tr:hover .bud-fk-jump { opacity: 1; pointer-events: auto; }
 .bud-fk-jump:hover { background: var(--accent); color: #fff; }
 
 .bud-grid-foot { display: flex; align-items: center; gap: 14px; padding: 5px 12px; background: var(--bg-2); border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); flex: none; }
