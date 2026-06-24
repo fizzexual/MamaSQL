@@ -152,7 +152,8 @@ export function RowInspector() {
   };
 
   const del = async () => {
-    if (window.confirm("Delete this row? This permanently removes it.")) await deleteRowAt(inspectorRow);
+    // deleteRowAt now shows its own themed confirm (with the skip-FK-checks option).
+    await deleteRowAt(inspectorRow);
   };
 
   return (

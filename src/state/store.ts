@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { getBackend } from "../ipc/backend";
 import { inferColumns } from "../lib/csv";
 import { resolveParams } from "../lib/params";
-import { confirmDialog } from "./dialog";
+import { confirmDelete, confirmDialog } from "./dialog";
 import { confirmIfDestructive, confirmProdWrite, isWrite } from "./safety";
 import { toast } from "./toast";
 
@@ -257,6 +257,32 @@ export interface AppStore {
 }
 
 const backend = getBackend();
+
+/** Disable foreign-key checks (per engine) around an operation, then restore. */
+export async function withFkDisabled<T>(id: string, engine: string | undefined, skipFk: boolean, fn: () => Promise<T>): Promise<T> {
+  if (!skipFk) return fn();
+  const off = engine === "postgres" ? "SET session_replication_role = replica" : engine === "mysql" ? "SET FOREIGN_KEY_CHECKS=0" : "PRAGMA foreign_keys=OFF";
+  const on = engine === "postgres" ? "SET session_replication_role = DEFAULT" : engine === "mysql" ? "SET FOREIGN_KEY_CHECKS=1" : "PRAGMA foreign_keys=ON";
+  try {
+    await backend.runQuery(id, off);
+  } catch {
+    /* e.g. Postgres needs superuser for this — proceed and let the real error surface */
+  }
+  try {
+    return await fn();
+  } finally {
+    try {
+      await backend.runQuery(id, on);
+    } catch {
+      /* ignore */
+    }
+  }
+}
+/** Heuristic: did an error come from a foreign-key constraint? */
+export function isFkError(e: unknown): boolean {
+  const m = (e && typeof e === "object" && "message" in e ? String((e as { message?: string }).message) : String(e)).toLowerCase();
+  return m.includes("foreign key");
+}
 
 export const useStore = create<AppStore>((set, get) => ({
   connections: [],
@@ -538,6 +564,32 @@ export const useStore = create<AppStore>((set, get) => ({
       set({ running: false });
       await get().loadHistory();
     } catch (e) {
+      // If a foreign-key constraint blocked it, offer to retry with FK checks off.
+      if (
+        isFkError(e) &&
+        (await confirmDialog({
+          title: "Foreign key constraint failed",
+          message: "Other rows reference this data, so the statement was blocked. Retry with foreign-key checks disabled?",
+          confirmLabel: "Retry, skip FK checks",
+          danger: true,
+        }))
+      ) {
+        try {
+          const result = await withFkDisabled(activeConnectionId, conn?.engine, true, () =>
+            backend.runQuery(activeConnectionId, finalSql),
+          );
+          get().setEditorResult(activeEditorId, result, null);
+          set({ running: false });
+          await get().loadHistory();
+          return;
+        } catch (e2) {
+          const err2 = normalizeError(e2);
+          get().setEditorResult(activeEditorId, null, err2);
+          set({ running: false });
+          toast(err2.message ?? "Query failed", "error");
+          return;
+        }
+      }
       const err = normalizeError(e);
       get().setEditorResult(activeEditorId, null, err);
       set({ running: false });
@@ -624,8 +676,18 @@ export const useStore = create<AppStore>((set, get) => ({
     const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
     if (pkIdx < 0) return;
     const pkValue = result.rows[rowIndex][pkIdx];
+    const pkColumn = editTable.pkColumn;
+    const choice = await confirmDelete({
+      title: "Delete row?",
+      message: `Delete the row where ${pkColumn} = ${String(pkValue)}? This can't be undone.`,
+      confirmLabel: "Delete",
+    });
+    if (!choice.ok) return;
+    const engine = get().connections.find((c) => c.id === activeConnectionId)?.engine;
     try {
-      await backend.deleteRow(activeConnectionId, editTable.table, editTable.pkColumn, pkValue);
+      await withFkDisabled(activeConnectionId, engine, choice.skipFk, () =>
+        backend.deleteRow(activeConnectionId, editTable.table, pkColumn, pkValue),
+      );
       const rows = result.rows.filter((_, i) => i !== rowIndex);
       set((s) => ({
         result: { ...result, rows },
@@ -639,6 +701,10 @@ export const useStore = create<AppStore>((set, get) => ({
       }));
     } catch (e) {
       set({ error: normalizeError(e) });
+      toast(
+        isFkError(e) ? "Delete blocked by a foreign key. Try again and tick “Skip foreign-key checks”." : normalizeError(e).message ?? "Delete failed",
+        "error",
+      );
     }
   },
 
@@ -944,14 +1010,28 @@ export const useStore = create<AppStore>((set, get) => ({
     const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
     if (pkIdx < 0) return;
     const pks = selection.map((i) => result.rows[i][pkIdx]);
+    const pkColumn = editTable.pkColumn;
+    const choice = await confirmDelete({
+      title: `Delete ${pks.length} ${pks.length === 1 ? "row" : "rows"}?`,
+      message: "This permanently deletes the selected rows. This can't be undone.",
+      confirmLabel: "Delete",
+    });
+    if (!choice.ok) return;
+    const engine = get().connections.find((c) => c.id === activeConnectionId)?.engine;
     try {
-      for (const pk of pks) {
-        await backend.deleteRow(activeConnectionId, editTable.table, editTable.pkColumn, pk);
-      }
+      await withFkDisabled(activeConnectionId, engine, choice.skipFk, async () => {
+        for (const pk of pks) {
+          await backend.deleteRow(activeConnectionId, editTable.table, pkColumn, pk);
+        }
+      });
       set({ selection: [] });
       await get().refresh();
     } catch (e) {
       set({ error: normalizeError(e) });
+      toast(
+        isFkError(e) ? "Delete blocked by a foreign key. Try again and tick “Skip foreign-key checks”." : normalizeError(e).message ?? "Delete failed",
+        "error",
+      );
     }
   },
 

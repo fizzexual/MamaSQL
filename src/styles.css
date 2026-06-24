@@ -652,6 +652,10 @@ button, .bud-src, .bud-table, .bud-tool, .bud-tab, .bud-naction, .icon-btn,
 .bud-hist-actions button { background: var(--bg-3); border: 1px solid var(--border); color: var(--muted); border-radius: 4px; padding: 3px 6px; cursor: pointer; display: inline-flex; }
 .bud-hist-actions button:hover { color: var(--accent); border-color: var(--accent); }
 .bud-hist-actions button.on { color: #fbbf24; }
+
+/* Delete dialog: skip-foreign-key-checks toggle */
+.bud-dialog-check { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0 2px; font-size: 12.5px; color: var(--text); cursor: pointer; }
+.bud-dialog-check input { margin-top: 2px; accent-color: var(--accent); flex: none; }
 .bud-table.multi:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .bud-inspector {
   background: var(--bg-2); border-left: 1px solid var(--border);

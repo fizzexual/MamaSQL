@@ -10,7 +10,9 @@ export interface DialogReq {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
-  resolve: (value: boolean | string | null) => void;
+  /** Optional checkbox shown in a confirm dialog; resolves { ok, checked }. */
+  checkbox?: string;
+  resolve: (value: boolean | string | { ok: boolean; checked: boolean } | null) => void;
 }
 
 interface DialogStore {
@@ -53,5 +55,22 @@ export function confirmDialog(opts: ConfirmOpts): Promise<boolean> {
 export function promptDialog(opts: PromptOpts): Promise<string | null> {
   return new Promise((resolve) => {
     useDialog.getState().open({ kind: "prompt", ...opts, resolve: (v) => resolve(typeof v === "string" ? v : null) });
+  });
+}
+
+/**
+ * Confirm a deletion with an optional "skip foreign-key checks" toggle.
+ * Resolves { ok, skipFk } — ok=false means cancelled.
+ */
+export function confirmDelete(opts: { title: string; message?: string; confirmLabel?: string }): Promise<{ ok: boolean; skipFk: boolean }> {
+  return new Promise((resolve) => {
+    useDialog.getState().open({
+      kind: "confirm",
+      danger: true,
+      checkbox: "Skip foreign-key checks (force delete even if other rows reference it)",
+      ...opts,
+      resolve: (v) =>
+        v && typeof v === "object" ? resolve({ ok: v.ok, skipFk: v.checked }) : resolve({ ok: v === true, skipFk: false }),
+    });
   });
 }

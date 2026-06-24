@@ -21,11 +21,11 @@ import { resolveParams } from "../../lib/params";
 import { formatSql } from "../../lib/sqlformat";
 import { CellViewer } from "./CellViewer";
 import { ExportMenu } from "./ExportMenu";
-import { promptDialog } from "../../state/dialog";
+import { confirmDialog, promptDialog } from "../../state/dialog";
 import { confirmIfDestructive, confirmProdWrite, isWrite } from "../../state/safety";
 import { toast } from "../../state/toast";
 import type { AppError, Column } from "../../ipc/types";
-import { useStore } from "../../state/store";
+import { isFkError, useStore, withFkDisabled } from "../../state/store";
 
 function normalize(e: unknown): AppError {
   if (e && typeof e === "object" && "kind" in e) return e as AppError;
@@ -172,6 +172,31 @@ export function SqlPanel() {
       void loadHistory();
     } catch (e) {
       if (runId.current !== id) return;
+      // If a foreign-key constraint blocked it, offer to retry with FK checks off.
+      if (
+        isFkError(e) &&
+        (await confirmDialog({
+          title: "Foreign key constraint failed",
+          message: "Other rows reference this data, so the statement was blocked. Retry with foreign-key checks disabled?",
+          confirmLabel: "Retry, skip FK checks",
+          danger: true,
+        }))
+      ) {
+        try {
+          const r2 = await withFkDisabled(connId, conn?.engine, true, () => getBackend().runQuery(connId, finalText));
+          if (runId.current !== id) return;
+          setEditorResult(edId, r2, null);
+          setSort(null);
+          setTab("result");
+          void loadHistory();
+          return;
+        } catch (e2) {
+          if (runId.current !== id) return;
+          setEditorResult(edId, null, normalize(e2));
+          setTab("log");
+          return;
+        }
+      }
       setEditorResult(edId, null, normalize(e));
       setTab("log");
     } finally {

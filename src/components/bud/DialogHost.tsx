@@ -6,10 +6,23 @@ export function DialogHost() {
   const current = useDialog((s) => s.current);
   const close = useDialog((s) => s.close);
   const [value, setValue] = useState("");
+  const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     setValue(current?.defaultValue ?? "");
+    setChecked(false);
   }, [current]);
+
+  const submit = () => {
+    if (!current) return;
+    current.resolve(current.kind === "prompt" ? value : current.checkbox ? { ok: true, checked } : true);
+    close();
+  };
+  const cancel = () => {
+    if (!current) return;
+    current.resolve(current.kind === "prompt" ? null : current.checkbox ? { ok: false, checked: false } : false);
+    close();
+  };
 
   // Keyboard for confirm dialogs (prompt handles its own keys via the input).
   useEffect(() => {
@@ -17,28 +30,18 @@ export function DialogHost() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
-        current.resolve(false);
-        close();
+        cancel();
       } else if (e.key === "Enter") {
         e.preventDefault();
-        current.resolve(true);
-        close();
+        submit();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [current, close]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current, checked, value]);
 
   if (!current) return null;
-
-  const submit = () => {
-    current.resolve(current.kind === "prompt" ? value : true);
-    close();
-  };
-  const cancel = () => {
-    current.resolve(current.kind === "prompt" ? null : false);
-    close();
-  };
 
   return (
     <div className="bud-dialog-backdrop" onClick={cancel}>
@@ -60,6 +63,12 @@ export function DialogHost() {
               }}
             />
           </div>
+        )}
+        {current.checkbox && (
+          <label className="bud-dialog-check">
+            <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />
+            <span>{current.checkbox}</span>
+          </label>
         )}
         <div className="bud-dialog-actions">
           <button className="bud-dialog-cancel" onClick={cancel}>
