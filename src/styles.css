@@ -636,6 +636,7 @@ button, .bud-src, .bud-table, .bud-tool, .bud-tab, .bud-naction, .icon-btn,
    ============================================================ */
 .bud-body.with-inspector { grid-template-columns: 248px 1fr 376px; }
 .bud-data-row { display: flex; flex: 1; min-height: 0; min-width: 0; }
+.bud-grid tbody td.sel { box-shadow: inset 0 0 0 2px var(--accent); }
 .bud-table.multi { background: color-mix(in srgb, var(--accent) 22%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
 .bud-table.multi:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .bud-inspector {

@@ -2,6 +2,7 @@ import { IconArrowUpRight, IconChevronLeft, IconChevronRight, IconPlus, IconSear
 import { useEffect, useMemo, useState } from "react";
 import { getBackend } from "../../ipc/backend";
 import { promptDialog } from "../../state/dialog";
+import { toast } from "../../state/toast";
 import type { ColumnInfo } from "../../ipc/types";
 import { useStore } from "../../state/store";
 import { CellViewer, isExpandable } from "./CellViewer";
@@ -96,6 +97,7 @@ export function DataGrid() {
   const [colEditor, setColEditor] = useState<ColumnEditorAnchor | null>(null);
   const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
   const [cellView, setCellView] = useState<{ value: string; column?: string } | null>(null);
+  const [selCell, setSelCell] = useState<{ r: number; c: number } | null>(null);
   const [gridFilter, setGridFilter] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(100);
@@ -183,6 +185,21 @@ export function DataGrid() {
     const t = setTimeout(() => setShowSkel(true), 160);
     return () => clearTimeout(t);
   }, [loadingResult]);
+
+  // Ctrl/Cmd+C copies the selected cell (unless the user is typing or has a text selection).
+  useEffect(() => {
+    if (!selCell || !result) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey) || (e.key !== "c" && e.key !== "C")) return;
+      const tag = (document.activeElement?.tagName ?? "").toLowerCase();
+      if (tag === "input" || tag === "textarea") return;
+      if (window.getSelection()?.toString()) return;
+      const v = result.rows[selCell.r]?.[selCell.c];
+      void navigator.clipboard?.writeText(v == null ? "" : String(v)).then(() => toast("Copied cell", "success")).catch(() => {});
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selCell, result]);
 
   // While loading: nothing for the first moment (no flash), then the skeleton.
   if (loadingResult) return showSkel ? <GridSkeleton columns={columns} /> : null;
@@ -372,9 +389,10 @@ export function DataGrid() {
                   return (
                     <td
                       key={ci}
-                      className={`${cell == null ? "bud-null" : ""} ${fk ? "bud-fk-cell" : ""}`}
+                      className={`${cell == null ? "bud-null" : ""} ${fk ? "bud-fk-cell" : ""} ${selCell?.r === ri && selCell?.c === ci ? "sel" : ""}`}
                       title={cell == null ? "" : String(cell)}
                       onClick={() => {
+                        setSelCell({ r: ri, c: ci });
                         const sv = cell == null ? "" : String(cell);
                         if (!editing && sv && isExpandable(sv)) setCellView({ value: sv, column: result.columns[ci].name });
                       }}
