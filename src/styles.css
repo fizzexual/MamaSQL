@@ -635,9 +635,11 @@ button, .bud-src, .bud-table, .bud-tool, .bud-tab, .bud-naction, .icon-btn,
    Row inspector — form-based row editor
    ============================================================ */
 .bud-body.with-inspector { grid-template-columns: 248px 1fr 376px; }
+.bud-data-row { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .bud-inspector {
   background: var(--bg-2); border-left: 1px solid var(--border);
-  display: flex; flex-direction: column; overflow: hidden; min-width: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  width: 340px; flex: none;
   animation: insp-in .18s ease;
 }
 @keyframes insp-in { from { opacity: 0; transform: translateX(14px); } to { opacity: 1; transform: none; } }

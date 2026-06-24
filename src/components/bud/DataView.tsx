@@ -14,6 +14,7 @@ import { type ComponentType, type MouseEvent, useEffect, useRef, useState } from
 import { download, fromCsv, toCsv } from "../../lib/csv";
 import { useStore } from "../../state/store";
 import { DataGrid } from "./DataGrid";
+import { RowInspector } from "./RowInspector";
 import { SqlPanel } from "./SqlPanel";
 
 type Icon = ComponentType<{ size?: number; stroke?: number }>;
@@ -28,6 +29,7 @@ type MenuState = { kind: "rowactions" | "generate"; x: number; y: number } | nul
 export function DataView() {
   const editTable = useStore((s) => s.editTable);
   const activeId = useStore((s) => s.activeConnectionId);
+  const inspectorRow = useStore((s) => s.inspectorRow);
   const result = useStore((s) => s.result);
   const error = useStore((s) => s.error);
   const view = useStore((s) => s.view);
@@ -174,7 +176,10 @@ export function DataView() {
       ) : !editTable ? (
         <div className="bud-empty">Pick a table on the left to view and edit its data.</div>
       ) : (
-        <DataGrid />
+        <div className="bud-data-row">
+          <DataGrid />
+          <RowInspector key={inspectorRow ?? "none"} />
+        </div>
       )}
 
       <input
