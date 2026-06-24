@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { getBackend } from "../ipc/backend";
 import { inferColumns } from "../lib/csv";
 import { resolveParams } from "../lib/params";
+import { confirmDialog } from "./dialog";
 import { confirmIfDestructive, confirmProdWrite, isWrite } from "./safety";
 import { toast } from "./toast";
 
@@ -220,6 +221,8 @@ export interface AppStore {
   deleteRowAt: (rowIndex: number) => Promise<void>;
   addRow: (columns: string[], values: unknown[]) => Promise<void>;
   dropTable: (table: string) => Promise<void>;
+  dropTables: (tables: string[]) => Promise<void>;
+  clearTables: (tables: string[]) => Promise<void>;
   createTable: (name: string, columns: ColumnDef[]) => Promise<void>;
   createLocalDatabase: (name: string) => Promise<void>;
   scanLocal: () => Promise<void>;
@@ -665,6 +668,62 @@ export const useStore = create<AppStore>((set, get) => ({
       }));
     } catch (e) {
       set({ error: normalizeError(e) });
+    }
+  },
+
+  dropTables: async (names) => {
+    const id = get().activeConnectionId;
+    if (!id || names.length === 0) return;
+    if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
+    const label = names.length === 1 ? `“${names[0]}”` : `${names.length} tables`;
+    const ok = await confirmDialog({
+      title: names.length === 1 ? "Drop table?" : `Drop ${names.length} tables?`,
+      message: `This permanently deletes ${label} and all rows in ${names.length === 1 ? "it" : "them"}. This can't be undone.`,
+      confirmLabel: names.length === 1 ? "Drop" : "Drop all",
+      danger: true,
+    });
+    if (!ok) return;
+    if (!(await confirmProdWrite(get().connections.find((c) => c.id === id), "DROP"))) return;
+    try {
+      for (const n of names) await backend.dropTable(id, n);
+      const tables = await backend.listTables(id);
+      set((s) => ({
+        schema: { tables, columnsByTable: {} },
+        editTable: s.editTable && names.includes(s.editTable.table) ? null : s.editTable,
+        result: s.editTable && names.includes(s.editTable.table) ? null : s.result,
+      }));
+      toast(`Dropped ${names.length} ${names.length === 1 ? "table" : "tables"}.`, "success");
+    } catch (e) {
+      const err = normalizeError(e);
+      set({ error: err });
+      toast(err.message ?? "Drop failed", "error");
+    }
+  },
+
+  clearTables: async (names) => {
+    const id = get().activeConnectionId;
+    if (!id || names.length === 0) return;
+    if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
+    const label = names.length === 1 ? `“${names[0]}”` : `${names.length} tables`;
+    const ok = await confirmDialog({
+      title: names.length === 1 ? "Clear table?" : `Clear ${names.length} tables?`,
+      message: `This deletes every row from ${label} but keeps the table structure. This can't be undone.`,
+      confirmLabel: "Clear rows",
+      danger: true,
+    });
+    if (!ok) return;
+    const conn = get().connections.find((c) => c.id === id);
+    if (!(await confirmProdWrite(conn, "DELETE"))) return;
+    const q = (n: string) => (conn?.engine === "mysql" ? `\`${n.replace(/`/g, "``")}\`` : `"${n.replace(/"/g, '""')}"`);
+    try {
+      for (const n of names) await backend.runQuery(id, `DELETE FROM ${q(n)}`);
+      const et = get().editTable;
+      if (et && names.includes(et.table)) await get().reload(et.table);
+      toast(`Cleared ${names.length} ${names.length === 1 ? "table" : "tables"}.`, "success");
+    } catch (e) {
+      const err = normalizeError(e);
+      set({ error: err });
+      toast(err.message ?? "Clear failed", "error");
     }
   },
 

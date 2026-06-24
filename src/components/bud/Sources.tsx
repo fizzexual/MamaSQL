@@ -7,6 +7,7 @@ import {
   IconCopy,
   IconDatabase,
   IconDatabaseCog,
+  IconEraser,
   IconEye,
   IconFileText,
   IconFilter,
@@ -29,7 +30,7 @@ import {
   IconTrash,
   IconX,
 } from "@tabler/icons-react";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { confirmDialog, promptDialog } from "../../state/dialog";
 import type { ConnectionConfig, Engine } from "../../ipc/types";
 import { useStore } from "../../state/store";
@@ -274,6 +275,8 @@ function Datasource({
   const deleteConnection = useStore((s) => s.deleteConnection);
   const saveConnection = useStore((s) => s.saveConnection);
   const createTable = useStore((s) => s.createTable);
+  const dropTables = useStore((s) => s.dropTables);
+  const clearTables = useStore((s) => s.clearTables);
   const setTopView = useStore((s) => s.setTopView);
   const toggleReadOnly = useStore((s) => s.toggleReadOnly);
   const isReadOnly = useStore((s) => s.readOnlyConns.includes(conn.id));
@@ -281,6 +284,35 @@ function Datasource({
   const shownTables = filter
     ? tables.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()))
     : tables;
+
+  // Multi-select of tables (Ctrl/Cmd-click toggles, Shift-click ranges).
+  const [selTables, setSelTables] = useState<string[]>([]);
+  const anchorRef = useRef<string | null>(null);
+  const tableNames = shownTables.map((t) => t.name);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clear selection whenever the table set changes
+  useEffect(() => {
+    setSelTables([]);
+    anchorRef.current = null;
+  }, [conn.id, tables]);
+  const activateTable = (name: string, e: React.MouseEvent): boolean => {
+    if (e.metaKey || e.ctrlKey) {
+      setSelTables((s) => (s.includes(name) ? s.filter((x) => x !== name) : [...s, name]));
+      anchorRef.current = name;
+      return true;
+    }
+    if (e.shiftKey && anchorRef.current) {
+      const a = tableNames.indexOf(anchorRef.current);
+      const b = tableNames.indexOf(name);
+      if (a >= 0 && b >= 0) {
+        const [lo, hi] = a < b ? [a, b] : [b, a];
+        setSelTables(tableNames.slice(lo, hi + 1));
+        return true;
+      }
+    }
+    setSelTables([]);
+    anchorRef.current = name;
+    return false;
+  };
   const schemaName = conn.engine === "postgres" ? "public" : "main";
   const dbName = conn.database || "database";
 
@@ -351,9 +383,24 @@ function Datasource({
     { label: `New ${singular}…`, icon: (<IconPlus size={15} stroke={1.7} />), disabled: true },
     { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: refresh },
   ];
+  const allNames = tables.map((t) => t.name);
   const tablesMenu: MenuItem[] = [
     { label: "New table…", icon: (<IconTablePlus size={15} stroke={1.7} />), onClick: () => void newTable() },
     { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: refresh },
+    { divider: true },
+    {
+      label: `Clear all tables (delete rows)${allNames.length ? ` · ${allNames.length}` : ""}`,
+      icon: (<IconEraser size={15} stroke={1.7} />),
+      disabled: allNames.length === 0,
+      onClick: () => void clearTables(allNames),
+    },
+    {
+      label: `Delete all tables${allNames.length ? ` · ${allNames.length}` : ""}`,
+      icon: (<IconTrash size={15} stroke={1.7} />),
+      danger: true,
+      disabled: allNames.length === 0,
+      onClick: () => void dropTables(allNames),
+    },
     { divider: true },
     { label: "Reload schema", icon: (<IconDatabaseCog size={15} stroke={1.7} />), onClick: refresh },
   ];
@@ -391,7 +438,16 @@ function Datasource({
                       {shownTables.length === 0 ? (
                         <div className="bud-ds-empty">{filter ? "No match" : "No tables"}</div>
                       ) : (
-                        shownTables.map((t) => <TableRow key={t.name} table={t.name} connectionId={conn.id} />)
+                        shownTables.map((t) => (
+                          <TableRow
+                            key={t.name}
+                            table={t.name}
+                            connectionId={conn.id}
+                            selected={selTables.includes(t.name)}
+                            selectedNames={selTables}
+                            onActivate={activateTable}
+                          />
+                        ))
                       )}
                     </ObjectGroup>
                     <ObjectGroup label="Views" count={0} menu={folderMenu("view")} />
@@ -411,7 +467,19 @@ function Datasource({
   );
 }
 
-function TableRow({ table, connectionId }: { table: string; connectionId: string }) {
+function TableRow({
+  table,
+  connectionId,
+  selected = false,
+  selectedNames = [],
+  onActivate,
+}: {
+  table: string;
+  connectionId: string;
+  selected?: boolean;
+  selectedNames?: string[];
+  onActivate?: (name: string, e: React.MouseEvent) => boolean;
+}) {
   const [ctx, setCtx] = useState<CtxAnchor | null>(null);
   const openTableData = useStore((s) => s.openTableData);
   const openView = useStore((s) => s.openView);
@@ -419,6 +487,8 @@ function TableRow({ table, connectionId }: { table: string; connectionId: string
   const reload = useStore((s) => s.reload);
   const renameTable = useStore((s) => s.renameTable);
   const dropTable = useStore((s) => s.dropTable);
+  const dropTables = useStore((s) => s.dropTables);
+  const clearTables = useStore((s) => s.clearTables);
   const editTable = useStore((s) => s.editTable);
   const activeViewId = useStore((s) => s.activeViewId);
   const views = useStore((s) => s.views);
@@ -471,14 +541,36 @@ function TableRow({ table, connectionId }: { table: string; connectionId: string
     { label: "Drop table", icon: (<IconTrash size={15} stroke={1.7} />), danger: true, onClick: () => void drop() },
   ];
 
+  // When several tables are multi-selected, right-clicking one shows bulk actions.
+  const multi = selectedNames.length > 1 && selectedNames.includes(table);
+  const bulkItems: MenuItem[] = [
+    { label: `${selectedNames.length} tables selected`, disabled: true },
+    { divider: true },
+    {
+      label: `Clear ${selectedNames.length} tables (delete rows)`,
+      icon: (<IconEraser size={15} stroke={1.7} />),
+      onClick: () => void clearTables(selectedNames),
+    },
+    {
+      label: `Drop ${selectedNames.length} tables`,
+      icon: (<IconTrash size={15} stroke={1.7} />),
+      danger: true,
+      onClick: () => void dropTables(selectedNames),
+    },
+  ];
+  const menuItems = multi ? bulkItems : items;
+
   return (
     <>
       <div
-        className={`bud-table ${tableActive ? "active" : ""}`}
-        onClick={() => openTableData(table)}
+        className={`bud-table ${tableActive ? "active" : ""} ${selected ? "multi" : ""}`}
+        onClick={(e) => {
+          const handled = onActivate?.(table, e) ?? false;
+          if (!handled) void openTableData(table);
+        }}
         onContextMenu={(e) => {
           e.preventDefault();
-          setCtx({ x: e.clientX, y: e.clientY, items });
+          setCtx({ x: e.clientX, y: e.clientY, items: menuItems });
         }}
       >
         <span className="bud-table-ic">
