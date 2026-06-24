@@ -40,6 +40,9 @@ export function DataView() {
   const error = useStore((s) => s.error);
   const view = useStore((s) => s.view);
   const setView = useStore((s) => s.setView);
+  const openTables = useStore((s) => s.openTables);
+  const openTableData = useStore((s) => s.openTableData);
+  const closeTableTab = useStore((s) => s.closeTableTab);
   const setSql = useStore((s) => s.setSql);
   const setTopView = useStore((s) => s.setTopView);
   const importCsv = useStore((s) => s.importCsv);
@@ -138,15 +141,30 @@ export function DataView() {
         <button className="bud-qtab-new" title="New SQL editor" onClick={newEditor}>
           <IconPlus size={15} stroke={2} />
         </button>
-        {editTable && (
-          <button className={`bud-qtab ${view === "data" ? "on" : ""}`} onClick={() => setView("data")}>
+        {openTables.map((t) => (
+          <button
+            key={t}
+            className={`bud-qtab ${view === "data" && editTable?.table === t ? "on" : ""}`}
+            title={t}
+            onClick={() => {
+              if (editTable?.table === t) setView("data");
+              else void openTableData(t);
+            }}
+          >
             <IconTable size={14} stroke={1.7} className="bud-qtab-ic" />
-            <span>{editTable.table}</span>
-            <span className="bud-qtab-x">
+            <span>{t}</span>
+            <span
+              className="bud-qtab-x"
+              title="Close tab"
+              onClick={(e) => {
+                e.stopPropagation();
+                closeTableTab(t);
+              }}
+            >
               <IconX size={12} stroke={2} />
             </span>
           </button>
-        )}
+        ))}
         {view === "history" && (
           <button className="bud-qtab on" onClick={() => setView("history")}>
             <IconClock size={14} stroke={1.7} className="bud-qtab-ic" />

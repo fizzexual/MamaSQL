@@ -300,7 +300,7 @@ function Datasource({
     anchorRef.current = null;
   }, [conn.id, tables]);
   const activateTable = (name: string, e: React.MouseEvent): boolean => {
-    if (e.metaKey || e.ctrlKey) {
+    if (e.altKey) {
       setSelTables((s) => (s.includes(name) ? s.filter((x) => x !== name) : [...s, name]));
       anchorRef.current = name;
       return true;
@@ -534,6 +534,7 @@ function TableRow({
 
   const items: MenuItem[] = [
     { label: "Open", icon: (<IconFolderOpen size={15} stroke={1.7} />), onClick: () => void openTableData(table) },
+    { label: "Open in new tab", icon: (<IconPlus size={15} stroke={1.7} />), onClick: () => void openTableData(table, { newTab: true }) },
     { label: "View data", icon: (<IconEye size={15} stroke={1.7} />), onClick: () => void openTableData(table) },
     { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: () => void reload(table) },
     { divider: true },
@@ -571,6 +572,11 @@ function TableRow({
       <div
         className={`bud-table ${tableActive ? "active" : ""} ${selected ? "multi" : ""}`}
         onClick={(e) => {
+          // Ctrl/Cmd-click opens the table in an additional tab.
+          if (e.metaKey || e.ctrlKey) {
+            void openTableData(table, { newTab: true });
+            return;
+          }
           const handled = onActivate?.(table, e) ?? false;
           if (!handled) void openTableData(table);
         }}

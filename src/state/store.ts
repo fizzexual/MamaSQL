@@ -178,6 +178,7 @@ export interface AppStore {
   running: boolean;
   history: HistoryEntry[];
   editTable: { table: string; pkColumn: string | null } | null;
+  openTables: string[];
   detected: ConnectionConfig[];
   loadingTables: boolean;
   loadingResult: boolean;
@@ -207,7 +208,8 @@ export interface AppStore {
   setEditorResult: (id: string, result: QueryResult | null, error: AppError | null) => void;
   run: () => Promise<void>;
   loadHistory: () => Promise<void>;
-  openTableData: (table: string) => Promise<void>;
+  openTableData: (table: string, opts?: { newTab?: boolean }) => Promise<void>;
+  closeTableTab: (table: string) => void;
   navigateFk: (refTable: string, refColumn: string, value: unknown) => Promise<void>;
   setPendingColFilter: (v: { column: string; value: string } | null) => void;
   toggleReadOnly: (id: string) => void;
@@ -298,6 +300,7 @@ export const useStore = create<AppStore>((set, get) => ({
   running: false,
   history: [],
   editTable: null,
+  openTables: [],
   detected: [],
   loadingTables: false,
   loadingResult: false,
@@ -414,6 +417,7 @@ export const useStore = create<AppStore>((set, get) => ({
       error: null,
       schema: { tables: [], columnsByTable: {} },
       editTable: null,
+      openTables: [],
       result: null,
       view: "sql",
       activeViewId: null,
@@ -608,9 +612,23 @@ export const useStore = create<AppStore>((set, get) => ({
 
   setPendingColFilter: (v) => set({ pendingColFilter: v }),
 
-  openTableData: async (table) => {
+  openTableData: async (table, opts) => {
     const id = get().activeConnectionId;
     if (!id) return;
+    // Maintain the open-table tab list. Ctrl/Cmd-click (newTab) appends a tab;
+    // a plain click replaces the active table tab so casual browsing doesn't pile
+    // up tabs. An already-open table is just re-activated.
+    const { openTables, editTable, view } = get();
+    let nextTabs: string[];
+    if (openTables.includes(table)) {
+      nextTabs = openTables;
+    } else if (opts?.newTab) {
+      nextTabs = [...openTables, table];
+    } else if (editTable && view === "data" && openTables.includes(editTable.table)) {
+      nextTabs = openTables.map((t) => (t === editTable.table ? table : t));
+    } else {
+      nextTabs = [...openTables, table];
+    }
     const sql = `SELECT * FROM ${table} LIMIT 1000;`;
     set({
       view: "data",
@@ -618,6 +636,7 @@ export const useStore = create<AppStore>((set, get) => ({
       loadingResult: true,
       error: null,
       editTable: { table, pkColumn: null },
+      openTables: nextTabs,
       inspectorRow: null,
       activeViewId: null,
       selection: [],
@@ -640,6 +659,19 @@ export const useStore = create<AppStore>((set, get) => ({
       await get().loadHistory();
     } catch (e) {
       set({ error: normalizeError(e), result: null, loadingResult: false });
+    }
+  },
+
+  closeTableTab: (table) => {
+    const { openTables, editTable } = get();
+    const idx = openTables.indexOf(table);
+    if (idx === -1) return;
+    const next = openTables.filter((t) => t !== table);
+    set({ openTables: next });
+    // If the closed tab was the active one, fall back to a neighbour (or the editor).
+    if (editTable?.table === table) {
+      if (next.length) void get().openTableData(next[Math.min(idx, next.length - 1)]);
+      else set({ editTable: null, view: "sql" });
     }
   },
 
