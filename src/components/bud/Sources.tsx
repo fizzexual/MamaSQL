@@ -110,6 +110,7 @@ export function Sources({
   const [panel, setPanel] = useState<(typeof PANELS)[number]>("Databases");
   const [rootOpen, setRootOpen] = useState(true);
   const [rootCtx, setRootCtx] = useState<CtxAnchor | null>(null);
+  const [compact, setCompact] = useState(false);
 
   const rootMenu: MenuItem[] = [
     { label: "New connection…", icon: (<IconPlus size={15} stroke={1.7} />), onClick: onAddServer },
@@ -122,7 +123,7 @@ export function Sources({
   }, [loadConnections, scanLocal]);
 
   return (
-    <aside className="bud-sources">
+    <aside className={`bud-sources ${compact ? "compact" : ""}`}>
       <nav className="bud-panel-tabs">
         {PANELS.map((p) => (
           <button key={p} className={`bud-panel-tab ${panel === p ? "on" : ""}`} onClick={() => setPanel(p)}>
@@ -157,7 +158,11 @@ export function Sources({
           <IconGitCompare size={15} stroke={1.7} />
         </button>
         <span className="bud-tree-toolbar-sp" />
-        <button title="Tree layout">
+        <button
+          className={compact ? "on" : ""}
+          title={compact ? "Comfortable spacing" : "Compact spacing"}
+          onClick={() => setCompact((v) => !v)}
+        >
           <IconLayoutSidebar size={15} stroke={1.7} />
         </button>
       </div>
@@ -379,8 +384,9 @@ function Datasource({
 
   const refresh = () => void openAndIntrospect(conn.id);
   const refreshMenu: MenuItem[] = [{ label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: refresh }];
-  const folderMenu = (singular: string): MenuItem[] => [
-    { label: `New ${singular}…`, icon: (<IconPlus size={15} stroke={1.7} />), disabled: true },
+  // Views/Indexes/Sequences/… don't have a create flow yet, so the folder menu
+  // is just Refresh (no permanently-disabled "New …" placeholder).
+  const folderMenu = (_singular: string): MenuItem[] => [
     { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: refresh },
   ];
   const allNames = tables.map((t) => t.name);

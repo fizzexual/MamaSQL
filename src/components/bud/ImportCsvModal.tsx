@@ -49,6 +49,18 @@ export function ImportCsvModal() {
     setParsed(null);
   };
 
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setOpen(false);
+        setParsed(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
   const onFile = async (file: File) => {
     const text = await file.text();
     const { headers, rows } = fromCsv(text);

@@ -10,6 +10,7 @@ import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { viewV } from "../../lib/motion";
 import { confirmDialog } from "../../state/dialog";
+import { toast } from "../../state/toast";
 import type { TopView } from "../../state/store";
 import { useStore } from "../../state/store";
 
@@ -48,7 +49,7 @@ function DesignPanel() {
   return (
     <PanelShell title="Design" subtitle="Screens generated from your data sources.">
       <div className="bud-wp-toolbar">
-        <button className="bud-create-view">
+        <button className="bud-create-view" onClick={() => toast("Screen builder is coming soon.", "info")}>
           <IconCirclePlus size={15} stroke={1.8} /> New screen
         </button>
       </div>
@@ -74,7 +75,7 @@ function AutomationPanel() {
   return (
     <PanelShell title="Automation" subtitle="Workflows that run when something happens in your data.">
       <div className="bud-wp-toolbar">
-        <button className="bud-create-view">
+        <button className="bud-create-view" onClick={() => toast("Automation builder is coming soon.", "info")}>
           <IconCirclePlus size={15} stroke={1.8} /> New automation
         </button>
       </div>
