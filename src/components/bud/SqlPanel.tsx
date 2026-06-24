@@ -69,6 +69,13 @@ function highlightSql(src: string): string {
 }
 
 type Tab = "log" | "dbms" | "result";
+
+const LOG_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function fmtLogDate(iso: string): string {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${LOG_MONTHS[d.getMonth()]} ${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
 type Suggestion = { label: string; kind: "column" | "table" | "keyword"; detail?: string };
 
 let _measureCtx: CanvasRenderingContext2D | null = null;
@@ -134,6 +141,7 @@ export function SqlPanel() {
   const [ac, setAc] = useState<{ items: Suggestion[]; index: number; token: string; x: number; y: number } | null>(null);
   const [resultView, setResultView] = useState<"table" | "chart">("table");
   const [rowFilter, setRowFilter] = useState("");
+  const [logFilter, setLogFilter] = useState("");
   const [cellView, setCellView] = useState<{ value: string; column?: string } | null>(null);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
@@ -719,19 +727,46 @@ export function SqlPanel() {
         </div>
         <div className="bud-results-body">
           {tab === "log" ? (
-            <div className="bud-results-log">
-              {err && <div className="bud-log-line err">ERROR: {err.message ?? err.kind}</div>}
-              {history.length === 0 && !err ? (
-                <div className="bud-log-line">Ready.</div>
-              ) : (
-                history.map((h) => (
-                  <div className="bud-log-line" key={h.id}>
-                    <span className="bud-log-time">{new Date(h.ranAt).toLocaleTimeString()}</span>
-                    <span className="bud-log-sql">{h.sql.replace(/\s+/g, " ").trim()}</span>
+            (() => {
+              const lf = logFilter.trim().toLowerCase();
+              const rows = lf ? history.filter((h) => h.sql.toLowerCase().includes(lf)) : history;
+              return (
+                <div className="bud-logs">
+                  <div className="bud-logs-bar">
+                    <div className="bud-logs-search">
+                      <IconSearch size={13} stroke={1.7} />
+                      <input value={logFilter} placeholder="Filter logs…" onChange={(e) => setLogFilter(e.target.value)} />
+                    </div>
+                    <span className="bud-logs-count">{rows.length.toLocaleString()} entries</span>
                   </div>
-                ))
-              )}
-            </div>
+                  <div className="bud-logs-head">
+                    <span className="bud-logs-date">Date</span>
+                    <span className="bud-logs-chev" />
+                    <span className="bud-logs-msg">Message</span>
+                  </div>
+                  <div className="bud-logs-body">
+                    {err && (
+                      <div className="bud-log-row err">
+                        <span className="bud-logs-date">{fmtLogDate(new Date().toISOString())}</span>
+                        <span className="bud-logs-chev">›</span>
+                        <span className="bud-logs-msg">ERROR: {err.message ?? err.kind}</span>
+                      </div>
+                    )}
+                    {rows.length === 0 && !err ? (
+                      <div className="bud-empty">{history.length === 0 ? "No queries run yet." : "No matching log entries."}</div>
+                    ) : (
+                      rows.map((h) => (
+                        <div className="bud-log-row" key={h.id}>
+                          <span className="bud-logs-date">{fmtLogDate(h.ranAt)}</span>
+                          <span className="bud-logs-chev">›</span>
+                          <span className="bud-logs-msg">{h.sql.replace(/\s+/g, " ").trim()}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              );
+            })()
           ) : tab === "dbms" ? (
             <div className="bud-results-log">No DBMS output.</div>
           ) : err ? (
