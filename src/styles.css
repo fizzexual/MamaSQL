@@ -2868,6 +2868,19 @@ select.bud-cb-select {
 .bud-conn-hint.warn { background: rgba(232, 160, 75, 0.12); border-color: rgba(232, 160, 75, 0.35); }
 .bud-conn-hint.warn svg { color: #e8a04b; }
 .bud-conn-hint code { font-family: var(--mono); font-size: 11px; background: rgba(255, 255, 255, 0.09); border-radius: 3px; padding: 0 4px; color: var(--text); }
+
+/* labeled Execute button in the editor run bar */
+.bud-sql-exec {
+  display: inline-flex; align-items: center; gap: 7px; flex: none;
+  background: var(--green); color: #fff; border: none; border-radius: 4px;
+  padding: 4px 12px; font-family: var(--sans); font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: background 0.12s ease, opacity 0.12s ease;
+}
+.bud-sql-exec:hover:not(:disabled) { background: var(--green-bright); }
+.bud-sql-exec:disabled { opacity: 0.5; cursor: default; }
+.bud-sql-exec svg { flex: none; }
+.bud-sql-exec .bud-kbd { display: inline-flex; gap: 2px; }
+.bud-sql-exec .bud-kbd kbd { background: rgba(255, 255, 255, 0.22); border: none; color: #fff; font-size: 10px; font-family: var(--mono); border-radius: 3px; padding: 0 4px; }
 .bud-field-hint { font-size: 11px; color: var(--faint); font-weight: 400; line-height: 1.4; }
 
 /* ============================================================

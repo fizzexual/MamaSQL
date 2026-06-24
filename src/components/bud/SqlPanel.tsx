@@ -513,6 +513,19 @@ export function SqlPanel() {
           </div>
         </div>
         <div className="bud-sql-bar">
+          <button
+            className="bud-sql-exec"
+            title="Execute — runs the selection if any (⌘↵)"
+            onClick={() => void exec(selectedOrAll())}
+            disabled={running || !connId}
+          >
+            <IconPlayerPlay size={13} stroke={1.9} />
+            {running ? "Running…" : "Execute"}
+            <span className="bud-kbd">
+              <kbd>⌘</kbd>
+              <kbd>↵</kbd>
+            </span>
+          </button>
           <span className="bud-ed-status">
             {caretLine}/{lineCount} [{sql.length}]
           </span>
