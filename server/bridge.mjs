@@ -445,10 +445,36 @@ const handlers = {
   async dropTable({ id, table }) {
     const { engine, conn, fileKey } = need(id);
     if (engine === "sqlite") {
-      sqliteRun(fileKey, `DROP TABLE IF EXISTS ${sqliteIdent(table)}`);
+      // A view needs DROP VIEW, not DROP TABLE — look up which it is.
+      const db = sqliteDbs.get(fileKey);
+      let type = "table";
+      const st = db.prepare("SELECT type FROM sqlite_master WHERE name = ?");
+      try {
+        st.bind([table]);
+        if (st.step()) type = String(st.get()[0] || "table");
+      } finally {
+        st.free();
+      }
+      sqliteRun(fileKey, `DROP ${/view/i.test(type) ? "VIEW" : "TABLE"} IF EXISTS ${sqliteIdent(table)}`);
       return { ok: true };
     }
-    await conn.query(`DROP TABLE IF EXISTS ${quote[engine](table)}`);
+    if (engine === "mysql") {
+      // DROP TABLE silently no-ops a view (and vice-versa); issue both so either
+      // a base table or a view is removed. IF EXISTS keeps the other a no-op.
+      for (const kw of ["TABLE", "VIEW"]) {
+        await conn.query(`DROP ${kw} IF EXISTS ${quote.mysql(table)}`);
+      }
+      return { ok: true };
+    }
+    // PostgreSQL: IF EXISTS doesn't suppress a wrong-type error, so pick the type.
+    const tr = await conn.query({
+      text: "SELECT table_type FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = $1",
+      values: [table],
+      rowMode: "array",
+    });
+    const rows = Array.isArray(tr) ? tr[tr.length - 1].rows : tr.rows;
+    const isView = !!rows?.[0] && /VIEW/i.test(String(rows[0][0] ?? ""));
+    await conn.query(`DROP ${isView ? "VIEW" : "TABLE"} IF EXISTS ${quote.postgres(table)}`);
     return { ok: true };
   },
   async createTable({ id, name, columns }) {
