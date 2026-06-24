@@ -2642,6 +2642,15 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
 .bud-ide-toolbar button.bud-tb-exec { color: var(--green-bright); }
 .bud-ide-toolbar button.bud-tb-exec:hover:not(:disabled) { background: rgba(78, 157, 81, 0.18); }
 .bud-ide-toolbar button.bud-tb-exec:disabled { color: var(--green); }
+/* The primary Execute icon also carries .bud-sql-run (the filled pill used on the
+   bottom bar). Strip that pill's padding/gap/fill here so it's a clean, evenly
+   sized green "run" button whose play icon is always clearly visible. */
+.bud-ide-toolbar button.bud-sql-run.bud-tb-exec {
+  width: 28px; height: 24px; padding: 0; gap: 0; font-weight: 400;
+  background: rgba(52, 211, 153, 0.14); color: var(--green-bright); border-radius: 6px;
+}
+.bud-ide-toolbar button.bud-sql-run.bud-tb-exec:hover:not(:disabled) { background: rgba(52, 211, 153, 0.28); color: var(--green-bright); }
+.bud-ide-toolbar button.bud-sql-run.bud-tb-exec:disabled { background: rgba(52, 211, 153, 0.08); color: var(--green); opacity: 0.5; }
 .bud-tb-sep { width: 1px; height: 16px; background: var(--border-strong); margin: 0 6px; flex: none; }
 
 /* ---------- connection bar (form controls) ---------- */
