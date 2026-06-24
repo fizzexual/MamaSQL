@@ -134,22 +134,37 @@ export function deleteSecret(id: string): void {
   writeSecrets(s);
 }
 
+// The bridge itself only ever replies 200 / 400 / 404. A 5xx therefore means the
+// proxy (vite or nginx) couldn't reach the bridge — i.e. it's down or restarting
+// — and the request never executed, so it's safe to retry. We retry a few times
+// with backoff so a brief bridge restart is invisible instead of a raw HTTP 500.
+const BRIDGE_DOWN_MSG = "Engine server isn't responding. Start it with `npm start` (or `docker compose up -d`).";
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function rpc<T>(path: string, body: unknown): Promise<T> {
-  let resp: Response;
-  try {
-    resp = await fetch(`${bridgeUrl()}/api/${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    throw { kind: "bridgeDown", message: "Engine server isn't running. Start it with `npm run bridge`." } as AppError;
+  const url = `${bridgeUrl()}/api/${path}`;
+  const payload = JSON.stringify(body);
+  let downErr: AppError = { kind: "bridgeDown", message: BRIDGE_DOWN_MSG };
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt > 0) await sleep(200 * 2 ** (attempt - 1)); // 200, 400, 800, 1600ms
+    let resp: Response;
+    try {
+      resp = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: payload });
+    } catch {
+      downErr = { kind: "bridgeDown", message: BRIDGE_DOWN_MSG };
+      continue; // network error → bridge unreachable → retry
+    }
+    if (resp.status >= 500) {
+      downErr = { kind: "bridgeDown", message: BRIDGE_DOWN_MSG };
+      continue; // proxy couldn't reach the bridge → retry
+    }
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || (data && data.error)) {
+      throw (data?.error ?? { kind: "internal", message: `HTTP ${resp.status}` }) as AppError;
+    }
+    return data as T;
   }
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok || (data && data.error)) {
-    throw (data?.error ?? { kind: "internal", message: `HTTP ${resp.status}` }) as AppError;
-  }
-  return data as T;
+  throw downErr; // still unreachable after retries
 }
 
 async function openById(id: string): Promise<void> {
