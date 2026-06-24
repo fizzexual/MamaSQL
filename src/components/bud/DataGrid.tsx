@@ -1,5 +1,5 @@
 import { IconArrowUpRight, IconChevronLeft, IconChevronRight, IconPlus, IconSearch, IconX } from "@tabler/icons-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getBackend } from "../../ipc/backend";
 import { displayRows } from "../../lib/cell";
 import { promptDialog } from "../../state/dialog";
@@ -99,6 +99,8 @@ export function DataGrid() {
   const navigateFk = useStore((s) => s.navigateFk);
   const pendingColFilter = useStore((s) => s.pendingColFilter);
   const setPendingColFilter = useStore((s) => s.setPendingColFilter);
+  const openTableData = useStore((s) => s.openTableData);
+  const searchTable = useStore((s) => s.searchTable);
   const [editing, setEditing] = useState<{ row: number; col: number } | null>(null);
   const [draft, setDraft] = useState("");
   const [newRow, setNewRow] = useState<string[] | null>(null);
@@ -107,6 +109,7 @@ export function DataGrid() {
   const [cellView, setCellView] = useState<{ value: string; column?: string } | null>(null);
   const [selCell, setSelCell] = useState<{ r: number; c: number } | null>(null);
   const [gridFilter, setGridFilter] = useState("");
+  const serverSearched = useRef(false);
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [allFks, setAllFks] = useState<{ table: string; column: string; refTable: string; refColumn: string }[]>([]);
@@ -168,7 +171,27 @@ export function DataGrid() {
   useEffect(() => {
     setGridFilter("");
     setPage(0);
+    serverSearched.current = false;
   }, [editTable?.table]);
+
+  // Whole-table search: debounce the filter and run it on the server so matches
+  // beyond the loaded window are found too (the client-side filter above still
+  // gives instant feedback while this resolves). Clearing it reloads the table.
+  useEffect(() => {
+    if (!editTable) return;
+    const q = gridFilter.trim();
+    const id = setTimeout(() => {
+      if (q) {
+        serverSearched.current = true;
+        void searchTable(q);
+      } else if (serverSearched.current) {
+        serverSearched.current = false;
+        void openTableData(editTable.table);
+      }
+    }, 300);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gridFilter, editTable?.table]);
 
   // Foreign keys are per-connection, so fetch them once (not on every table
   // switch) and derive the current table's map below.
@@ -316,7 +339,8 @@ export function DataGrid() {
         </div>
         {hasFilters && (
           <span className="bud-grid-toolbar-info">
-            {filteredOrder.length.toLocaleString()} of {result.rows.length.toLocaleString()} match
+            {filteredOrder.length.toLocaleString()} match{filteredOrder.length === 1 ? "" : "es"}
+            {result.rows.length >= 1000 ? " (first 1,000)" : ""}
           </span>
         )}
         <span className="bud-grid-foot-spacer" />

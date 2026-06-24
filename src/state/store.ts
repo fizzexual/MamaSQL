@@ -210,6 +210,7 @@ export interface AppStore {
   loadHistory: () => Promise<void>;
   openTableData: (table: string, opts?: { newTab?: boolean }) => Promise<void>;
   closeTableTab: (table: string) => void;
+  searchTable: (query: string) => Promise<void>;
   navigateFk: (refTable: string, refColumn: string, value: unknown) => Promise<void>;
   setPendingColFilter: (v: { column: string; value: string } | null) => void;
   toggleReadOnly: (id: string) => void;
@@ -672,6 +673,32 @@ export const useStore = create<AppStore>((set, get) => ({
     if (editTable?.table === table) {
       if (next.length) void get().openTableData(next[Math.min(idx, next.length - 1)]);
       else set({ editTable: null, view: "sql" });
+    }
+  },
+
+  // Whole-table search: filters EVERY row of the active table on the server (not
+  // just the rows already loaded into the grid), across all columns. Engine-aware
+  // casting/quoting so it works on SQLite, PostgreSQL and MySQL.
+  searchTable: async (query) => {
+    const { activeConnectionId, editTable, result, connections } = get();
+    if (!activeConnectionId || !editTable) return;
+    const cols = (result?.columns ?? []).map((c) => c.name);
+    if (!cols.length) return;
+    const engine = connections.find((c) => c.id === activeConnectionId)?.engine;
+    const qid =
+      engine === "mysql"
+        ? (n: string) => "`" + n.replace(/`/g, "``") + "`"
+        : (n: string) => '"' + n.replace(/"/g, '""') + '"';
+    const toText = (e: string) => (engine === "mysql" ? `CAST(${e} AS CHAR)` : `CAST(${e} AS TEXT)`);
+    const lit = `'%${query.replace(/'/g, "''")}%'`;
+    const where = cols.map((c) => `${toText(qid(c))} LIKE ${lit}`).join(" OR ");
+    const from = qid(editTable.table);
+    set({ loadingResult: true, error: null });
+    try {
+      const r = await backend.runQuery(activeConnectionId, `SELECT * FROM ${from} WHERE ${where} LIMIT 1000;`);
+      set({ result: r, loadingResult: false });
+    } catch (e) {
+      set({ error: normalizeError(e), loadingResult: false });
     }
   },
 
