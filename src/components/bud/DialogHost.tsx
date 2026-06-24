@@ -1,4 +1,6 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { backdropV, MotionButton, panelV } from "../../lib/motion";
 import { useDialog } from "../../state/dialog";
 
 /** Renders the active themed dialog (confirm / prompt). Mount once at the app root. */
@@ -41,12 +43,28 @@ export function DialogHost() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current, checked, value]);
 
-  if (!current) return null;
-
   return (
-    <div className="bud-dialog-backdrop" onClick={cancel}>
-      <div className="bud-dialog" role="dialog" aria-modal="true" onClick={(e) => e.stopPropagation()}>
-        <div className="bud-dialog-title">{current.title}</div>
+    <AnimatePresence>
+      {current && (
+        <motion.div
+          className="bud-dialog-backdrop"
+          variants={backdropV}
+          initial="hidden"
+          animate="show"
+          exit="exit"
+          onClick={cancel}
+        >
+          <motion.div
+            className="bud-dialog"
+            role="dialog"
+            aria-modal="true"
+            variants={panelV}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bud-dialog-title">{current.title}</div>
         {current.message && <div className="bud-dialog-msg">{current.message}</div>}
         {current.kind === "prompt" && (
           <div className="bud-dialog-field">
@@ -71,18 +89,20 @@ export function DialogHost() {
           </label>
         )}
         <div className="bud-dialog-actions">
-          <button className="bud-dialog-cancel" onClick={cancel}>
+          <MotionButton className="bud-dialog-cancel" onClick={cancel}>
             {current.cancelLabel ?? "Cancel"}
-          </button>
-          <button
+          </MotionButton>
+          <MotionButton
             className={`bud-dialog-ok ${current.danger ? "danger" : ""}`}
             autoFocus={current.kind === "confirm"}
             onClick={submit}
           >
             {current.confirmLabel ?? "OK"}
-          </button>
+          </MotionButton>
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

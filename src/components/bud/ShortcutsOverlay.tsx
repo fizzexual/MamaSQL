@@ -1,4 +1,6 @@
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { backdropV, listItemV, listV, panelV } from "../../lib/motion";
 
 const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["⌘", "K"], label: "Command palette" },
@@ -41,28 +43,44 @@ export function ShortcutsOverlay() {
     };
   }, []);
 
-  if (!open) return null;
-
   return (
-    <div className="bud-sc-backdrop" onClick={() => setOpen(false)}>
-      <div className="bud-sc" onClick={(e) => e.stopPropagation()}>
-        <div className="bud-sc-head">Keyboard shortcuts</div>
-        <div className="bud-sc-list">
-          {SHORTCUTS.map((s) => (
-            <div className="bud-sc-row" key={s.label}>
-              <span className="bud-sc-label">{s.label}</span>
-              <span className="bud-sc-keys">
-                {s.keys.map((k, i) => (
-                  <kbd key={i}>{k}</kbd>
-                ))}
-              </span>
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="bud-sc-backdrop"
+          variants={backdropV}
+          initial="hidden"
+          animate="show"
+          exit="exit"
+          onClick={() => setOpen(false)}
+        >
+          <motion.div
+            className="bud-sc"
+            variants={panelV}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bud-sc-head">Keyboard shortcuts</div>
+            <motion.div className="bud-sc-list" variants={listV} initial="hidden" animate="show">
+              {SHORTCUTS.map((s) => (
+                <motion.div className="bud-sc-row" key={s.label} variants={listItemV}>
+                  <span className="bud-sc-label">{s.label}</span>
+                  <span className="bud-sc-keys">
+                    {s.keys.map((k, i) => (
+                      <kbd key={i}>{k}</kbd>
+                    ))}
+                  </span>
+                </motion.div>
+              ))}
+            </motion.div>
+            <div className="bud-sc-foot">
+              Press <kbd>Esc</kbd> to close
             </div>
-          ))}
-        </div>
-        <div className="bud-sc-foot">
-          Press <kbd>Esc</kbd> to close
-        </div>
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

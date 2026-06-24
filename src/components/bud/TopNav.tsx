@@ -12,6 +12,7 @@ import {
   IconSettings,
 } from "@tabler/icons-react";
 import { useRef } from "react";
+import { MotionButton } from "../../lib/motion";
 import { promptDialog } from "../../state/dialog";
 import { useStore } from "../../state/store";
 
@@ -84,9 +85,15 @@ export function TopNav({
           <IconRefresh size={16} stroke={1.6} />
         </button>
         <span className="bud-tb-divider" />
-        <button className="bud-tb-run" title="Execute (⌘↵)" onClick={() => void run()} disabled={!activeId}>
+        <MotionButton
+          className="bud-tb-run"
+          title="Execute (⌘↵)"
+          onClick={() => void run()}
+          disabled={!activeId}
+          whileTap={{ scale: 0.86 }}
+        >
           <IconPlayerPlay size={16} stroke={1.7} />
-        </button>
+        </MotionButton>
         <span className="bud-tb-divider" />
         <button title="SQL history" onClick={() => setView("history")}>
           <IconHistory size={16} stroke={1.6} />
@@ -98,7 +105,7 @@ export function TopNav({
           <IconKeyboard size={16} stroke={1.6} />
         </button>
         <span className="bud-tb-divider" />
-        <button
+        <MotionButton
           className="bud-cmdk-pill"
           title="Command palette (⌘K)"
           onClick={() => window.dispatchEvent(new Event("mamasql:cmdk"))}
@@ -106,7 +113,7 @@ export function TopNav({
           <IconSearch size={13} stroke={1.8} />
           <span>Search</span>
           <kbd>⌘K</kbd>
-        </button>
+        </MotionButton>
       </div>
 
       <div className={`bud-tb-conn ${active ? "on" : ""}`} title={active ? `Connected to ${active.name}` : "No active connection"}>

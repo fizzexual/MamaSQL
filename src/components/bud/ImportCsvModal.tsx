@@ -1,6 +1,8 @@
 import { IconFileImport, IconUpload } from "@tabler/icons-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
 import { fromCsv, inferColumns } from "../../lib/csv";
+import { backdropV, centeredModalV, MotionButton } from "../../lib/motion";
 import { useStore } from "../../state/store";
 import { toast } from "../../state/toast";
 
@@ -42,8 +44,6 @@ export function ImportCsvModal() {
     if (tables.length > 0 && !target) setTarget(tables[0].name);
   }, [tables, target]);
 
-  if (!open) return null;
-
   const close = () => {
     setOpen(false);
     setParsed(null);
@@ -79,11 +79,31 @@ export function ImportCsvModal() {
 
   return (
     <>
-      <div className="bud-modal-backdrop" onClick={close} />
-      <div className="bud-modal bud-import" onClick={(e) => e.stopPropagation()}>
-        <div className="bud-modal-head">
-          <IconFileImport size={16} stroke={1.7} /> Import CSV
-        </div>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            key="import-bg"
+            className="bud-modal-backdrop"
+            variants={backdropV}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            onClick={close}
+          />
+        )}
+        {open && (
+          <motion.div
+            key="import-modal"
+            className="bud-modal bud-import"
+            variants={centeredModalV}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="bud-modal-head">
+              <IconFileImport size={16} stroke={1.7} /> Import CSV
+            </div>
         <div className="bud-modal-body">
           {!parsed ? (
             <button
@@ -166,15 +186,17 @@ export function ImportCsvModal() {
             </>
           )}
         </div>
-        <div className="bud-modal-actions">
-          <button className="bud-modal-cancel" onClick={close}>
-            Cancel
-          </button>
-          <button className="bud-modal-save" onClick={run} disabled={!parsed || busy}>
-            {busy ? "Importing…" : "Import"}
-          </button>
-        </div>
-      </div>
+            <div className="bud-modal-actions">
+              <MotionButton className="bud-modal-cancel" onClick={close}>
+                Cancel
+              </MotionButton>
+              <MotionButton className="bud-modal-save" onClick={run} disabled={!parsed || busy}>
+                {busy ? "Importing…" : "Import"}
+              </MotionButton>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <input
         ref={fileRef}
         id="bud-import-csv-file"

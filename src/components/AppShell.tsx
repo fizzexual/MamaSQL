@@ -1,3 +1,4 @@
+import { AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { ConnectionConfig } from "../ipc/types";
 import { useStore } from "../state/store";
@@ -66,13 +67,25 @@ export function AppShell() {
       <TopNav onAddServer={openAdd} onToggleSidebar={() => setSidebarHidden((v) => !v)} sidebarHidden={sidebarHidden} />
       <div className="bud-body">
         <Sources onAddServer={openAdd} onEditServer={openEdit} />
-        {topView === "data" ? <DataView /> : <WorkspacePanel view={topView} />}
+        <AnimatePresence mode="wait" initial={false}>
+          {topView === "data" ? (
+            <DataView key="data" />
+          ) : (
+            <WorkspacePanel key={topView} view={topView} />
+          )}
+        </AnimatePresence>
       </div>
       {!sidebarHidden && <div className="bud-hsplit" onMouseDown={onResize} title="Drag to resize sidebar" />}
       <StatusBar />
-      {serverModal && (
-        <ServerModal existing={serverModal === "new" ? null : serverModal} onClose={() => setServerModal(null)} />
-      )}
+      <AnimatePresence>
+        {serverModal && (
+          <ServerModal
+            key="server-modal"
+            existing={serverModal === "new" ? null : serverModal}
+            onClose={() => setServerModal(null)}
+          />
+        )}
+      </AnimatePresence>
       <CommandPalette onAddServer={openAdd} />
       <ShortcutsOverlay />
       <ErDiagram />

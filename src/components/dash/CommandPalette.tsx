@@ -13,7 +13,9 @@ import {
   IconTable,
   IconTerminal2,
 } from "@tabler/icons-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { type ComponentType, type KeyboardEvent as ReactKeyboardEvent, useEffect, useMemo, useRef, useState } from "react";
+import { backdropV, commandV } from "../../lib/motion";
 import { useStore } from "../../state/store";
 
 type Icon = ComponentType<{ size?: number; stroke?: number }>;
@@ -163,12 +165,26 @@ export function CommandPalette({ onAddServer }: { onAddServer: () => void }) {
     }
   };
 
-  if (!open) return null;
-
   return (
-    <div className="cmdk-backdrop" onClick={close}>
-      <div className="cmdk" onClick={(e) => e.stopPropagation()}>
-        <div className="cmdk-input">
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          className="cmdk-backdrop"
+          variants={backdropV}
+          initial="hidden"
+          animate="show"
+          exit="exit"
+          onClick={close}
+        >
+          <motion.div
+            className="cmdk"
+            variants={commandV}
+            initial="hidden"
+            animate="show"
+            exit="exit"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="cmdk-input">
           <IconSearch size={16} stroke={1.8} />
           <input
             ref={inputRef}
@@ -223,8 +239,10 @@ export function CommandPalette({ onAddServer }: { onAddServer: () => void }) {
           <span>
             <kbd>esc</kbd> close
           </span>
-        </div>
-      </div>
-    </div>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

@@ -6,7 +6,9 @@ import {
   IconMail,
   IconTrash,
 } from "@tabler/icons-react";
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
+import { viewV } from "../../lib/motion";
 import { confirmDialog } from "../../state/dialog";
 import type { TopView } from "../../state/store";
 import { useStore } from "../../state/store";
@@ -32,13 +34,13 @@ export function WorkspacePanel({ view }: { view: TopView }) {
 
 function PanelShell({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
   return (
-    <main className="bud-main bud-wp">
+    <motion.main className="bud-main bud-wp" variants={viewV} initial="hidden" animate="show" exit="exit">
       <div className="bud-wp-head">
         <h1 className="bud-wp-title">{title}</h1>
         <p className="bud-wp-sub">{subtitle}</p>
       </div>
       <div className="bud-wp-body">{children}</div>
-    </main>
+    </motion.main>
   );
 }
 

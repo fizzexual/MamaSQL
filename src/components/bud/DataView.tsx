@@ -13,8 +13,10 @@ import {
   IconUpload,
   IconX,
 } from "@tabler/icons-react";
+import { motion } from "framer-motion";
 import { type ComponentType, type MouseEvent, useEffect, useRef, useState } from "react";
 import { download, fromCsv, toCsv } from "../../lib/csv";
+import { viewV } from "../../lib/motion";
 import { toast } from "../../state/toast";
 import { useStore } from "../../state/store";
 import { DataGrid } from "./DataGrid";
@@ -111,7 +113,7 @@ export function DataView() {
   const cols = result?.columns.map((c) => c.name) ?? [];
 
   return (
-    <main className="bud-main">
+    <motion.main className="bud-main" variants={viewV} initial="hidden" animate="show" exit="exit">
       <div className="bud-qtabs">
         {editors.map((ed) => (
           <button
@@ -240,7 +242,7 @@ export function DataView() {
         </>
       )}
 
-    </main>
+    </motion.main>
   );
 }
 

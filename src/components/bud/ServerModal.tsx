@@ -1,5 +1,7 @@
 import { IconAlertTriangle, IconCheck, IconInfoCircle, IconPlus, IconRefresh } from "@tabler/icons-react";
+import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
+import { backdropV, centeredModalV, MotionButton } from "../../lib/motion";
 import { getBackend, isTauri } from "../../ipc/backend";
 import { bridgeHealthy } from "../../ipc/http";
 import type { ConnEnv, ConnectionConfig, Engine } from "../../ipc/types";
@@ -122,8 +124,22 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
 
   return (
     <>
-      <div className="bud-modal-backdrop" onClick={onClose} />
-      <div className="bud-modal" onClick={(e) => e.stopPropagation()}>
+      <motion.div
+        className="bud-modal-backdrop"
+        variants={backdropV}
+        initial="hidden"
+        animate="show"
+        exit="exit"
+        onClick={onClose}
+      />
+      <motion.div
+        className="bud-modal"
+        variants={centeredModalV}
+        initial="hidden"
+        animate="show"
+        exit="exit"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="bud-modal-head">{editing ? "Edit data source" : "Add data source"}</div>
         <div className="bud-modal-body">
           <label className="bud-field">
@@ -255,14 +271,14 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
           )}
         </div>
         <div className="bud-modal-actions">
-          <button className="bud-modal-cancel" onClick={onClose}>
+          <MotionButton className="bud-modal-cancel" onClick={onClose}>
             Cancel
-          </button>
-          <button className="bud-modal-save" onClick={save} disabled={busy || !canSave}>
+          </MotionButton>
+          <MotionButton className="bud-modal-save" onClick={save} disabled={busy || !canSave}>
             {busy ? "Connecting…" : editing ? "Save changes" : "Add data source"}
-          </button>
+          </MotionButton>
         </div>
-      </div>
+      </motion.div>
     </>
   );
 }

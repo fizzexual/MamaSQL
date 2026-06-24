@@ -3150,6 +3150,21 @@ select.bud-cb-select {
 .bud-qtab-new:hover { color: var(--accent); }
 ::selection { background: rgba(124, 108, 245, 0.32); }
 
+/* ===================================================================== */
+/* Framer Motion pass (kept last on purpose).                            */
+/* These floating layers now get their enter/exit from Framer — real     */
+/* spring physics and true exit animations. Disable the legacy CSS       */
+/* keyframes on them so the two don't fight on mount.                    */
+/* ===================================================================== */
+.cmdk-backdrop,
+.cmdk,
+.bud-toast,
+.bud-dialog-backdrop,
+.bud-dialog { animation: none !important; }
+
+/* Toast stack reflows via Framer's layout animation on dismiss. */
+.bud-toasts .bud-toast { will-change: transform, opacity; }
+
 /* Dotted "canvas" behind the workspace (the Plasma signature) */
 .bud-main {
   background-color: var(--bg);
