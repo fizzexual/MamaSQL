@@ -162,12 +162,12 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
                 </label>
               </div>
               {!isTauri() && /^(localhost|127\.0\.0\.1|::1)$/i.test(host.trim()) && (
-                <div className="bud-conn-hint warn">
+                <div className="bud-conn-hint">
                   <IconInfoCircle size={15} stroke={1.7} />
                   <span>
-                    The engine server may run in Docker, where <code>localhost</code> is the bridge itself — not your
-                    database. Use the compose service name (e.g. <code>postgres</code> / <code>mysql</code>), or{" "}
-                    <code>host.docker.internal</code> for a database on your own machine.
+                    <code>localhost</code> connects to a database on your own computer (even when MamaSQL runs in
+                    Docker). If it still can't connect, that database only allows local connections — let it accept
+                    other hosts (bind to <code>0.0.0.0</code>), or run MamaSQL outside Docker.
                   </span>
                 </div>
               )}

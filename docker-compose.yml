@@ -29,6 +29,10 @@ services:
       BRIDGE_PORT: "5174"
     expose:
       - "5174"
+    # Lets connections use host "host.docker.internal" to reach a database
+    # running on your own machine (works on all platforms, incl. Linux).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: always
 
   # --- Optional demo databases ---------------------------------------------

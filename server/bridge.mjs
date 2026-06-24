@@ -5,11 +5,24 @@
 // mysql2). Run it with `npm run bridge` (or `npm run dev:all`) and the web app
 // will route Postgres/MySQL connections here automatically. SQLite stays fully
 // in-browser and does not need this server.
+import { existsSync } from "node:fs";
 import { createServer } from "node:http";
 import pg from "pg";
 import mysql from "mysql2/promise";
 
 const PORT = Number(process.env.BRIDGE_PORT) || 5174;
+
+// When the bridge runs in a container, "localhost" means the container itself.
+// Transparently remap localhost / 127.0.0.1 / ::1 (and empty) to the host
+// machine so a database running on the user's PC is reachable. External hosts,
+// LAN IPs, and compose service names pass through unchanged.
+const IN_DOCKER = existsSync("/.dockerenv") || process.env.BRIDGE_IN_DOCKER === "true";
+function resolveHost(host) {
+  const h = String(host ?? "").trim();
+  if (!IN_DOCKER) return h || "localhost";
+  if (h === "" || h.toLowerCase() === "localhost" || h === "127.0.0.1" || h === "::1") return "host.docker.internal";
+  return h;
+}
 
 /** Open connections keyed by the web app's connection id. */
 const pools = new Map(); // id -> { engine, conn }
@@ -69,7 +82,7 @@ function toResult(raw, startedAt) {
 
 /* ---- connecting ---- */
 async function connect(cfg, password) {
-  const host = cfg.host || "localhost";
+  const host = resolveHost(cfg.host);
   if (cfg.engine === "postgres") {
     const client = new pg.Client({
       host,

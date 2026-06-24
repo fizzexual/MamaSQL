@@ -26,6 +26,9 @@ services:
       BRIDGE_PORT: "5174"
     expose:
       - "5174"
+    # Reach a database on your own machine via host "host.docker.internal".
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     restart: unless-stopped
 
   postgres:
