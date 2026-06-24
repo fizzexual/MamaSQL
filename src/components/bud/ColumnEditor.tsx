@@ -137,6 +137,10 @@ export function ColumnEditor({
             </div>
           )}
         </div>
+        <p className="bud-ce-hint">
+          A field's <b>type</b> is the kind of value it holds — plain text, a number, a date &amp; time,
+          true/false, or JSON. It decides how values are shown, sorted, and edited.
+        </p>
         <div className="bud-ce-section">
           Formatting <span className="bud-info">ⓘ</span>
         </div>

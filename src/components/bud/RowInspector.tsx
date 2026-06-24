@@ -156,6 +156,30 @@ export function RowInspector() {
     await deleteRowAt(inspectorRow);
   };
 
+  const fieldsBlock = (
+    <div className="insp-fields">
+      {result.columns.map((col, ci) => {
+        if (hidden.has(col.name)) return null;
+        const isPk = ci === pkIdx;
+        return (
+          <label className="insp-field" key={col.name}>
+            <span className="insp-label">
+              {col.name}
+              {isPk && <span className="insp-pk-tag">PK</span>}
+            </span>
+            <FieldInput
+              kind={fieldKind(col, samplesByCol[ci] ?? [])}
+              value={draft[col.name]}
+              disabled={isPk || !canEdit}
+              samples={samplesByCol[ci] ?? []}
+              onChange={(v) => set(col.name, v)}
+            />
+          </label>
+        );
+      })}
+    </div>
+  );
+
   return (
     <aside className={`bud-inspector dens-${density} ${labelLeft ? "label-left" : ""}`}>
       <div className="insp-head">
@@ -192,27 +216,7 @@ export function RowInspector() {
 
           {!canEdit && <div className="insp-warn">⚠ No primary key — this table is read-only.</div>}
 
-          <div className="insp-fields">
-            {result.columns.map((col, ci) => {
-              if (hidden.has(col.name)) return null;
-              const isPk = ci === pkIdx;
-              return (
-                <label className="insp-field" key={col.name}>
-                  <span className="insp-label">
-                    {col.name}
-                    {isPk && <span className="insp-pk-tag">PK</span>}
-                  </span>
-                  <FieldInput
-                    kind={fieldKind(col, samplesByCol[ci] ?? [])}
-                    value={draft[col.name]}
-                    disabled={isPk || !canEdit}
-                    samples={samplesByCol[ci] ?? []}
-                    onChange={(v) => set(col.name, v)}
-                  />
-                </label>
-              );
-            })}
-          </div>
+          {fieldsBlock}
 
           <div className="insp-section">Fields</div>
           <div className="insp-toggles">
@@ -257,6 +261,8 @@ export function RowInspector() {
               Left
             </button>
           </div>
+          <div className="insp-section">Preview</div>
+          {fieldsBlock}
         </div>
       )}
 

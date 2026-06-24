@@ -732,8 +732,10 @@ select.insp-input {
 .insp-save:hover:not(:disabled) { filter: brightness(1.07); transform: translateY(-1px); }
 .insp-save:disabled { opacity: 0.5; }
 
-.dens-compact .insp-fields { gap: 9px; }
-.dens-compact .insp-input { padding: 6px 9px; }
+.dens-compact .insp-fields { gap: 7px; }
+.dens-compact .insp-field { gap: 3px; }
+.dens-compact .insp-input { padding: 4px 8px; font-size: 12.5px; }
+.dens-compact .insp-label { font-size: 11px; }
 .label-left .insp-field { flex-direction: row; align-items: center; }
 .label-left .insp-label { width: 96px; flex: none; }
 .label-left .insp-input { flex: 1; }
@@ -3236,6 +3238,8 @@ select.bud-cb-select {
 .bud-ce-type-opt:hover { background: var(--panel-3); }
 .bud-ce-type-opt.sel, .bud-ce-type-opt.sel svg { color: var(--accent-2); }
 .bud-ce-type-check { margin-left: auto; flex: none; }
+.bud-ce-hint { margin: -3px 2px 0; font-size: 11.5px; line-height: 1.5; color: var(--faint); }
+.bud-ce-hint b { color: var(--muted); font-weight: 600; }
 
 /* The sidebar is chrome, not content — its labels shouldn't be text-selectable
    (no Ctrl+A / double-click / drag highlight). Inputs inside it stay selectable. */
