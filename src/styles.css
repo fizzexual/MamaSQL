@@ -2514,25 +2514,29 @@ select.bud-filter-col, select.bud-filter-op { appearance: none; -webkit-appearan
    This is the final cascade block, so it wins.
    ============================================================ */
 :root {
-  --bg: #1c1d1f;            /* editor + main surface (near black) */
-  --bg-2: #26282b;          /* toolbars, tabs, connection bar */
-  --panel: #232427;
-  --panel-2: #2e3034;       /* hover */
-  --panel-3: #34363a;
-  --border: #34363a;
-  --border-strong: #45474c;
-  --text: #d6d8da;
-  --muted: #9a9da2;
-  --faint: #6b6e73;
-  --accent: #4a88c7;        /* chrome: active tab / selection (blue) */
-  --accent-2: #5a98d7;
-  --accent-soft: rgba(74, 136, 199, 0.20);
-  --green: #4e9d51;         /* execute / connected (DbVisualizer green) */
-  --green-bright: #5fb85f;
-  --input-bg: #2b2d30;
-  --tree-bg: #202123;
-  --titlebar: #2a2c2f;
-  --gutter: #232427;
+  /* Plasma-inspired theme: deep purple-tinted near-black + a violet accent. */
+  --bg: #0c0c11;            /* editor + main surface (deep near-black) */
+  --bg-2: #131319;          /* toolbars, tabs, connection bar */
+  --panel: #15151c;
+  --panel-2: #1e1e27;       /* hover */
+  --panel-3: #26262f;
+  --bg-3: #1e1e27;
+  --bg-4: #26262f;
+  --border: rgba(255, 255, 255, 0.07);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --text: #ececf1;
+  --muted: #a2a2b0;
+  --faint: #6b6b7a;
+  --accent: #7c6cf5;        /* violet — active tab / selection / primary */
+  --accent-2: #9486ff;
+  --accent-soft: rgba(124, 108, 245, 0.16);
+  --accent-glow: rgba(124, 108, 245, 0.45);
+  --green: #34d399;         /* execute / connected / success (emerald) */
+  --green-bright: #4ade80;
+  --input-bg: #16161d;
+  --tree-bg: #0e0e13;
+  --titlebar: #0e0e13;
+  --gutter: #121218;
 }
 
 /* shell: titlebar / body / statusbar */
@@ -3107,3 +3111,56 @@ select.bud-cb-select {
 /* empty-table state inside the data grid (mirrors header, no skeleton body) */
 .bud-empty-row td { border-bottom: none; background: transparent; }
 .bud-grid .bud-empty-cell { padding: 26px 14px; text-align: center; color: var(--faint); font-size: 13px; }
+
+/* ===================================================================== */
+/* Plasma-inspired adaptation — softer surfaces, rounder edges, violet    */
+/* accents, subtle texture. Kept last so it wins the cascade.             */
+/* ===================================================================== */
+
+/* Rounder inputs & selects (supersede the earlier 4px !important rule) */
+.bud-app input:not([type="checkbox"]),
+.bud-app select,
+.bud-app textarea { border-radius: 9px !important; }
+
+/* Rounder buttons / primary actions */
+.bud-export-btn, .bud-modal-save, .bud-modal-cancel, .bud-dialog-ok, .bud-dialog-cancel,
+.bud-test-btn, .bud-db-new, .bud-diff-go, .bud-sql-exec, .bud-sql-run, .bud-addrow-btn,
+.bud-addcol-btn, .bud-test-btn { border-radius: 10px; }
+
+/* Rounder floating surfaces (dialogs, popovers, menus) */
+.bud-modal, .bud-dialog, .bud-cellviewer, .bud-erd, .bud-diff { border-radius: 16px; }
+.bud-export-menu, .bud-ctx-menu, .bud-ctx, .bud-ac, .bud-cell-pop, .bud-grid-search,
+.bud-src-search, .bud-hist-bar { border-radius: 12px; }
+
+/* Tree objects feel like soft cards (Plasma File-Check style) */
+.bud-table, .bud-objgroup-head, .bud-src, .bud-ds-empty, .bud-hist-item { border-radius: 8px; }
+
+/* Subtle dotted "canvas" texture on empty states (the Plasma signature) */
+.bud-empty {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 22px 22px;
+  background-position: center;
+}
+
+/* Violet selection / active accents throughout */
+.bud-grid tbody tr.selected, .bud-grid tbody tr.row-open { background: var(--accent-soft); }
+.bud-table.active { background: var(--accent-soft); }
+.bud-grid tbody td.sel { box-shadow: inset 0 0 0 2px var(--accent); }
+.bud-qtab .bud-qtab-ic.sql { color: var(--accent); }
+.bud-qtab-new:hover { color: var(--accent); }
+::selection { background: rgba(124, 108, 245, 0.32); }
+
+/* Dotted "canvas" behind the workspace (the Plasma signature) */
+.bud-main {
+  background-color: var(--bg);
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+/* …with the workspace chrome sitting opaque on top of it */
+.bud-qtabs, .bud-toolbar, .bud-connbar, .bud-ide-toolbar, .bud-grid-toolbar { background: var(--bg-2); }
+/* Main content reads as a soft floating card on the canvas */
+.bud-grid-area, .bud-sql-results {
+  margin: 10px; border: 1px solid var(--border); border-radius: 14px;
+  background: var(--bg-2); overflow: hidden;
+}
+.bud-sql-editor-wrap { border: 1px solid var(--border); border-radius: 14px; margin: 10px 10px 0; }
