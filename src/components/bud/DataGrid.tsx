@@ -1,5 +1,6 @@
-import { IconPlus, IconX } from "@tabler/icons-react";
+import { IconArrowUpRight, IconChevronLeft, IconChevronRight, IconPlus, IconX } from "@tabler/icons-react";
 import { useEffect, useMemo, useState } from "react";
+import { getBackend } from "../../ipc/backend";
 import { promptDialog } from "../../state/dialog";
 import type { ColumnInfo } from "../../ipc/types";
 import { useStore } from "../../state/store";
@@ -82,11 +83,19 @@ export function DataGrid() {
   const toggleRow = useStore((s) => s.toggleRow);
   const selectAllRows = useStore((s) => s.selectAllRows);
   const columns = useStore((s) => (editTable ? s.schema.columnsByTable[editTable.table] : undefined));
+  const activeId = useStore((s) => s.activeConnectionId);
+  const navigateFk = useStore((s) => s.navigateFk);
+  const pendingColFilter = useStore((s) => s.pendingColFilter);
+  const setPendingColFilter = useStore((s) => s.setPendingColFilter);
   const [editing, setEditing] = useState<{ row: number; col: number } | null>(null);
   const [draft, setDraft] = useState("");
   const [newRow, setNewRow] = useState<string[] | null>(null);
   const [colEditor, setColEditor] = useState<ColumnEditorAnchor | null>(null);
   const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
+  const [colFilters, setColFilters] = useState<Record<number, string>>({});
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(100);
+  const [fks, setFks] = useState<Record<string, { refTable: string; refColumn: string }>>({});
   // Only show the skeleton if loading actually lingers — avoids a flash on the
   // near-instant in-browser SQLite loads.
   const [showSkel, setShowSkel] = useState(false);
@@ -131,6 +140,37 @@ export function DataGrid() {
 
   useEffect(() => setSort(null), [editTable?.table]);
 
+  // On table change: reset filters/paging and fetch this table's foreign keys.
+  useEffect(() => {
+    setColFilters({});
+    setPage(0);
+    if (!activeId || !editTable) {
+      setFks({});
+      return;
+    }
+    let alive = true;
+    getBackend()
+      .listForeignKeys(activeId)
+      .then((list) => {
+        if (!alive) return;
+        const map: Record<string, { refTable: string; refColumn: string }> = {};
+        for (const fk of list) if (fk.table === editTable.table) map[fk.column] = { refTable: fk.refTable, refColumn: fk.refColumn };
+        setFks(map);
+      })
+      .catch(() => alive && setFks({}));
+    return () => {
+      alive = false;
+    };
+  }, [editTable?.table, activeId]);
+
+  // Seed a filter when arriving here by clicking a foreign key.
+  useEffect(() => {
+    if (!pendingColFilter || !result) return;
+    const idx = result.columns.findIndex((c) => c.name === pendingColFilter.column);
+    if (idx >= 0) setColFilters({ [idx]: pendingColFilter.value });
+    setPendingColFilter(null);
+  }, [pendingColFilter, result]);
+
   useEffect(() => {
     if (!loadingResult) {
       setShowSkel(false);
@@ -145,6 +185,20 @@ export function DataGrid() {
   if (!result || !editTable) return null;
   const table = editTable.table;
   const allSelected = result.rows.length > 0 && selection.length === result.rows.length;
+
+  const matchesFilters = (ri: number) => {
+    for (const [ciStr, f] of Object.entries(colFilters)) {
+      if (!f) continue;
+      const cell = result.rows[ri][Number(ciStr)];
+      if (cell == null || !String(cell).toLowerCase().includes(f.toLowerCase())) return false;
+    }
+    return true;
+  };
+  const filteredOrder = order.filter(matchesFilters);
+  const hasFilters = Object.values(colFilters).some((v) => v);
+  const pageCount = Math.max(1, Math.ceil(filteredOrder.length / pageSize));
+  const curPage = Math.min(page, pageCount - 1);
+  const pagedOrder = filteredOrder.slice(curPage * pageSize, curPage * pageSize + pageSize);
 
   const colInfo = (name: string): ColumnInfo =>
     columns?.find((c) => c.name === name) ?? { name, dataType: "TEXT", nullable: true, isPrimaryKey: false };
@@ -195,8 +249,9 @@ export function DataGrid() {
   };
 
   return (
-    <div className="bud-grid-wrap">
-      <table className="bud-grid">
+    <div className="bud-grid-area">
+      <div className="bud-grid-wrap">
+        <table className="bud-grid">
         <thead>
           <tr>
             <th className="bud-checkcol">
@@ -228,6 +283,26 @@ export function DataGrid() {
               </button>
             </th>
           </tr>
+          <tr className="bud-filter-row">
+            <th className="bud-checkcol" />
+            <th className="bud-rownum" />
+            {result.columns.map((c, i) => (
+              <th key={i}>
+                <input
+                  className="bud-colfilter"
+                  value={colFilters[i] ?? ""}
+                  placeholder="filter…"
+                  aria-label={`Filter ${c.name}`}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    setColFilters((f) => ({ ...f, [i]: v }));
+                    setPage(0);
+                  }}
+                />
+              </th>
+            ))}
+            <th className="bud-addcol" />
+          </tr>
         </thead>
         <tbody>
           {newRow && (
@@ -257,16 +332,16 @@ export function DataGrid() {
               <td />
             </tr>
           )}
-          {order.length === 0 && !newRow && (
+          {filteredOrder.length === 0 && !newRow && (
             <tr className="bud-empty-row">
               <td className="bud-checkcol" />
               <td className="bud-rownum" />
               <td className="bud-empty-cell" colSpan={result.columns.length + 1}>
-                This table is empty — add a row below.
+                {hasFilters ? "No rows match the filters." : "This table is empty — add a row below."}
               </td>
             </tr>
           )}
-          {order.map((ri, pos) => {
+          {pagedOrder.map((ri, pos) => {
             const row = result.rows[ri];
             return (
               <tr
@@ -282,39 +357,54 @@ export function DataGrid() {
                   />
                 </td>
                 <td className="bud-rownum">
-                  <span className="rn-num">{pos + 1}</span>
+                  <span className="rn-num">{curPage * pageSize + pos + 1}</span>
                   <button className="rn-expand" title="Edit row in panel" onClick={() => openInspector(ri)}>
                     ⤢
                   </button>
                 </td>
-                {row.map((cell, ci) => (
-                  <td
-                    key={ci}
-                    className={cell == null ? "bud-null" : ""}
-                    title={cell == null ? "" : String(cell)}
-                    onDoubleClick={() => startEdit(ri, ci)}
-                  >
-                    {editing && editing.row === ri && editing.col === ci ? (
-                      <input
-                        className="bud-cell-input"
-                        autoFocus
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        onBlur={commitEdit}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") commitEdit();
-                          if (e.key === "Escape") setEditing(null);
-                        }}
-                      />
-                    ) : cell == null ? (
-                      ""
-                    ) : optionCols.has(ci) ? (
-                      pill(cell)
-                    ) : (
-                      String(cell)
-                    )}
-                  </td>
-                ))}
+                {row.map((cell, ci) => {
+                  const fk = cell != null ? fks[result.columns[ci].name] : undefined;
+                  return (
+                    <td
+                      key={ci}
+                      className={`${cell == null ? "bud-null" : ""} ${fk ? "bud-fk-cell" : ""}`}
+                      title={cell == null ? "" : String(cell)}
+                      onDoubleClick={() => startEdit(ri, ci)}
+                    >
+                      {editing && editing.row === ri && editing.col === ci ? (
+                        <input
+                          className="bud-cell-input"
+                          autoFocus
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          onBlur={commitEdit}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") commitEdit();
+                            if (e.key === "Escape") setEditing(null);
+                          }}
+                        />
+                      ) : cell == null ? (
+                        ""
+                      ) : (
+                        <>
+                          {optionCols.has(ci) ? pill(cell) : String(cell)}
+                          {fk && (
+                            <button
+                              className="bud-fk-jump"
+                              title={`Go to ${fk.refTable}.${fk.refColumn} = ${String(cell)}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void navigateFk(fk.refTable, fk.refColumn, cell);
+                              }}
+                            >
+                              <IconArrowUpRight size={12} stroke={2} />
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </td>
+                  );
+                })}
                 <td />
               </tr>
             );
@@ -333,6 +423,47 @@ export function DataGrid() {
           </tr>
         </tbody>
       </table>
+      </div>
+      {filteredOrder.length > 0 && (
+        <div className="bud-grid-foot">
+          <span className="bud-grid-foot-info">
+            {hasFilters
+              ? `${filteredOrder.length.toLocaleString()} of ${result.rows.length.toLocaleString()} rows`
+              : `${result.rows.length.toLocaleString()} ${result.rows.length === 1 ? "row" : "rows"}`}
+            {result.truncated ? " (first 1000)" : ""}
+          </span>
+          <span className="bud-grid-foot-spacer" />
+          {pageCount > 1 && (
+            <span className="bud-pager">
+              <button title="Previous page" disabled={curPage === 0} onClick={() => setPage(curPage - 1)}>
+                <IconChevronLeft size={14} stroke={2} />
+              </button>
+              <span className="bud-pager-info">
+                {curPage + 1} / {pageCount}
+              </span>
+              <button title="Next page" disabled={curPage >= pageCount - 1} onClick={() => setPage(curPage + 1)}>
+                <IconChevronRight size={14} stroke={2} />
+              </button>
+            </span>
+          )}
+          <label className="bud-pagesize">
+            Rows
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(0);
+              }}
+            >
+              {[50, 100, 200, 500].map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
       {colEditor && <ColumnEditor anchor={colEditor} table={table} onClose={() => setColEditor(null)} />}
     </div>
   );

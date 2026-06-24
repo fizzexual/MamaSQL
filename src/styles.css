@@ -2914,6 +2914,34 @@ select.bud-cb-select {
 .bud-erd-tag { font-size: 8.5px; font-weight: 700; letter-spacing: 0.3px; border-radius: 3px; padding: 1px 4px; }
 .bud-erd-tag.pk { color: #e0bd6a; background: rgba(216, 165, 72, 0.18); }
 .bud-erd-tag.fk { color: #9cc4e8; background: rgba(127, 168, 208, 0.2); }
+
+/* ============================================================
+   Data grid: per-column filter row, FK jump, pagination
+   ============================================================ */
+.bud-grid-area { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.bud-grid-area .bud-grid-wrap { flex: 1; }
+
+.bud-filter-row th { position: sticky; top: 33px; z-index: 1; background: var(--bg-2); padding: 3px 6px; border-bottom: 1px solid var(--border-strong); }
+.bud-filter-row .bud-checkcol, .bud-filter-row .bud-rownum, .bud-filter-row .bud-addcol { background: var(--bg-2); }
+.bud-colfilter { width: 100%; box-sizing: border-box; background: var(--input-bg); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; font-size: 11.5px; color: var(--text); font-family: var(--sans); }
+.bud-colfilter:focus { outline: none; border-color: var(--accent); }
+.bud-colfilter::placeholder { color: var(--faint); }
+
+.bud-fk-cell { position: relative; }
+.bud-fk-jump { display: none; align-items: center; justify-content: center; background: var(--accent-soft); border: none; color: var(--accent-2); border-radius: 3px; width: 16px; height: 16px; margin-left: 6px; cursor: pointer; vertical-align: middle; }
+.bud-grid tbody tr:hover .bud-fk-jump { display: inline-flex; }
+.bud-fk-jump:hover { background: var(--accent); color: #fff; }
+
+.bud-grid-foot { display: flex; align-items: center; gap: 14px; padding: 5px 12px; background: var(--bg-2); border-top: 1px solid var(--border); font-size: 11.5px; color: var(--muted); flex: none; }
+.bud-grid-foot-info { font-variant-numeric: tabular-nums; }
+.bud-grid-foot-spacer { flex: 1; }
+.bud-pager { display: inline-flex; align-items: center; gap: 6px; }
+.bud-pager button { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 20px; border: 1px solid var(--border-strong); background: var(--input-bg); color: var(--muted); border-radius: 4px; cursor: pointer; }
+.bud-pager button:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+.bud-pager button:disabled { opacity: 0.4; cursor: default; }
+.bud-pager-info { font-variant-numeric: tabular-nums; min-width: 44px; text-align: center; }
+.bud-pagesize { display: inline-flex; align-items: center; gap: 6px; }
+.bud-pagesize select { background: var(--input-bg); border: 1px solid var(--border-strong); color: var(--text); border-radius: 4px; padding: 2px 6px; font-size: 11.5px; }
 .bud-field-hint { font-size: 11px; color: var(--faint); font-weight: 400; line-height: 1.4; }
 
 /* ============================================================

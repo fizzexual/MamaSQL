@@ -177,6 +177,7 @@ export interface AppStore {
   selection: number[];
   scripts: SavedItem[];
   favorites: SavedItem[];
+  pendingColFilter: { column: string; value: string } | null;
 
   loadConnections: () => Promise<void>;
   restoreSession: () => Promise<void>;
@@ -192,6 +193,8 @@ export interface AppStore {
   run: () => Promise<void>;
   loadHistory: () => Promise<void>;
   openTableData: (table: string) => Promise<void>;
+  navigateFk: (refTable: string, refColumn: string, value: unknown) => Promise<void>;
+  setPendingColFilter: (v: { column: string; value: string } | null) => void;
   editCell: (rowIndex: number, colIndex: number, value: unknown) => Promise<void>;
   deleteRowAt: (rowIndex: number) => Promise<void>;
   addRow: (columns: string[], values: unknown[]) => Promise<void>;
@@ -258,6 +261,7 @@ export const useStore = create<AppStore>((set, get) => ({
   selection: [],
   scripts: loadSaved(SCRIPTS_KEY),
   favorites: loadSaved(FAVS_KEY),
+  pendingColFilter: null,
 
   loadConnections: async () => {
     set({ connections: await backend.listConnections() });
@@ -446,10 +450,17 @@ export const useStore = create<AppStore>((set, get) => ({
     set({ history: await backend.recentHistory(50) });
   },
 
+  navigateFk: async (refTable, refColumn, value) => {
+    set({ pendingColFilter: { column: refColumn, value: value == null ? "" : String(value) } });
+    await get().openTableData(refTable);
+  },
+
+  setPendingColFilter: (v) => set({ pendingColFilter: v }),
+
   openTableData: async (table) => {
     const id = get().activeConnectionId;
     if (!id) return;
-    const sql = `SELECT * FROM ${table} LIMIT 200;`;
+    const sql = `SELECT * FROM ${table} LIMIT 1000;`;
     set({
       view: "data",
       topView: "data",
