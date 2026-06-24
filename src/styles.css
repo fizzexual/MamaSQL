@@ -3014,6 +3014,18 @@ select.bud-cb-select {
 .bud-diff-row.chg { color: #fbbf24; background: rgba(245,158,11,.08); }
 .bud-diff-note { color: var(--muted); }
 
+/* Transaction mode controls */
+.bud-tb-toggle { font-size: 10.5px; font-weight: 600; letter-spacing: .03em; padding: 0 8px; border-radius: 4px; color: var(--muted); }
+.bud-tb-toggle.on { background: rgba(245,158,11,.18); color: #fbbf24; }
+.bud-tb-commit.live { color: #4ade80 !important; }
+.bud-tb-rollback.live { color: #f87171 !important; }
+.bud-ed-uncommitted { color: #fbbf24; font-size: 11px; font-weight: 600; }
+.bud-ed-commitmode { cursor: pointer; background: none; border: none; font: inherit; }
+.bud-ed-commitmode:hover { color: var(--text); }
+.bud-status-txn { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #fbbf24; padding: 0 4px; }
+.bud-status-txn button { background: var(--bg-3); border: 1px solid var(--border); color: var(--text); border-radius: 3px; padding: 1px 7px; font-size: 10.5px; cursor: pointer; }
+.bud-status-txn button:hover { border-color: var(--accent); color: var(--accent); }
+
 .bud-fk-cell { position: relative; }
 .bud-fk-jump { display: none; align-items: center; justify-content: center; background: var(--accent-soft); border: none; color: var(--accent-2); border-radius: 3px; width: 16px; height: 16px; margin-left: 6px; cursor: pointer; vertical-align: middle; }
 .bud-grid tbody tr:hover .bud-fk-jump { display: inline-flex; }

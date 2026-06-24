@@ -210,6 +210,12 @@ export interface AppStore {
   navigateFk: (refTable: string, refColumn: string, value: unknown) => Promise<void>;
   setPendingColFilter: (v: { column: string; value: string } | null) => void;
   toggleReadOnly: (id: string) => void;
+  autoCommit: boolean;
+  txnDirty: boolean;
+  setAutoCommit: (v: boolean) => void;
+  beginTxnIfManual: () => Promise<void>;
+  commitTxn: () => Promise<void>;
+  rollbackTxn: () => Promise<void>;
   editCell: (rowIndex: number, colIndex: number, value: unknown) => Promise<void>;
   deleteRowAt: (rowIndex: number) => Promise<void>;
   addRow: (columns: string[], values: unknown[]) => Promise<void>;
@@ -292,6 +298,54 @@ export const useStore = create<AppStore>((set, get) => ({
       toast(readOnlyConns.includes(id) ? "Read-only mode on — writes are blocked." : "Read-only mode off.", "info");
       return { readOnlyConns };
     }),
+
+  autoCommit: true,
+  txnDirty: false,
+
+  setAutoCommit: (v) => {
+    if (!v) {
+      set({ autoCommit: false });
+      toast("Manual commit — writes run in a transaction until you commit.", "info");
+      return;
+    }
+    void (async () => {
+      if (get().txnDirty) await get().commitTxn();
+      set({ autoCommit: true });
+      toast("Auto-commit on.", "info");
+    })();
+  },
+
+  beginTxnIfManual: async () => {
+    const { autoCommit, txnDirty, activeConnectionId } = get();
+    if (autoCommit || txnDirty || !activeConnectionId) return;
+    await backend.runQuery(activeConnectionId, "BEGIN");
+    set({ txnDirty: true });
+  },
+
+  commitTxn: async () => {
+    const { txnDirty, activeConnectionId } = get();
+    if (!txnDirty || !activeConnectionId) return;
+    try {
+      await backend.runQuery(activeConnectionId, "COMMIT");
+      set({ txnDirty: false });
+      toast("Transaction committed.", "success");
+    } catch (e) {
+      toast(normalizeError(e).message ?? "Commit failed", "error");
+    }
+  },
+
+  rollbackTxn: async () => {
+    const { txnDirty, activeConnectionId, editTable } = get();
+    if (!txnDirty || !activeConnectionId) return;
+    try {
+      await backend.runQuery(activeConnectionId, "ROLLBACK");
+      set({ txnDirty: false });
+      toast("Transaction rolled back.", "info");
+      if (editTable) await get().reload(editTable.table);
+    } catch (e) {
+      toast(normalizeError(e).message ?? "Rollback failed", "error");
+    }
+  },
 
   loadConnections: async () => {
     set({ connections: await backend.listConnections() });
@@ -473,6 +527,7 @@ export const useStore = create<AppStore>((set, get) => ({
     const finalSql = await resolveParams(sql);
     if (finalSql == null) return; // a parameter prompt was cancelled
     if (!(await confirmIfDestructive(finalSql))) return;
+    if (isWrite(finalSql)) await get().beginTxnIfManual();
     set({ running: true, view: "sql", topView: "data" });
     try {
       const result = await backend.runQuery(activeConnectionId, finalSql);

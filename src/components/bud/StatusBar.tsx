@@ -7,6 +7,9 @@ export function StatusBar() {
   const loadingResult = useStore((s) => s.loadingResult);
   const selection = useStore((s) => s.selection);
   const readOnly = useStore((s) => s.readOnlyConns.includes(s.activeConnectionId ?? ""));
+  const txnDirty = useStore((s) => s.txnDirty);
+  const rollbackTxn = useStore((s) => s.rollbackTxn);
+  const commitTxn = useStore((s) => s.commitTxn);
 
   const rows = result?.rows.length ?? 0;
   const sel = selection.length;
@@ -42,6 +45,13 @@ export function StatusBar() {
         )}
       </div>
       <div className="bud-status-r">
+        {txnDirty && (
+          <span className="bud-status-txn" title="Uncommitted transaction">
+            <button onClick={() => void commitTxn()}>Commit</button>
+            <button onClick={() => void rollbackTxn()}>Rollback</button>
+            ● Uncommitted
+          </span>
+        )}
         {loadingResult && <span className="bud-status-item">Loading…</span>}
         {sel > 0 && <span className="bud-status-item accent">{sel} selected</span>}
         <span className="bud-status-item">{secs}/0.000 sec</span>

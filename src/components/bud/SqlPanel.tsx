@@ -114,6 +114,12 @@ export function SqlPanel() {
   const res = useStore((s) => s.editorResults[s.activeEditorId] ?? null);
   const err = useStore((s) => s.editorErrors[s.activeEditorId] ?? null);
   const setEditorResult = useStore((s) => s.setEditorResult);
+  const autoCommit = useStore((s) => s.autoCommit);
+  const txnDirty = useStore((s) => s.txnDirty);
+  const setAutoCommit = useStore((s) => s.setAutoCommit);
+  const beginTxnIfManual = useStore((s) => s.beginTxnIfManual);
+  const commitTxn = useStore((s) => s.commitTxn);
+  const rollbackTxn = useStore((s) => s.rollbackTxn);
 
   const [running, setRunning] = useState(false);
   const [tab, setTab] = useState<Tab>("result");
@@ -149,6 +155,7 @@ export function SqlPanel() {
     const finalText = await resolveParams(text);
     if (finalText == null) return; // a parameter prompt was cancelled
     if (!(await confirmIfDestructive(finalText))) return;
+    if (isWrite(finalText)) await beginTxnIfManual();
     const id = ++runId.current;
     const edId = activeEditorId;
     setRunning(true);
@@ -352,10 +359,17 @@ export function SqlPanel() {
           <IconPlayerStop size={15} stroke={1.8} />
         </button>
         <span className="bud-tb-sep" />
-        <button title="Commit (auto-commit on)" disabled>
+        <button
+          className={`bud-tb-toggle ${autoCommit ? "" : "on"}`}
+          title={autoCommit ? "Auto-commit is on — click for manual transactions" : "Manual commit — writes run in a transaction"}
+          onClick={() => setAutoCommit(!autoCommit)}
+        >
+          {autoCommit ? "Auto" : "Manual"}
+        </button>
+        <button className={`bud-tb-commit ${txnDirty ? "live" : ""}`} title="Commit transaction" onClick={() => void commitTxn()} disabled={!txnDirty}>
           <IconCheck size={15} stroke={1.8} />
         </button>
-        <button title="Rollback (auto-commit on)" disabled>
+        <button className={`bud-tb-rollback ${txnDirty ? "live" : ""}`} title="Rollback transaction" onClick={() => void rollbackTxn()} disabled={!txnDirty}>
           <IconArrowBackUp size={15} stroke={1.8} />
         </button>
         <span className="bud-tb-sep" />
@@ -525,8 +539,11 @@ export function SqlPanel() {
               {res.rows.length} {res.rows.length === 1 ? "row" : "rows"} · {res.elapsedMs} ms
             </span>
           )}
+          {txnDirty && <span className="bud-ed-uncommitted" title="Uncommitted changes — Commit or Rollback">● Uncommitted</span>}
           <span className="bud-ed-eol">LF</span>
-          <span className="bud-ed-eol">Auto Commit: ON</span>
+          <button className="bud-ed-eol bud-ed-commitmode" onClick={() => setAutoCommit(!autoCommit)} title="Toggle auto-commit">
+            Auto Commit: {autoCommit ? "ON" : "OFF"}
+          </button>
           <span className="bud-ed-eol">UTF-8</span>
         </div>
       </div>

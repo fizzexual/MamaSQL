@@ -99,6 +99,9 @@ async function idbDel(key: string): Promise<void> {
 class LocalBackend implements Backend {
   private sql: Promise<SqlJsStatic> | null = null;
   private open = new Map<string, Database>();
+  // Connection ids with an open manual transaction — persistence is deferred
+  // until COMMIT/ROLLBACK so a half-finished transaction can't survive a reload.
+  private txn = new Set<string>();
 
   private SQL(): Promise<SqlJsStatic> {
     if (!this.sql) this.sql = initSqlJs({ locateFile: () => sqlWasmUrl });
@@ -196,7 +199,11 @@ class LocalBackend implements Backend {
       throw queryErr(e);
     }
     const elapsedMs = Math.max(1, Math.round(performance.now() - started));
-    if (!/^\s*(select|with|pragma|explain)\b/i.test(sql)) await this.persist(connectionId);
+    const s = sql.trim().toLowerCase();
+    if (/^begin\b/.test(s)) this.txn.add(connectionId);
+    else if (/^(commit|end|rollback)\b/.test(s)) this.txn.delete(connectionId);
+    const isWrite = !/^\s*(select|with|pragma|explain)\b/i.test(sql);
+    if (isWrite && !this.txn.has(connectionId)) await this.persist(connectionId);
     return { columns, rows, rowsAffected: db.getRowsModified(), elapsedMs, truncated: false };
   }
 
