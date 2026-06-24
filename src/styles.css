@@ -2885,6 +2885,35 @@ select.bud-cb-select {
 /* new-editor tab button */
 .bud-qtab-new { display: inline-flex; align-items: center; justify-content: center; width: 30px; flex: none; border: none; border-right: 1px solid var(--border); background: transparent; color: var(--muted); cursor: pointer; }
 .bud-qtab-new:hover { background: var(--panel-2); color: var(--text); }
+
+/* ============================================================
+   ER / schema diagram
+   ============================================================ */
+.bud-erd-backdrop { position: fixed; inset: 0; z-index: 95; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(3px); display: grid; place-items: center; padding: 24px; }
+.bud-erd { width: min(1200px, 96vw); height: min(800px, 92vh); display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 9px; box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6); overflow: hidden; }
+.bud-erd-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); flex: none; }
+.bud-erd-title { font-size: 14px; font-weight: 700; color: var(--text); display: flex; align-items: baseline; gap: 10px; }
+.bud-erd-sub { font-size: 12px; font-weight: 400; color: var(--muted); }
+.bud-erd-close { background: none; border: none; color: var(--muted); display: inline-flex; padding: 4px; border-radius: 6px; cursor: pointer; }
+.bud-erd-close:hover { background: var(--panel-2); color: var(--text); }
+.bud-erd-canvas { position: relative; flex: 1; min-height: 0; overflow: auto; background: var(--bg); background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px); background-size: 22px 22px; }
+.bud-erd-svg { position: absolute; top: 0; left: 0; pointer-events: none; z-index: 0; }
+.bud-erd-line { fill: none; stroke: var(--accent-2); stroke-width: 1.6; opacity: 0.75; }
+.bud-erd-dot { fill: var(--accent-2); }
+.bud-erd-boxes { position: relative; z-index: 1; display: flex; flex-wrap: wrap; gap: 30px; padding: 30px; align-content: flex-start; }
+.bud-erd-box { width: 232px; background: var(--panel-2); border: 1px solid var(--border-strong); border-radius: 7px; overflow: hidden; box-shadow: var(--elev-2); align-self: flex-start; }
+.bud-erd-box-head { display: flex; align-items: center; gap: 7px; padding: 7px 10px; font-size: 12.5px; font-weight: 600; color: #fff; background: var(--accent); }
+.bud-erd-box-head svg { flex: none; }
+.bud-erd-cols { display: flex; flex-direction: column; }
+.bud-erd-col { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 8px; padding: 4px 10px; font-size: 12px; border-top: 1px solid var(--border); }
+.bud-erd-col.dim { color: var(--faint); font-style: italic; grid-template-columns: 1fr; }
+.bud-erd-col-name { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bud-erd-col-name.pk { font-weight: 700; }
+.bud-erd-col-type { color: var(--faint); font-family: var(--mono); font-size: 10.5px; white-space: nowrap; }
+.bud-erd-col-tags { display: inline-flex; gap: 3px; }
+.bud-erd-tag { font-size: 8.5px; font-weight: 700; letter-spacing: 0.3px; border-radius: 3px; padding: 1px 4px; }
+.bud-erd-tag.pk { color: #e0bd6a; background: rgba(216, 165, 72, 0.18); }
+.bud-erd-tag.fk { color: #9cc4e8; background: rgba(127, 168, 208, 0.2); }
 .bud-field-hint { font-size: 11px; color: var(--faint); font-weight: 400; line-height: 1.4; }
 
 /* ============================================================

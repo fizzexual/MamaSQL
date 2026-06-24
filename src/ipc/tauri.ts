@@ -3,6 +3,7 @@ import type { Backend } from "./backend";
 import type {
   ColumnInfo,
   ConnectionConfig,
+  ForeignKey,
   HistoryEntry,
   QueryResult,
   TableInfo,
@@ -28,6 +29,7 @@ export const tauriBackend: Backend = {
     invoke<TableInfo[]>("list_tables", { connectionId }),
   listColumns: (connectionId, table) =>
     invoke<ColumnInfo[]>("list_columns", { connectionId, table }),
+  listForeignKeys: (connectionId) => invoke<ForeignKey[]>("list_foreign_keys", { connectionId }),
   recentHistory: (limit) => invoke<HistoryEntry[]>("recent_history", { limit }),
   updateCell: (connectionId, table, pkColumn, pkValue, column, value) =>
     invoke<void>("update_cell", { connectionId, table, pkColumn, pkValue, column, value }),

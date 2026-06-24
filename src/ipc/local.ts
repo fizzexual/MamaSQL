@@ -12,6 +12,7 @@ import type {
   ColumnDef,
   ColumnInfo,
   ConnectionConfig,
+  ForeignKey,
   HistoryEntry,
   QueryResult,
   TableInfo,
@@ -219,6 +220,24 @@ class LocalBackend implements Backend {
       isPrimaryKey: Number(r[5]) > 0,
     }));
   }
+  async listForeignKeys(connectionId: string): Promise<ForeignKey[]> {
+    const db = await this.ensureDb(connectionId);
+    const tablesRes = db.exec(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+    );
+    const names = (tablesRes.length ? tablesRes[0].values : []).map((r) => String(r[0]));
+    const out: ForeignKey[] = [];
+    for (const t of names) {
+      const res = db.exec(`PRAGMA foreign_key_list(${q(t)})`);
+      const rows = res.length ? res[0].values : [];
+      // columns: id, seq, table(ref), from, to, on_update, on_delete, match
+      for (const r of rows) {
+        out.push({ table: t, column: String(r[3]), refTable: String(r[2]), refColumn: r[4] == null ? "" : String(r[4]) });
+      }
+    }
+    return out;
+  }
+
   async recentHistory(limit: number): Promise<HistoryEntry[]> {
     try {
       const raw = JSON.parse(localStorage.getItem(HIST_KEY) ?? "[]");

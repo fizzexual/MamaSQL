@@ -16,6 +16,7 @@ import {
   IconPencil,
   IconPlus,
   IconRefresh,
+  IconSchema,
   IconSearch,
   IconSettings,
   IconStar,
@@ -140,6 +141,9 @@ export function Sources({
         </button>
         <button className={searchOpen ? "on" : ""} title="Filter objects" onClick={() => setSearchOpen((v) => !v)}>
           <IconFilter size={15} stroke={1.7} />
+        </button>
+        <button title="Schema diagram (ER)" onClick={() => window.dispatchEvent(new Event("mamasql:erd"))}>
+          <IconSchema size={15} stroke={1.7} />
         </button>
         <span className="bud-tree-toolbar-sp" />
         <button title="Tree layout">
@@ -401,6 +405,7 @@ function TableRow({ table, connectionId }: { table: string; connectionId: string
   const views = useStore((s) => s.views);
   const loadSql = useStore((s) => s.loadSql);
   const addColumn = useStore((s) => s.addColumn);
+  const showTableDdl = useStore((s) => s.showTableDdl);
   const myViews = views.filter((v) => v.connectionId === connectionId && v.table === table);
   const tableActive = editTable?.table === table && activeViewId === null;
 
@@ -438,6 +443,7 @@ function TableRow({ table, connectionId }: { table: string; connectionId: string
     { label: "Refresh", icon: (<IconRefresh size={15} stroke={1.7} />), onClick: () => void reload(table) },
     { divider: true },
     { label: "Generate SELECT", icon: (<IconCode size={15} stroke={1.7} />), onClick: () => loadSql(`SELECT * FROM ${table} LIMIT 100;`) },
+    { label: "Show CREATE (DDL)", icon: (<IconSchema size={15} stroke={1.7} />), onClick: () => void showTableDdl(table) },
     { label: "Count rows", icon: (<IconHash size={15} stroke={1.7} />), onClick: () => loadSql(`SELECT count(*) FROM ${table};`) },
     { label: "Add column…", icon: (<IconColumnInsertRight size={15} stroke={1.7} />), onClick: () => void addColumnTo() },
     { label: "Copy name", icon: (<IconCopy size={15} stroke={1.7} />), onClick: copyName },

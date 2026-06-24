@@ -78,6 +78,7 @@ export const webBackend: Backend = {
   },
   listTables: (id) => sub(id).listTables(id),
   listColumns: (id, table) => sub(id).listColumns(id, table),
+  listForeignKeys: (id) => sub(id).listForeignKeys(id),
   recentHistory: async (limit) => readHistory().slice(0, limit),
 
   updateCell: (id, table, pkColumn, pkValue, column, value) =>

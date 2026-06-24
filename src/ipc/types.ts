@@ -38,6 +38,14 @@ export interface ColumnInfo {
   isPrimaryKey: boolean;
 }
 
+/** A foreign-key relationship: table.column references refTable.refColumn. */
+export interface ForeignKey {
+  table: string;
+  column: string;
+  refTable: string;
+  refColumn: string;
+}
+
 export interface ColumnDef {
   name: string;
   dataType: string;

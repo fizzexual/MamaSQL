@@ -120,6 +120,7 @@ export const httpBackend: Backend = {
   runQuery: (id, sql) => withReopen(id, "query", { id, sql }),
   listTables: (id) => withReopen(id, "tables", { id }),
   listColumns: (id, table) => withReopen(id, "columns", { id, table }),
+  listForeignKeys: (id) => withReopen(id, "foreignKeys", { id }),
   recentHistory: async () => [],
   updateCell: (id, table, pkColumn, pkValue, column, value) =>
     withReopen<void>(id, "updateCell", { id, table, pkColumn, pkValue, column, value }).then(() => {}),

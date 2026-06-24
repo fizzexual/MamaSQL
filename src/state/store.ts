@@ -222,6 +222,7 @@ export interface AppStore {
   deleteSelected: () => Promise<void>;
   duplicateSelected: () => Promise<void>;
   loadSql: (sql: string) => void;
+  showTableDdl: (table: string) => Promise<void>;
   saveScript: (name: string, sql: string) => void;
   deleteScript: (id: string) => void;
   saveFavorite: (name: string, sql: string) => void;
@@ -366,6 +367,31 @@ export const useStore = create<AppStore>((set, get) => ({
       persistEditors(s.editors, id);
       return { activeEditorId: id, sql: ed.sql, view: "sql", topView: "data" };
     }),
+
+  showTableDdl: async (table) => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    let cols = get().schema.columnsByTable[table];
+    if (!cols) {
+      try {
+        cols = await backend.listColumns(id, table);
+      } catch {
+        cols = [];
+      }
+    }
+    const quote = (n: string) => `"${n.replace(/"/g, '""')}"`;
+    const lines = cols.map((c) => {
+      let s = `  ${quote(c.name)} ${c.dataType || "TEXT"}`;
+      if (c.isPrimaryKey) s += " PRIMARY KEY";
+      else if (!c.nullable) s += " NOT NULL";
+      return s;
+    });
+    const ddl = lines.length
+      ? `CREATE TABLE ${quote(table)} (\n${lines.join(",\n")}\n);`
+      : `-- No column information available for ${table}`;
+    get().newEditor();
+    get().setSql(ddl);
+  },
 
   closeEditor: (id) =>
     set((s) => {

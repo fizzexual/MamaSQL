@@ -4,6 +4,7 @@ import type {
   ColumnDef,
   ColumnInfo,
   ConnectionConfig,
+  ForeignKey,
   HistoryEntry,
   QueryResult,
   TableInfo,
@@ -22,6 +23,7 @@ export interface Backend {
   runQuery(connectionId: string, sql: string): Promise<QueryResult>;
   listTables(connectionId: string): Promise<TableInfo[]>;
   listColumns(connectionId: string, table: string): Promise<ColumnInfo[]>;
+  listForeignKeys(connectionId: string): Promise<ForeignKey[]>;
   recentHistory(limit: number): Promise<HistoryEntry[]>;
   updateCell(
     connectionId: string,
