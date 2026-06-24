@@ -51,7 +51,7 @@ export const webBackend: Backend = {
   listConnections: () => localBackend.listConnections(),
   saveConnection: async (cfg, password = null) => {
     await localBackend.saveConnection(cfg, password);
-    if (cfg.engine !== "sqlite") saveSecret(cfg.id, password);
+    if (cfg.engine !== "sqlite") await saveSecret(cfg.id, password);
   },
   deleteConnection: async (id) => {
     try {

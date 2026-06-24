@@ -21,6 +21,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { getBackend } from "../../ipc/backend";
 import { download, toCsv, toJson } from "../../lib/csv";
 import { promptDialog } from "../../state/dialog";
+import { confirmIfDestructive, isWrite } from "../../state/safety";
 import { toast } from "../../state/toast";
 import type { AppError, Column } from "../../ipc/types";
 import { useStore } from "../../state/store";
@@ -113,6 +114,7 @@ export function SqlPanel() {
   const saveScript = useStore((s) => s.saveScript);
   const saveFavorite = useStore((s) => s.saveFavorite);
   const activeEditorId = useStore((s) => s.activeEditorId);
+  const readOnly = useStore((s) => s.readOnlyConns.includes(s.activeConnectionId ?? ""));
   const res = useStore((s) => s.editorResults[s.activeEditorId] ?? null);
   const err = useStore((s) => s.editorErrors[s.activeEditorId] ?? null);
   const setEditorResult = useStore((s) => s.setEditorResult);
@@ -144,6 +146,11 @@ export function SqlPanel() {
 
   const exec = async (text = sql) => {
     if (!connId || running) return;
+    if (readOnly && isWrite(text)) {
+      toast("Connection is read-only — writes are blocked.", "error");
+      return;
+    }
+    if (!(await confirmIfDestructive(text))) return;
     const id = ++runId.current;
     const edId = activeEditorId;
     setRunning(true);

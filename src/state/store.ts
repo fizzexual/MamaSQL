@@ -1,6 +1,17 @@
 import { create } from "zustand";
 import { getBackend } from "../ipc/backend";
+import { confirmIfDestructive, isWrite } from "./safety";
 import { toast } from "./toast";
+
+const READONLY_KEY = "mamasql.readonly";
+function loadReadOnly(): string[] {
+  try {
+    const raw = JSON.parse(localStorage.getItem(READONLY_KEY) ?? "[]");
+    return Array.isArray(raw) ? raw.map(String) : [];
+  } catch {
+    return [];
+  }
+}
 import type {
   AppError,
   ColumnDef,
@@ -178,6 +189,7 @@ export interface AppStore {
   scripts: SavedItem[];
   favorites: SavedItem[];
   pendingColFilter: { column: string; value: string } | null;
+  readOnlyConns: string[];
 
   loadConnections: () => Promise<void>;
   restoreSession: () => Promise<void>;
@@ -195,6 +207,7 @@ export interface AppStore {
   openTableData: (table: string) => Promise<void>;
   navigateFk: (refTable: string, refColumn: string, value: unknown) => Promise<void>;
   setPendingColFilter: (v: { column: string; value: string } | null) => void;
+  toggleReadOnly: (id: string) => void;
   editCell: (rowIndex: number, colIndex: number, value: unknown) => Promise<void>;
   deleteRowAt: (rowIndex: number) => Promise<void>;
   addRow: (columns: string[], values: unknown[]) => Promise<void>;
@@ -262,6 +275,21 @@ export const useStore = create<AppStore>((set, get) => ({
   scripts: loadSaved(SCRIPTS_KEY),
   favorites: loadSaved(FAVS_KEY),
   pendingColFilter: null,
+  readOnlyConns: loadReadOnly(),
+
+  toggleReadOnly: (id) =>
+    set((s) => {
+      const readOnlyConns = s.readOnlyConns.includes(id)
+        ? s.readOnlyConns.filter((x) => x !== id)
+        : [...s.readOnlyConns, id];
+      try {
+        localStorage.setItem(READONLY_KEY, JSON.stringify(readOnlyConns));
+      } catch {
+        /* ignore */
+      }
+      toast(readOnlyConns.includes(id) ? "Read-only mode on — writes are blocked." : "Read-only mode off.", "info");
+      return { readOnlyConns };
+    }),
 
   loadConnections: async () => {
     set({ connections: await backend.listConnections() });
@@ -429,19 +457,26 @@ export const useStore = create<AppStore>((set, get) => ({
     })),
 
   run: async () => {
-    const { activeConnectionId, sql } = get();
+    const { activeConnectionId, sql, activeEditorId, readOnlyConns } = get();
     if (!activeConnectionId) {
-      set({ error: { kind: "notConnected", message: "Open a connection first." }, result: null });
+      toast("Open a connection first.", "error");
       return;
     }
-    set({ running: true, error: null });
+    if (readOnlyConns.includes(activeConnectionId) && isWrite(sql)) {
+      toast("Connection is read-only — writes are blocked.", "error");
+      return;
+    }
+    if (!(await confirmIfDestructive(sql))) return;
+    set({ running: true, view: "sql", topView: "data" });
     try {
       const result = await backend.runQuery(activeConnectionId, sql);
-      set({ result, running: false, editTable: null });
+      get().setEditorResult(activeEditorId, result, null);
+      set({ running: false });
       await get().loadHistory();
     } catch (e) {
       const err = normalizeError(e);
-      set({ error: err, result: null, running: false });
+      get().setEditorResult(activeEditorId, null, err);
+      set({ running: false });
       toast(err.message ?? "Query failed", "error");
     }
   },
@@ -495,6 +530,7 @@ export const useStore = create<AppStore>((set, get) => ({
   editCell: async (rowIndex, colIndex, value) => {
     const { activeConnectionId, result, editTable } = get();
     if (!activeConnectionId || !result || !editTable?.pkColumn) return;
+    if (get().readOnlyConns.includes(activeConnectionId)) return toast("Read-only — writes are blocked.", "error");
     const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
     if (pkIdx < 0) return;
     const pkValue = result.rows[rowIndex][pkIdx];
@@ -520,6 +556,7 @@ export const useStore = create<AppStore>((set, get) => ({
   deleteRowAt: async (rowIndex) => {
     const { activeConnectionId, result, editTable } = get();
     if (!activeConnectionId || !result || !editTable?.pkColumn) return;
+    if (get().readOnlyConns.includes(activeConnectionId)) return toast("Read-only — writes are blocked.", "error");
     const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
     if (pkIdx < 0) return;
     const pkValue = result.rows[rowIndex][pkIdx];
@@ -544,6 +581,7 @@ export const useStore = create<AppStore>((set, get) => ({
   addRow: async (columns, values) => {
     const { activeConnectionId, editTable } = get();
     if (!activeConnectionId || !editTable) return;
+    if (get().readOnlyConns.includes(activeConnectionId)) return toast("Read-only — writes are blocked.", "error");
     try {
       await backend.insertRow(activeConnectionId, editTable.table, columns, values);
       await get().openTableData(editTable.table); // refresh to show the new row + its PK
@@ -555,6 +593,7 @@ export const useStore = create<AppStore>((set, get) => ({
   dropTable: async (table) => {
     const id = get().activeConnectionId;
     if (!id) return;
+    if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
     try {
       await backend.dropTable(id, table);
       const tables = await backend.listTables(id);
@@ -571,6 +610,7 @@ export const useStore = create<AppStore>((set, get) => ({
   createTable: async (name, columns) => {
     const id = get().activeConnectionId;
     if (!id) return;
+    if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
     try {
       await backend.createTable(id, name, columns);
       const tables = await backend.listTables(id);
@@ -630,6 +670,7 @@ export const useStore = create<AppStore>((set, get) => ({
   addColumn: async (table, column) => {
     const id = get().activeConnectionId;
     if (!id) return;
+    if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
     try {
       await backend.addColumn(id, table, column);
       await get().reload(table);
@@ -641,6 +682,7 @@ export const useStore = create<AppStore>((set, get) => ({
   dropColumn: async (table, column) => {
     const id = get().activeConnectionId;
     if (!id) return;
+    if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
     try {
       await backend.dropColumn(id, table, column);
       await get().reload(table);
@@ -652,6 +694,7 @@ export const useStore = create<AppStore>((set, get) => ({
   renameColumn: async (table, from, to) => {
     const id = get().activeConnectionId;
     if (!id) return;
+    if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
     try {
       await backend.renameColumn(id, table, from, to);
       await get().reload(table);
@@ -663,6 +706,7 @@ export const useStore = create<AppStore>((set, get) => ({
   renameTable: async (from, to) => {
     const id = get().activeConnectionId;
     if (!id) return;
+    if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
     try {
       await backend.renameTable(id, from, to);
       const tables = await backend.listTables(id);
@@ -676,6 +720,7 @@ export const useStore = create<AppStore>((set, get) => ({
   importCsv: async (table, headers, rows) => {
     const id = get().activeConnectionId;
     if (!id) return;
+    if (get().readOnlyConns.includes(id)) return toast("Read-only — writes are blocked.", "error");
     try {
       for (const r of rows) await backend.insertRow(id, table, headers, r);
       await get().reload(table);
@@ -764,6 +809,7 @@ export const useStore = create<AppStore>((set, get) => ({
   deleteSelected: async () => {
     const { activeConnectionId, result, editTable, selection } = get();
     if (!activeConnectionId || !result || !editTable?.pkColumn || selection.length === 0) return;
+    if (get().readOnlyConns.includes(activeConnectionId)) return toast("Read-only — writes are blocked.", "error");
     const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
     if (pkIdx < 0) return;
     const pks = selection.map((i) => result.rows[i][pkIdx]);
@@ -781,6 +827,7 @@ export const useStore = create<AppStore>((set, get) => ({
   duplicateSelected: async () => {
     const { activeConnectionId, result, editTable, selection } = get();
     if (!activeConnectionId || !result || !editTable || selection.length === 0) return;
+    if (get().readOnlyConns.includes(activeConnectionId)) return toast("Read-only — writes are blocked.", "error");
     const pkIdx = editTable.pkColumn ? result.columns.findIndex((c) => c.name === editTable.pkColumn) : -1;
     // Compute the next integer id when the PK looks like an auto-increment integer.
     let nextId = 0;

@@ -84,6 +84,7 @@ export function DataGrid() {
   const selectAllRows = useStore((s) => s.selectAllRows);
   const columns = useStore((s) => (editTable ? s.schema.columnsByTable[editTable.table] : undefined));
   const activeId = useStore((s) => s.activeConnectionId);
+  const readOnly = useStore((s) => s.readOnlyConns.includes(s.activeConnectionId ?? ""));
   const navigateFk = useStore((s) => s.navigateFk);
   const pendingColFilter = useStore((s) => s.pendingColFilter);
   const setPendingColFilter = useStore((s) => s.setPendingColFilter);
@@ -207,7 +208,7 @@ export function DataGrid() {
     setSort((s) => (!s || s.col !== col ? { col, dir: 1 } : s.dir === 1 ? { col, dir: -1 } : null));
 
   const startEdit = (row: number, col: number) => {
-    if (!pkCol || col === pkIdx) return;
+    if (!pkCol || col === pkIdx || readOnly) return;
     setEditing({ row, col });
     setDraft(result.rows[row][col] == null ? "" : String(result.rows[row][col]));
   };
@@ -278,7 +279,7 @@ export function DataGrid() {
               </th>
             ))}
             <th className="bud-addcol">
-              <button className="bud-addcol-btn" title="Add column" onClick={addColumnPrompt}>
+              <button className="bud-addcol-btn" title="Add column" onClick={addColumnPrompt} disabled={readOnly}>
                 <IconPlus size={14} stroke={2} />
               </button>
             </th>
@@ -411,7 +412,7 @@ export function DataGrid() {
           })}
           <tr className="bud-addrow">
             <td className="bud-checkcol">
-              <button className="bud-addrow-btn" onClick={() => setNewRow(result.columns.map(() => ""))} title="Add row">
+              <button className="bud-addrow-btn" onClick={() => setNewRow(result.columns.map(() => ""))} title="Add row" disabled={readOnly}>
                 <IconPlus size={15} stroke={2} />
               </button>
             </td>

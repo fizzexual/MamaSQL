@@ -1,4 +1,4 @@
-import { IconPlugConnected, IconPlugConnectedX } from "@tabler/icons-react";
+import { IconLock, IconPlugConnected, IconPlugConnectedX } from "@tabler/icons-react";
 import { useStore } from "../../state/store";
 
 export function StatusBar() {
@@ -6,6 +6,7 @@ export function StatusBar() {
   const result = useStore((s) => s.result);
   const loadingResult = useStore((s) => s.loadingResult);
   const selection = useStore((s) => s.selection);
+  const readOnly = useStore((s) => s.readOnlyConns.includes(s.activeConnectionId ?? ""));
 
   const rows = result?.rows.length ?? 0;
   const sel = selection.length;
@@ -27,6 +28,11 @@ export function StatusBar() {
           <span className="bud-status-conn off">
             <IconPlugConnectedX size={13} stroke={1.8} />
             Not connected
+          </span>
+        )}
+        {readOnly && (
+          <span className="bud-status-ro" title="This connection is read-only">
+            <IconLock size={12} stroke={1.9} /> Read-only
           </span>
         )}
       </div>

@@ -13,6 +13,8 @@ import {
   IconFolderOpen,
   IconHash,
   IconLayoutSidebar,
+  IconLock,
+  IconLockOpen,
   IconPencil,
   IconPlus,
   IconRefresh,
@@ -265,6 +267,8 @@ function Datasource({
   const saveConnection = useStore((s) => s.saveConnection);
   const createTable = useStore((s) => s.createTable);
   const setTopView = useStore((s) => s.setTopView);
+  const toggleReadOnly = useStore((s) => s.toggleReadOnly);
+  const isReadOnly = useStore((s) => s.readOnlyConns.includes(conn.id));
   const isActive = activeId === conn.id;
   const shownTables = filter
     ? tables.filter((t) => t.name.toLowerCase().includes(filter.toLowerCase()))
@@ -323,6 +327,11 @@ function Datasource({
         setTopView("settings");
       },
     },
+    {
+      label: isReadOnly ? "Read-only mode (on)" : "Read-only mode",
+      icon: isReadOnly ? (<IconLock size={15} stroke={1.7} />) : (<IconLockOpen size={15} stroke={1.7} />),
+      onClick: () => toggleReadOnly(conn.id),
+    },
     { label: "Copy connection string", icon: (<IconCopy size={15} stroke={1.7} />), onClick: copyString },
     { divider: true },
     { label: "Remove data source", icon: (<IconTrash size={15} stroke={1.7} />), danger: true, onClick: remove },
@@ -358,6 +367,7 @@ function Datasource({
           <EngineIcon engine={conn.engine} />
         </span>
         <span className="bud-src-name">{conn.name}</span>
+        {isReadOnly && <IconLock size={12} stroke={1.9} className="bud-ds-ro" />}
       </div>
       {isActive && (open || !!filter) && (
         <div className="bud-ds-tables">
