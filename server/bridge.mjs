@@ -5,12 +5,104 @@
 // mysql2). Run it with `npm run bridge` (or `npm run dev:all`) and the web app
 // will route Postgres/MySQL connections here automatically. SQLite stays fully
 // in-browser and does not need this server.
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import pg from "pg";
 import mysql from "mysql2/promise";
+import initSqlJs from "sql.js";
 
 const PORT = Number(process.env.BRIDGE_PORT) || 5174;
+
+// Where server-side SQLite database files live. Defaults to ./data next to the
+// repo (or /data in the container). Each database name maps to one file, so the
+// same database name is shared across browsers, tabs, and ports.
+const DATA_DIR = process.env.DATA_DIR || path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "data");
+mkdirSync(DATA_DIR, { recursive: true });
+
+const require = createRequire(import.meta.url);
+const SQLJS_DIST = path.dirname(require.resolve("sql.js"));
+let _sqlJs = null;
+function sqlJs() {
+  if (!_sqlJs) _sqlJs = initSqlJs({ locateFile: (f) => path.join(SQLJS_DIST, f) });
+  return _sqlJs;
+}
+
+/** Sanitize a database name into a safe file name. */
+function sqliteFileKey(name) {
+  const safe = String(name || "database").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "") || "database";
+  return safe;
+}
+function sqlitePath(fileKey) {
+  return path.join(DATA_DIR, `${fileKey}.sqlite`);
+}
+// One in-memory sql.js database per file, shared by every connection pointing at
+// it (so concurrent browsers see each other's writes via this single process).
+const sqliteDbs = new Map(); // fileKey -> Database
+const sqliteTxn = new Set(); // fileKeys with an open transaction (defer persist)
+
+async function openSqlite(fileKey) {
+  let db = sqliteDbs.get(fileKey);
+  if (db) return db;
+  const SQL = await sqlJs();
+  const file = sqlitePath(fileKey);
+  db = existsSync(file) ? new SQL.Database(readFileSync(file)) : new SQL.Database();
+  sqliteDbs.set(fileKey, db);
+  if (!existsSync(file)) writeFileSync(file, Buffer.from(db.export()));
+  return db;
+}
+function persistSqlite(fileKey) {
+  const db = sqliteDbs.get(fileKey);
+  if (db) writeFileSync(sqlitePath(fileKey), Buffer.from(db.export()));
+}
+function sqliteIdent(id) {
+  return `"${String(id).replace(/"/g, '""')}"`;
+}
+/** Run one statement with bound params; persist (unless inside a transaction). */
+function sqliteRun(fileKey, sql, params = []) {
+  const db = sqliteDbs.get(fileKey);
+  const st = db.prepare(sql);
+  try {
+    st.run(params);
+  } finally {
+    st.free();
+  }
+  if (!sqliteTxn.has(fileKey)) persistSqlite(fileKey);
+}
+/** Run a (possibly multi-statement) query; returns the last result set. */
+function sqliteQuery(fileKey, sql, started) {
+  const db = sqliteDbs.get(fileKey);
+  let columns = [];
+  let rows = [];
+  const res = db.exec(sql);
+  if (res.length) {
+    const last = res[res.length - 1];
+    columns = last.columns;
+    rows = last.values;
+  } else if (/^\s*(select|with|pragma)\b/i.test(sql)) {
+    try {
+      const st = db.prepare(sql);
+      columns = st.getColumnNames();
+      st.free();
+    } catch {
+      /* ignore */
+    }
+  }
+  const s = sql.trim().toLowerCase();
+  if (/^begin\b/.test(s)) sqliteTxn.add(fileKey);
+  else if (/^(commit|end|rollback)\b/.test(s)) sqliteTxn.delete(fileKey);
+  const isWrite = !/^\s*(select|with|pragma|explain)\b/i.test(sql);
+  if (isWrite && !sqliteTxn.has(fileKey)) persistSqlite(fileKey);
+  return {
+    columns: columns.map((name) => ({ name, dataType: "" })),
+    rows,
+    rowsAffected: db.getRowsModified(),
+    elapsedMs: Math.max(1, Math.round(performance.now() - started)),
+    truncated: false,
+  };
+}
 
 // When the bridge runs in a container, "localhost" means the container itself.
 // Transparently remap localhost / 127.0.0.1 / ::1 (and empty) to the host
@@ -131,12 +223,22 @@ const handlers = {
   },
 
   async test({ cfg, password }) {
+    if (cfg.engine === "sqlite") {
+      await sqlJs();
+      return { ok: true };
+    }
     const conn = await connect(cfg, password);
     await closeConn({ engine: cfg.engine, conn });
     return { ok: true };
   },
 
   async databases({ cfg, password }) {
+    if (cfg.engine === "sqlite") {
+      return readdirSync(DATA_DIR)
+        .filter((f) => f.endsWith(".sqlite"))
+        .map((f) => f.replace(/\.sqlite$/, ""))
+        .sort();
+    }
     // connect to the server's default db so we can list everything
     const base = { ...cfg, database: cfg.engine === "postgres" ? "postgres" : "" };
     const conn = await connect(base, password);
@@ -153,6 +255,12 @@ const handlers = {
   },
 
   async createDatabase({ cfg, password, name }) {
+    if (cfg.engine === "sqlite") {
+      const key = sqliteFileKey(name);
+      await openSqlite(key);
+      persistSqlite(key);
+      return { ok: true };
+    }
     const safe = String(name).replace(/[^A-Za-z0-9_]/g, "");
     if (!safe) throw new Error("Invalid database name");
     const base = { ...cfg, database: cfg.engine === "postgres" ? "postgres" : "" };
@@ -166,6 +274,12 @@ const handlers = {
   },
 
   async open({ id, cfg, password }) {
+    if (cfg.engine === "sqlite") {
+      const fileKey = sqliteFileKey(cfg.database);
+      await openSqlite(fileKey);
+      pools.set(id, { engine: "sqlite", conn: null, fileKey });
+      return { ok: true };
+    }
     const existing = pools.get(id);
     if (existing) await closeConn(existing);
     const conn = await connect(cfg, password);
@@ -176,21 +290,30 @@ const handlers = {
   async close({ id }) {
     const e = pools.get(id);
     if (e) {
-      await closeConn(e);
+      // Keep the shared sqlite db cached for other connections; just drop pg/mysql.
+      if (e.engine !== "sqlite") await closeConn(e);
       pools.delete(id);
     }
     return { ok: true };
   },
 
   async query({ id, sql }) {
-    const { engine, conn } = need(id);
+    const e = need(id);
     const started = performance.now();
-    const raw = await rawArrayRows(engine, conn, sql);
+    if (e.engine === "sqlite") return sqliteQuery(e.fileKey, sql, started);
+    const raw = await rawArrayRows(e.engine, e.conn, sql);
     return toResult(raw, started);
   },
 
   async tables({ id }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      const r = sqliteDbs
+        .get(fileKey)
+        .exec("SELECT name, type FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%' ORDER BY name");
+      const rows = r.length ? r[0].values : [];
+      return rows.map((row) => ({ name: String(row[0]), kind: String(row[1]), schema: null }));
+    }
     const sql =
       engine === "postgres"
         ? "SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = current_schema() ORDER BY table_name"
@@ -200,7 +323,17 @@ const handlers = {
   },
 
   async columns({ id, table }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      const r = sqliteDbs.get(fileKey).exec(`PRAGMA table_info(${sqliteIdent(table)})`);
+      const rows = r.length ? r[0].values : [];
+      return rows.map((row) => ({
+        name: String(row[1]),
+        dataType: row[2] ? String(row[2]) : "",
+        nullable: Number(row[3]) === 0,
+        isPrimaryKey: Number(row[5]) > 0,
+      }));
+    }
     if (engine === "postgres") {
       const sql = `
         SELECT c.column_name, c.data_type, c.is_nullable,
@@ -235,7 +368,20 @@ const handlers = {
   },
 
   async foreignKeys({ id }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      const db = sqliteDbs.get(fileKey);
+      const tr = db.exec("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name");
+      const names = (tr.length ? tr[0].values : []).map((r) => String(r[0]));
+      const out = [];
+      for (const t of names) {
+        const r = db.exec(`PRAGMA foreign_key_list(${sqliteIdent(t)})`);
+        for (const row of r.length ? r[0].values : []) {
+          out.push({ table: t, column: String(row[3]), refTable: String(row[2]), refColumn: row[4] == null ? "" : String(row[4]) });
+        }
+      }
+      return out;
+    }
     const sql =
       engine === "postgres"
         ? `SELECT tc.table_name, kcu.column_name, ccu.table_name AS ref_table, ccu.column_name AS ref_column
@@ -258,20 +404,38 @@ const handlers = {
   },
 
   async updateCell({ id, table, pkColumn, pkValue, column, value }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      sqliteRun(fileKey, `UPDATE ${sqliteIdent(table)} SET ${sqliteIdent(column)} = ? WHERE ${sqliteIdent(pkColumn)} = ?`, [value, pkValue]);
+      return { ok: true };
+    }
     const Q = quote[engine];
     const P = placeholder[engine];
     await conn.query(`UPDATE ${Q(table)} SET ${Q(column)} = ${P(0)} WHERE ${Q(pkColumn)} = ${P(1)}`, [value, pkValue]);
     return { ok: true };
   },
   async deleteRow({ id, table, pkColumn, pkValue }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      sqliteRun(fileKey, `DELETE FROM ${sqliteIdent(table)} WHERE ${sqliteIdent(pkColumn)} = ?`, [pkValue]);
+      return { ok: true };
+    }
     const Q = quote[engine];
     await conn.query(`DELETE FROM ${Q(table)} WHERE ${Q(pkColumn)} = ${placeholder[engine](0)}`, [pkValue]);
     return { ok: true };
   },
   async insertRow({ id, table, columns, values }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      if (columns.length === 0) {
+        sqliteRun(fileKey, `INSERT INTO ${sqliteIdent(table)} DEFAULT VALUES`);
+      } else {
+        const cols = columns.map(sqliteIdent).join(", ");
+        const ph = columns.map(() => "?").join(", ");
+        sqliteRun(fileKey, `INSERT INTO ${sqliteIdent(table)} (${cols}) VALUES (${ph})`, values);
+      }
+      return { ok: true };
+    }
     const Q = quote[engine];
     const cols = columns.map(Q).join(", ");
     const ph = columns.map((_, i) => placeholder[engine](i)).join(", ");
@@ -279,14 +443,31 @@ const handlers = {
     return { ok: true };
   },
   async dropTable({ id, table }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      sqliteRun(fileKey, `DROP TABLE IF EXISTS ${sqliteIdent(table)}`);
+      return { ok: true };
+    }
     await conn.query(`DROP TABLE IF EXISTS ${quote[engine](table)}`);
     return { ok: true };
   },
   async createTable({ id, name, columns }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    const cols = columns.length ? columns : [{ name: "id", dataType: "INTEGER", nullable: false, primaryKey: true }];
+    if (engine === "sqlite") {
+      const defs = cols
+        .map((c) => {
+          const parts = [sqliteIdent(c.name), c.dataType || "TEXT"];
+          if (c.primaryKey) parts.push("PRIMARY KEY");
+          else if (!c.nullable) parts.push("NOT NULL");
+          return parts.join(" ");
+        })
+        .join(", ");
+      sqliteRun(fileKey, `CREATE TABLE ${sqliteIdent(name)} (${defs})`);
+      return { ok: true };
+    }
     const Q = quote[engine];
-    const defs = (columns.length ? columns : [{ name: "id", dataType: "INTEGER", nullable: false, primaryKey: true }])
+    const defs = cols
       .map((c) => {
         const parts = [Q(c.name), c.dataType || "TEXT"];
         if (c.primaryKey) parts.push("PRIMARY KEY");
@@ -298,25 +479,41 @@ const handlers = {
     return { ok: true };
   },
   async addColumn({ id, table, column }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(table)} ADD COLUMN ${sqliteIdent(column.name)} ${column.dataType || "TEXT"}`);
+      return { ok: true };
+    }
     const Q = quote[engine];
     await conn.query(`ALTER TABLE ${Q(table)} ADD COLUMN ${Q(column.name)} ${column.dataType || "TEXT"}`);
     return { ok: true };
   },
   async dropColumn({ id, table, column }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(table)} DROP COLUMN ${sqliteIdent(column)}`);
+      return { ok: true };
+    }
     const Q = quote[engine];
     await conn.query(`ALTER TABLE ${Q(table)} DROP COLUMN ${Q(column)}`);
     return { ok: true };
   },
   async renameColumn({ id, table, from, to }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(table)} RENAME COLUMN ${sqliteIdent(from)} TO ${sqliteIdent(to)}`);
+      return { ok: true };
+    }
     const Q = quote[engine];
     await conn.query(`ALTER TABLE ${Q(table)} RENAME COLUMN ${Q(from)} TO ${Q(to)}`);
     return { ok: true };
   },
   async renameTable({ id, from, to }) {
-    const { engine, conn } = need(id);
+    const { engine, conn, fileKey } = need(id);
+    if (engine === "sqlite") {
+      sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(from)} RENAME TO ${sqliteIdent(to)}`);
+      return { ok: true };
+    }
     const Q = quote[engine];
     const sql =
       engine === "mysql" ? `RENAME TABLE ${Q(from)} TO ${Q(to)}` : `ALTER TABLE ${Q(from)} RENAME TO ${Q(to)}`;

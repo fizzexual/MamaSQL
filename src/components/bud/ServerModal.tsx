@@ -29,7 +29,7 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
 
   const [engine, setEngine] = useState<Engine>(existing?.engine ?? "sqlite");
   const [bridgeUp, setBridgeUp] = useState<boolean | null>(null);
-  const remoteInBrowser = engine !== "sqlite" && !isTauri();
+  const remoteInBrowser = !isTauri();
   const remoteReady = isTauri() || bridgeUp === true;
 
   useEffect(() => {
@@ -118,7 +118,7 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
     }
   };
 
-  const canSave = engine === "sqlite" ? !!database.trim() : remoteReady && !!database.trim() && !!host.trim();
+  const canSave = !!database.trim() && remoteReady && (engine === "sqlite" || !!host.trim());
 
   return (
     <>
@@ -129,7 +129,7 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
           <label className="bud-field">
             <span>Engine</span>
             <select value={engine} onChange={(e) => { setEngine(e.target.value as Engine); setDatabases(null); setStatus(null); }}>
-              <option value="sqlite">SQLite (local — works here)</option>
+              <option value="sqlite">SQLite (server file)</option>
               <option value="postgres">PostgreSQL</option>
               <option value="mysql">MySQL / MariaDB</option>
             </select>
@@ -247,7 +247,10 @@ export function ServerModal({ existing, onClose }: { existing?: ConnectionConfig
             <label className="bud-field">
               <span>Database name</span>
               <input value={database} onChange={(e) => setDatabase(e.target.value)} placeholder="e.g. analytics" />
-              <span className="bud-field-hint">A real SQLite database, stored locally in your browser and saved between visits.</span>
+              <span className="bud-field-hint">
+                A real SQLite database stored in a file on the server — shared across browsers, tabs, and ports. Type an
+                existing name to open it, or a new name to create it.
+              </span>
             </label>
           )}
         </div>

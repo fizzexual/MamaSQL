@@ -41,3 +41,6 @@ Thumbs.db
 # Screenshot helper output
 /screenshot*.png
 /_shot.*
+
+# Server-side SQLite database files
+data/

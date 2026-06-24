@@ -1,29 +1,18 @@
-// Web router backend: in a browser tab, SQLite runs in-process (sql.js) while
-// PostgreSQL / MySQL are routed to the local engine bridge over HTTP. The
-// connection registry + query history live in localStorage and are shared by
-// both, so the connection list and history are unified regardless of engine.
+// Web router backend: all engine work — SQLite, PostgreSQL, and MySQL — goes
+// through the local engine bridge over HTTP. SQLite database files live in a
+// server folder (DATA_DIR) so the same database is shared across browsers,
+// tabs, and ports (in-browser IndexedDB storage was per-origin, so it wasn't).
+// The connection registry + query history still live in localStorage.
 import type { Backend } from "./backend";
 import { httpBackend, deleteSecret, saveSecret } from "./http";
 import { localBackend } from "./local";
-import type { ColumnDef, ConnectionConfig, HistoryEntry } from "./types";
+import type { ColumnDef, HistoryEntry } from "./types";
 
-const CONNS_KEY = "mamasql.connections";
 const HIST_KEY = "mamasql.history";
 
-function loadConns(): ConnectionConfig[] {
-  try {
-    const raw = JSON.parse(localStorage.getItem(CONNS_KEY) ?? "[]");
-    return Array.isArray(raw) ? (raw as ConnectionConfig[]) : [];
-  } catch {
-    return [];
-  }
-}
-function engineOf(id: string): string | undefined {
-  return loadConns().find((c) => c.id === id)?.engine;
-}
-/** The backend that owns a given connection (sqlite → in-browser, else bridge). */
-function sub(id: string): Backend {
-  return engineOf(id) === "sqlite" ? localBackend : httpBackend;
+/** Engine work for every connection goes through the bridge. */
+function sub(_id: string): Backend {
+  return httpBackend;
 }
 
 function readHistory(): HistoryEntry[] {
@@ -63,10 +52,10 @@ export const webBackend: Backend = {
     await localBackend.deleteConnection(id);
   },
 
-  /* cfg-driven ops route by the cfg's engine */
-  testConnection: (cfg, password = null) => (cfg.engine === "sqlite" ? localBackend : httpBackend).testConnection(cfg, password),
-  listDatabases: (cfg, password = null) => (cfg.engine === "sqlite" ? localBackend : httpBackend).listDatabases(cfg, password),
-  createDatabase: (cfg, password, name) => (cfg.engine === "sqlite" ? localBackend : httpBackend).createDatabase(cfg, password, name),
+  /* cfg-driven ops — all engines go through the bridge */
+  testConnection: (cfg, password = null) => httpBackend.testConnection(cfg, password),
+  listDatabases: (cfg, password = null) => httpBackend.listDatabases(cfg, password),
+  createDatabase: (cfg, password, name) => httpBackend.createDatabase(cfg, password, name),
 
   /* id-driven ops route by the connection's engine */
   openConnection: (id) => sub(id).openConnection(id),

@@ -27,6 +27,11 @@ services:
     image: ghcr.io/fizzexual/mamasql-bridge:${MAMASQL_VERSION:-latest}
     environment:
       BRIDGE_PORT: "5174"
+      # SQLite database files live here — a named volume so they persist across
+      # restarts and are shared by every browser/tab/port that connects.
+      DATA_DIR: "/data"
+    volumes:
+      - sqlitedata:/data
     expose:
       - "5174"
     # Lets connections use host "host.docker.internal" to reach a database
@@ -66,3 +71,4 @@ services:
 volumes:
   pgdata:
   mysqldata:
+  sqlitedata:

@@ -24,6 +24,9 @@ services:
       dockerfile: docker/bridge.Dockerfile
     environment:
       BRIDGE_PORT: "5174"
+      DATA_DIR: "/data"
+    volumes:
+      - sqlitedata:/data
     expose:
       - "5174"
     # Reach a database on your own machine via host "host.docker.internal".
@@ -59,3 +62,4 @@ services:
 volumes:
   pgdata:
   mysqldata:
+  sqlitedata:
