@@ -4,7 +4,10 @@ import {
   IconCode,
   IconCopy,
   IconDownload,
+  IconPlayerPlay,
   IconPlus,
+  IconSearch,
+  IconStar,
   IconTable,
   IconTrash,
   IconUpload,
@@ -12,6 +15,7 @@ import {
 } from "@tabler/icons-react";
 import { type ComponentType, type MouseEvent, useEffect, useRef, useState } from "react";
 import { download, fromCsv, toCsv } from "../../lib/csv";
+import { toast } from "../../state/toast";
 import { useStore } from "../../state/store";
 import { DataGrid } from "./DataGrid";
 import { RowInspector } from "./RowInspector";
@@ -245,22 +249,63 @@ function HistoryView() {
   const history = useStore((s) => s.history);
   const loadHistory = useStore((s) => s.loadHistory);
   const loadSql = useStore((s) => s.loadSql);
+  const run = useStore((s) => s.run);
+  const saveFavorite = useStore((s) => s.saveFavorite);
+  const favorites = useStore((s) => s.favorites);
+  const [q, setQ] = useState("");
 
   useEffect(() => {
     void loadHistory();
   }, [loadHistory]);
 
+  const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+  const ql = q.trim().toLowerCase();
+  const shown = ql ? history.filter((h) => h.sql.toLowerCase().includes(ql)) : history;
+  const favSqls = new Set(favorites.map((f) => norm(f.sql)));
+
+  const rerun = (sql: string) => {
+    loadSql(sql);
+    void run();
+  };
+  const star = (sql: string) => {
+    saveFavorite(norm(sql).slice(0, 48), sql);
+    toast("Added to favorites", "success");
+  };
+
   return (
     <div className="bud-history">
-      {history.length === 0 ? (
-        <div className="bud-empty">No SQL has been run yet.</div>
-      ) : (
-        history.map((h) => (
-          <button key={h.id} className="bud-hist-item" onClick={() => loadSql(h.sql)}>
-            <span className="bud-hist-sql">{h.sql.replace(/\s+/g, " ").trim()}</span>
-            <span className="bud-hist-time">{new Date(h.ranAt).toLocaleString()}</span>
+      <div className="bud-hist-bar">
+        <IconSearch size={13} stroke={1.7} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search history…" />
+        {q && (
+          <button className="bud-hist-bar-x" title="Clear" onClick={() => setQ("")}>
+            <IconX size={13} stroke={1.9} />
           </button>
-        ))
+        )}
+        <span className="bud-hist-count">{shown.length}</span>
+      </div>
+      {shown.length === 0 ? (
+        <div className="bud-empty">{history.length === 0 ? "No SQL has been run yet." : "No matching history."}</div>
+      ) : (
+        shown.map((h) => {
+          const fav = favSqls.has(norm(h.sql));
+          return (
+            <div key={h.id} className="bud-hist-item">
+              <button className="bud-hist-main" title="Load into editor" onClick={() => loadSql(h.sql)}>
+                <span className="bud-hist-sql">{norm(h.sql)}</span>
+                <span className="bud-hist-time">{new Date(h.ranAt).toLocaleString()}</span>
+              </button>
+              <span className="bud-hist-actions">
+                <button title="Re-run" onClick={() => rerun(h.sql)}>
+                  <IconPlayerPlay size={13} stroke={1.8} />
+                </button>
+                <button className={fav ? "on" : ""} title={fav ? "In favorites" : "Add to favorites"} onClick={() => star(h.sql)}>
+                  <IconStar size={13} stroke={1.8} />
+                </button>
+              </span>
+            </div>
+          );
+        })
       )}
     </div>
   );

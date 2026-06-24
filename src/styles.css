@@ -638,6 +638,20 @@ button, .bud-src, .bud-table, .bud-tool, .bud-tab, .bud-naction, .icon-btn,
 .bud-data-row { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .bud-grid tbody td.sel { box-shadow: inset 0 0 0 2px var(--accent); }
 .bud-table.multi { background: color-mix(in srgb, var(--accent) 22%, transparent); box-shadow: inset 2px 0 0 var(--accent); }
+
+/* Query history: search bar + per-item actions */
+.bud-hist-bar { display: flex; align-items: center; gap: 7px; background: var(--input-bg); border: 1px solid var(--border-strong); border-radius: 6px; padding: 4px 9px; margin-bottom: 4px; position: sticky; top: 0; z-index: 1; }
+.bud-hist-bar svg { color: var(--faint); flex: none; }
+.bud-hist-bar input { flex: 1; min-width: 0; background: none; border: none; outline: none; color: var(--text); font-size: 12px; }
+.bud-hist-bar-x { background: none; border: none; color: var(--faint); cursor: pointer; display: inline-flex; padding: 0; }
+.bud-hist-count { font-size: 11px; color: var(--faint); font-variant-numeric: tabular-nums; }
+.bud-hist-item { flex-direction: row !important; align-items: center; gap: 8px; }
+.bud-hist-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; text-align: left; background: none; border: none; padding: 0; cursor: pointer; }
+.bud-hist-actions { display: flex; gap: 4px; opacity: 0; flex: none; transition: opacity .12s; }
+.bud-hist-item:hover .bud-hist-actions { opacity: 1; }
+.bud-hist-actions button { background: var(--bg-3); border: 1px solid var(--border); color: var(--muted); border-radius: 4px; padding: 3px 6px; cursor: pointer; display: inline-flex; }
+.bud-hist-actions button:hover { color: var(--accent); border-color: var(--accent); }
+.bud-hist-actions button.on { color: #fbbf24; }
 .bud-table.multi:hover { background: color-mix(in srgb, var(--accent) 30%, transparent); }
 .bud-inspector {
   background: var(--bg-2); border-left: 1px solid var(--border);
