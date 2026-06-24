@@ -110,6 +110,8 @@ export function SqlPanel() {
   const saveScript = useStore((s) => s.saveScript);
   const saveFavorite = useStore((s) => s.saveFavorite);
   const activeEditorId = useStore((s) => s.activeEditorId);
+  const editors = useStore((s) => s.editors);
+  const selectEditor = useStore((s) => s.selectEditor);
   const readOnly = useStore((s) => s.readOnlyConns.includes(s.activeConnectionId ?? ""));
   const res = useStore((s) => s.editorResults[s.activeEditorId] ?? null);
   const err = useStore((s) => s.editorErrors[s.activeEditorId] ?? null);
@@ -140,6 +142,7 @@ export function SqlPanel() {
   const panelRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const pendingCaret = useRef<number | null>(null);
+  const pendingSel = useRef<{ s: number; e: number } | null>(null);
   const runId = useRef(0);
 
   const schemaName = conn?.engine === "postgres" ? "public" : conn?.database || "main";
@@ -206,6 +209,88 @@ export function SqlPanel() {
     setSql(lines.join("\n"));
   };
 
+  /** Replace the editor value and restore the given selection afterwards. */
+  const applyEdit = (next: string, selStart: number, selEnd = selStart) => {
+    pendingSel.current = { s: selStart, e: selEnd };
+    setSql(next);
+  };
+
+  /** Ctrl+D — duplicate the selection, or the current line if there's none. */
+  const duplicate = () => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const v = sql;
+    const s = ta.selectionStart;
+    const e = ta.selectionEnd;
+    if (s !== e) {
+      const sel = v.slice(s, e);
+      applyEdit(v.slice(0, e) + sel + v.slice(e), e, e + sel.length);
+      return;
+    }
+    const ls = v.lastIndexOf("\n", s - 1) + 1;
+    let le = v.indexOf("\n", s);
+    if (le === -1) le = v.length;
+    const line = v.slice(ls, le);
+    applyEdit(`${v.slice(0, le)}\n${line}${v.slice(le)}`, s + line.length + 1);
+  };
+
+  /** Alt+Up / Alt+Down — move the current line(s) up or down. */
+  const moveLines = (dir: -1 | 1) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const v = sql;
+    const lines = v.split("\n");
+    const first = v.slice(0, ta.selectionStart).split("\n").length - 1;
+    const last = v.slice(0, ta.selectionEnd).split("\n").length - 1;
+    if ((dir === -1 && first === 0) || (dir === 1 && last === lines.length - 1)) return;
+    const block = lines.splice(first, last - first + 1);
+    lines.splice(first + dir, 0, ...block);
+    const newFirst = first + dir;
+    const charStart = lines.slice(0, newFirst).join("\n").length + (newFirst > 0 ? 1 : 0);
+    applyEdit(lines.join("\n"), charStart, charStart + block.join("\n").length);
+  };
+
+  /** Indent (Tab) / outdent (Shift+Tab) the selected lines, or insert two spaces. */
+  const indent = (outdent: boolean) => {
+    const ta = taRef.current;
+    if (!ta) return;
+    const v = sql;
+    const s = ta.selectionStart;
+    const e = ta.selectionEnd;
+    if (s === e && !outdent) {
+      applyEdit(v.slice(0, s) + "  " + v.slice(s), s + 2);
+      return;
+    }
+    const ls = v.lastIndexOf("\n", s - 1) + 1;
+    let le = v.indexOf("\n", e);
+    if (le === -1) le = v.length;
+    const block = v.slice(ls, le);
+    const next = block
+      .split("\n")
+      .map((l) => (outdent ? l.replace(/^ {1,2}/, "") : `  ${l}`))
+      .join("\n");
+    applyEdit(v.slice(0, ls) + next + v.slice(le), ls, ls + next.length);
+  };
+
+  // Bracket / quote pairs — wrap a selection, or auto-close an opening bracket.
+  const PAIRS: Record<string, string> = { "(": ")", "[": "]", "{": "}", "'": "'", '"': '"', "`": "`" };
+  /** Returns true if it handled the key (caller should preventDefault). */
+  const handlePair = (key: string): boolean => {
+    const ta = taRef.current;
+    if (!ta || !PAIRS[key]) return false;
+    const s = ta.selectionStart;
+    const e = ta.selectionEnd;
+    if (s !== e) {
+      applyEdit(sql.slice(0, s) + key + sql.slice(s, e) + PAIRS[key] + sql.slice(e), s + 1, e + 1);
+      return true;
+    }
+    if (key === "(" || key === "[" || key === "{") {
+      applyEdit(sql.slice(0, s) + key + PAIRS[key] + sql.slice(e), s + 1);
+      return true;
+    }
+    return false; // don't auto-double quotes on an empty selection (annoying)
+  };
+
   const sync = () => {
     const ta = taRef.current;
     if (!ta) return;
@@ -269,10 +354,17 @@ export function SqlPanel() {
     ta.focus();
   };
 
-  // Restore caret + sync the highlight scroll after an autocomplete insert.
+  // Restore caret/selection + sync the highlight scroll after a programmatic edit.
   useEffect(() => {
-    if (pendingCaret.current != null && taRef.current) {
-      const ta = taRef.current;
+    const ta = taRef.current;
+    if (pendingSel.current != null && ta) {
+      ta.focus();
+      ta.selectionStart = pendingSel.current.s;
+      ta.selectionEnd = pendingSel.current.e;
+      pendingSel.current = null;
+      updateCaret();
+      sync();
+    } else if (pendingCaret.current != null && ta) {
       ta.selectionStart = ta.selectionEnd = pendingCaret.current;
       pendingCaret.current = null;
       updateCaret();
@@ -492,6 +584,31 @@ export function SqlPanel() {
                   setSql(formatSql(sql));
                   return;
                 }
+                if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === "d" || e.key === "D")) {
+                  e.preventDefault();
+                  setAc(null);
+                  duplicate();
+                  return;
+                }
+                if (e.altKey && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+                  e.preventDefault();
+                  setAc(null);
+                  moveLines(e.key === "ArrowUp" ? -1 : 1);
+                  return;
+                }
+                if (e.altKey && /^[1-9]$/.test(e.key)) {
+                  const target = editors[Number(e.key) - 1];
+                  if (target) {
+                    e.preventDefault();
+                    selectEditor(target.id);
+                  }
+                  return;
+                }
+                if (!e.ctrlKey && !e.metaKey && !e.altKey && PAIRS[e.key] && handlePair(e.key)) {
+                  e.preventDefault();
+                  setAc(null);
+                  return;
+                }
                 if (ac) {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
@@ -506,6 +623,9 @@ export function SqlPanel() {
                     e.preventDefault();
                     setAc(null);
                   }
+                } else if (e.key === "Tab") {
+                  e.preventDefault();
+                  indent(e.shiftKey);
                 } else if (e.key === " " && (e.ctrlKey || e.metaKey)) {
                   e.preventDefault();
                   requestAnimationFrame(refreshAc);

@@ -3,14 +3,20 @@ import { useEffect, useState } from "react";
 const SHORTCUTS: { keys: string[]; label: string }[] = [
   { keys: ["⌘", "K"], label: "Command palette" },
   { keys: ["⌘", "↵"], label: "Execute query (or selection)" },
-  { keys: ["Ctrl", "/"], label: "Toggle line comment" },
+  { keys: ["⌘", "/"], label: "Toggle line comment" },
+  { keys: ["⌘", "⇧", "F"], label: "Format SQL" },
+  { keys: ["⌘", "D"], label: "Duplicate line / selection" },
+  { keys: ["Alt", "↑", "↓"], label: "Move line up / down" },
+  { keys: ["Tab", "⇧Tab"], label: "Indent / outdent" },
+  { keys: ["(", "[", "\"", "…"], label: "Wrap selection in brackets / quotes" },
+  { keys: ["Alt", "1-9"], label: "Switch editor tab" },
   { keys: ["⌘", "Space"], label: "Trigger autocomplete" },
-  { keys: ["Tab"], label: "Accept suggestion" },
   { keys: ["↑", "↓"], label: "Navigate suggestions / palette" },
+  { keys: ["Ctrl", "C"], label: "Copy selected cell (data grid)" },
   { keys: ["Esc"], label: "Close popups & menus" },
   { keys: ["?"], label: "Show this help" },
   { keys: ["Right-click"], label: "Context menu on tree / tables" },
-  { keys: ["Double-click"], label: "Edit a cell (data grid)" },
+  { keys: ["Click / Dbl-click"], label: "Select cell / edit cell (data grid)" },
 ];
 
 export function ShortcutsOverlay() {
