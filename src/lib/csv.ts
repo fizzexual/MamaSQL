@@ -19,6 +19,40 @@ export function toJson(r: QueryResult): string {
   return JSON.stringify(objs, null, 2);
 }
 
+/** Tab-separated — what spreadsheets expect when pasting from the clipboard. */
+export function toTsv(r: QueryResult): string {
+  const clean = (v: unknown) => (v == null ? "" : String(v).replace(/[\t\n\r]+/g, " "));
+  const header = r.columns.map((c) => clean(c.name)).join("\t");
+  const body = r.rows.map((row) => row.map(clean).join("\t")).join("\n");
+  return `${header}\n${body}`;
+}
+
+/** GitHub-flavored Markdown table. */
+export function toMarkdown(r: QueryResult): string {
+  const cell = (v: unknown) => (v == null ? "" : String(v).replace(/\|/g, "\\|").replace(/\n/g, " "));
+  const names = r.columns.map((c) => cell(c.name));
+  const head = `| ${names.join(" | ")} |`;
+  const sep = `| ${names.map(() => "---").join(" | ")} |`;
+  const body = r.rows.map((row) => `| ${row.map(cell).join(" | ")} |`).join("\n");
+  return [head, sep, body].join("\n");
+}
+
+function sqlLiteral(v: unknown): string {
+  if (v == null) return "NULL";
+  if (typeof v === "number" || typeof v === "bigint") return String(v);
+  if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+  return `'${String(v).replace(/'/g, "''")}'`;
+}
+
+/** A runnable batch of INSERT statements for the result rows. */
+export function toInserts(r: QueryResult, table = "table_name"): string {
+  const ident = (s: string) => `"${s.replace(/"/g, '""')}"`;
+  const cols = r.columns.map((c) => ident(c.name)).join(", ");
+  return r.rows
+    .map((row) => `INSERT INTO ${ident(table)} (${cols}) VALUES (${row.map(sqlLiteral).join(", ")});`)
+    .join("\n");
+}
+
 export function download(filename: string, content: string): void {
   const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
   const url = URL.createObjectURL(blob);

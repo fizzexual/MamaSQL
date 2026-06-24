@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { getBackend } from "../ipc/backend";
+import { resolveParams } from "../lib/params";
 import { confirmIfDestructive, isWrite } from "./safety";
 import { toast } from "./toast";
 
@@ -466,10 +467,12 @@ export const useStore = create<AppStore>((set, get) => ({
       toast("Connection is read-only — writes are blocked.", "error");
       return;
     }
-    if (!(await confirmIfDestructive(sql))) return;
+    const finalSql = await resolveParams(sql);
+    if (finalSql == null) return; // a parameter prompt was cancelled
+    if (!(await confirmIfDestructive(finalSql))) return;
     set({ running: true, view: "sql", topView: "data" });
     try {
-      const result = await backend.runQuery(activeConnectionId, sql);
+      const result = await backend.runQuery(activeConnectionId, finalSql);
       get().setEditorResult(activeEditorId, result, null);
       set({ running: false });
       await get().loadHistory();

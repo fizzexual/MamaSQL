@@ -4,7 +4,9 @@ import { getBackend } from "../../ipc/backend";
 import { promptDialog } from "../../state/dialog";
 import type { ColumnInfo } from "../../ipc/types";
 import { useStore } from "../../state/store";
+import { CellViewer, isExpandable } from "./CellViewer";
 import { ColumnEditor, type ColumnEditorAnchor } from "./ColumnEditor";
+import { ExportMenu } from "./ExportMenu";
 
 function typeIcon(t: string): string {
   const u = t.toUpperCase();
@@ -93,6 +95,7 @@ export function DataGrid() {
   const [newRow, setNewRow] = useState<string[] | null>(null);
   const [colEditor, setColEditor] = useState<ColumnEditorAnchor | null>(null);
   const [sort, setSort] = useState<{ col: number; dir: 1 | -1 } | null>(null);
+  const [cellView, setCellView] = useState<{ value: string; column?: string } | null>(null);
   const [gridFilter, setGridFilter] = useState("");
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(100);
@@ -269,6 +272,8 @@ export function DataGrid() {
             {filteredOrder.length.toLocaleString()} of {result.rows.length.toLocaleString()} match
           </span>
         )}
+        <span className="bud-grid-foot-spacer" />
+        <ExportMenu result={result} rows={filteredOrder.map((ri) => result.rows[ri])} table={table} />
       </div>
       <div className="bud-grid-wrap">
         <table className="bud-grid">
@@ -369,6 +374,10 @@ export function DataGrid() {
                       key={ci}
                       className={`${cell == null ? "bud-null" : ""} ${fk ? "bud-fk-cell" : ""}`}
                       title={cell == null ? "" : String(cell)}
+                      onClick={() => {
+                        const sv = cell == null ? "" : String(cell);
+                        if (!editing && sv && isExpandable(sv)) setCellView({ value: sv, column: result.columns[ci].name });
+                      }}
                       onDoubleClick={() => startEdit(ri, ci)}
                     >
                       {editing && editing.row === ri && editing.col === ci ? (
@@ -465,6 +474,7 @@ export function DataGrid() {
         </div>
       )}
       {colEditor && <ColumnEditor anchor={colEditor} table={table} onClose={() => setColEditor(null)} />}
+      {cellView && <CellViewer value={cellView.value} column={cellView.column} onClose={() => setCellView(null)} />}
     </div>
   );
 }

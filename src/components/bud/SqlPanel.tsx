@@ -3,9 +3,7 @@ import {
   IconArrowBackUp,
   IconChartBar,
   IconCheck,
-  IconCopy,
   IconDeviceFloppy,
-  IconDownload,
   IconEraser,
   IconFileCode,
   IconMessage2,
@@ -19,7 +17,10 @@ import {
 } from "@tabler/icons-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getBackend } from "../../ipc/backend";
-import { download, toCsv, toJson } from "../../lib/csv";
+import { resolveParams } from "../../lib/params";
+import { formatSql } from "../../lib/sqlformat";
+import { CellViewer } from "./CellViewer";
+import { ExportMenu } from "./ExportMenu";
 import { promptDialog } from "../../state/dialog";
 import { confirmIfDestructive, isWrite } from "../../state/safety";
 import { toast } from "../../state/toast";
@@ -65,11 +66,6 @@ function highlightSql(src: string): string {
   }
   out += esc(src.slice(last));
   return out;
-}
-
-/** Light formatter: upper-case recognised keywords, leave everything else alone. */
-function formatSql(src: string): string {
-  return src.replace(/[A-Za-z_]\w*/g, (w) => (KEYWORDS.has(w.toUpperCase()) ? w.toUpperCase() : w));
 }
 
 type Tab = "log" | "dbms" | "result";
@@ -130,8 +126,7 @@ export function SqlPanel() {
   const [ac, setAc] = useState<{ items: Suggestion[]; index: number; token: string; x: number; y: number } | null>(null);
   const [resultView, setResultView] = useState<"table" | "chart">("table");
   const [rowFilter, setRowFilter] = useState("");
-  const [copied, setCopied] = useState(false);
-  const [cellDetail, setCellDetail] = useState<{ value: string; x: number; y: number } | null>(null);
+  const [cellView, setCellView] = useState<{ value: string; column?: string } | null>(null);
 
   const taRef = useRef<HTMLTextAreaElement>(null);
   const hlRef = useRef<HTMLPreElement>(null);
@@ -150,13 +145,15 @@ export function SqlPanel() {
       toast("Connection is read-only — writes are blocked.", "error");
       return;
     }
-    if (!(await confirmIfDestructive(text))) return;
+    const finalText = await resolveParams(text);
+    if (finalText == null) return; // a parameter prompt was cancelled
+    if (!(await confirmIfDestructive(finalText))) return;
     const id = ++runId.current;
     const edId = activeEditorId;
     setRunning(true);
     setEditorResult(edId, res, null); // keep current rows visible, clear any prior error
     try {
-      const r = await getBackend().runQuery(connId, text);
+      const r = await getBackend().runQuery(connId, finalText);
       if (runId.current !== id) return; // superseded / stopped
       setEditorResult(edId, r, null);
       setSort(null);
@@ -336,31 +333,6 @@ export function SqlPanel() {
   const toggleSort = (col: number) =>
     setSort((s) => (!s || s.col !== col ? { col, dir: 1 } : s.dir === 1 ? { col, dir: -1 } : null));
 
-  const exportAs = (fmt: "csv" | "json") => {
-    if (!res) return;
-    const data = { ...res, rows: filteredRows };
-    if (fmt === "csv") download("result.csv", toCsv(data));
-    else download("result.json", toJson(data));
-  };
-
-  const copyMarkdown = () => {
-    if (!res) return;
-    const names = res.columns.map((c) => c.name);
-    const head = `| ${names.join(" | ")} |`;
-    const sep = `| ${names.map(() => "---").join(" | ")} |`;
-    const body = filteredRows
-      .map((r) => `| ${r.map((c) => (c == null ? "" : String(c).replace(/\|/g, "\\|"))).join(" | ")} |`)
-      .join("\n");
-    void navigator.clipboard
-      ?.writeText([head, sep, body].join("\n"))
-      .then(() => {
-        setCopied(true);
-        toast("Copied result as Markdown", "success");
-        setTimeout(() => setCopied(false), 1200);
-      })
-      .catch(() => {});
-  };
-
   return (
     <div className="bud-sqlpanel" ref={panelRef}>
       <div className="bud-ide-toolbar">
@@ -386,7 +358,7 @@ export function SqlPanel() {
           <IconArrowBackUp size={15} stroke={1.8} />
         </button>
         <span className="bud-tb-sep" />
-        <button title="Format SQL" onClick={() => setSql(formatSql(sql))} disabled={!sql.trim()}>
+        <button title="Format SQL (Ctrl+Shift+F)" onClick={() => setSql(formatSql(sql))} disabled={!sql.trim()}>
           <IconAlignLeft size={15} stroke={1.8} />
         </button>
         <button title="Toggle comment (Ctrl+/)" onClick={toggleComment} disabled={!sql.trim()}>
@@ -499,6 +471,12 @@ export function SqlPanel() {
                   toggleComment();
                   return;
                 }
+                if ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === "f" || e.key === "F")) {
+                  e.preventDefault();
+                  setAc(null);
+                  setSql(formatSql(sql));
+                  return;
+                }
                 if (ac) {
                   if (e.key === "ArrowDown") {
                     e.preventDefault();
@@ -603,15 +581,7 @@ export function SqlPanel() {
                 <button title="Re-run" onClick={() => void exec()} disabled={running || !connId}>
                   <IconRefresh size={14} stroke={1.7} />
                 </button>
-                <button title="Export to CSV" onClick={() => exportAs("csv")}>
-                  <IconDownload size={14} stroke={1.7} /> CSV
-                </button>
-                <button title="Export to JSON" onClick={() => exportAs("json")}>
-                  <IconDownload size={14} stroke={1.7} /> JSON
-                </button>
-                <button title="Copy as Markdown" onClick={copyMarkdown}>
-                  <IconCopy size={14} stroke={1.7} /> {copied ? "Copied!" : "Copy MD"}
-                </button>
+                <ExportMenu result={{ ...res, rows: filteredRows }} />
                 <span className="bud-res-meta">
                   {filteredRows.length.toLocaleString()} {filteredRows.length === 1 ? "row" : "rows"}
                   {limited ? ` (capped at ${cap})` : ""} · {res.elapsedMs} ms
@@ -643,14 +613,8 @@ export function SqlPanel() {
                             <td
                               key={ci}
                               className={cell == null ? "bud-null" : ""}
-                              title="Click for full value"
-                              onClick={(ev) =>
-                                setCellDetail({
-                                  value: cell == null ? "NULL" : String(cell),
-                                  x: Math.min(ev.clientX, window.innerWidth - 340),
-                                  y: Math.min(ev.clientY, window.innerHeight - 240),
-                                })
-                              }
+                              title="Click to inspect"
+                              onClick={() => setCellView({ value: cell == null ? "NULL" : String(cell), column: res.columns[ci]?.name })}
                             >
                               {cell == null ? "NULL" : String(cell)}
                             </td>
@@ -689,27 +653,7 @@ export function SqlPanel() {
         </div>
       )}
 
-      {cellDetail && (
-        <>
-          <div className="bud-menu-backdrop" onClick={() => setCellDetail(null)} />
-          <div className="bud-cell-pop" style={{ left: cellDetail.x, top: cellDetail.y }}>
-            <div className="bud-cell-pop-head">
-              <span>Cell value · {cellDetail.value.length} chars</span>
-              <button
-                title="Copy"
-                onClick={() => {
-                  void navigator.clipboard?.writeText(cellDetail.value).catch(() => {});
-                  toast("Copied cell value", "success");
-                  setCellDetail(null);
-                }}
-              >
-                <IconCopy size={13} stroke={1.7} /> Copy
-              </button>
-            </div>
-            <pre className="bud-cell-pop-body">{cellDetail.value}</pre>
-          </div>
-        </>
-      )}
+      {cellView && <CellViewer value={cellView.value} column={cellView.column} onClose={() => setCellView(null)} />}
     </div>
   );
 }
