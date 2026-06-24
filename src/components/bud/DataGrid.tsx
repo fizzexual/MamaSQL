@@ -201,8 +201,10 @@ export function DataGrid() {
     return () => window.removeEventListener("keydown", onKey);
   }, [selCell, result]);
 
-  // While loading: nothing for the first moment (no flash), then the skeleton.
-  if (loadingResult) return showSkel ? <GridSkeleton columns={columns} /> : null;
+  // While loading we keep the current grid on screen, so switching tables doesn't
+  // flash to black (local queries finish well under the skeleton delay). Only show
+  // a skeleton when there's genuinely nothing yet (the first load).
+  if (loadingResult && !result) return showSkel ? <GridSkeleton columns={columns} /> : null;
   if (!result || !editTable) return null;
   const table = editTable.table;
   const allSelected = result.rows.length > 0 && selection.length === result.rows.length;
