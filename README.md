@@ -168,6 +168,10 @@ Strict `tsc` and a clean Vite production bundle are part of the build.
 
 See [`docs/superpowers/specs/`](docs/superpowers/specs/) for the full design specification.
 
+## License
+
+[MIT](LICENSE) © 2026 Stiliyan Stoyanov
+
 ---
 
 _Built with [Claude Code](https://claude.com/claude-code)._
