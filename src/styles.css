@@ -3244,6 +3244,27 @@ select.bud-cb-select {
 .bud-ce-hint { margin: -3px 2px 0; font-size: 11.5px; line-height: 1.5; color: var(--faint); }
 .bud-ce-hint b { color: var(--muted); font-weight: 600; }
 
+/* Smooth scrolling for keyboard / programmatic scrolls and scrollIntoView jumps
+   (mouse wheel stays native; the SQL editor is intentionally excluded so the
+   cursor tracks instantly while typing). */
+.bud-main,
+.bud-sources-list,
+.bud-grid-wrap,
+.bud-results-body,
+.bud-logs-body,
+.bud-history,
+.insp-body,
+.bud-wp,
+.bud-chart,
+.bud-cellviewer-body,
+.bud-cell-pop-body,
+.bud-diff-body,
+.bud-import-preview,
+.bud-ac,
+.cmdk-list {
+  scroll-behavior: smooth;
+}
+
 /* The sidebar is chrome, not content — its labels shouldn't be text-selectable
    (no Ctrl+A / double-click / drag highlight). Inputs inside it stay selectable. */
 .bud-sources { user-select: none; -webkit-user-select: none; }
