@@ -121,7 +121,8 @@ export function TopNav({
         <span>{active ? `Connected · ${active.name}` : "Disconnected"}</span>
       </div>
       <div className="bud-tb-brand">
-        Mama<span>SQL</span>
+        <img className="bud-tb-logo" src="/mamasql-logo.svg" alt="" />
+        <span className="bud-tb-word">MamaSQL</span>
       </div>
 
       <input

@@ -3099,9 +3099,10 @@ select.bud-cb-select {
    QoL: MamaSQL wordmark, resizable sidebar, toast notifications
    ============================================================ */
 
-/* wordmark (replaces the product title, top-right) */
-.bud-tb-brand { margin-left: 14px; font-size: 13.5px; font-weight: 800; letter-spacing: 0.4px; background: var(--brand-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; white-space: nowrap; -webkit-app-region: no-drag; }
-.bud-tb-brand span { color: transparent; }
+/* wordmark — landing-style: database logo mark + "MamaSQL" (top-right) */
+.bud-tb-brand { margin-left: 14px; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; -webkit-app-region: no-drag; }
+.bud-tb-logo { width: 19px; height: 19px; display: block; flex: none; }
+.bud-tb-word { font-size: 14px; font-weight: 600; letter-spacing: 0.2px; color: var(--text); }
 
 /* resizable sidebar */
 .bud-app { position: relative; }
