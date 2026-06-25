@@ -1,6 +1,7 @@
 import { AnimatePresence } from "framer-motion";
 import { useEffect, useState } from "react";
 import type { ConnectionConfig } from "../ipc/types";
+import { installSmoothScroll } from "../lib/smoothScroll";
 import { useStore } from "../state/store";
 import { DataView } from "./bud/DataView";
 import { DialogHost } from "./bud/DialogHost";
@@ -35,6 +36,9 @@ export function AppShell() {
   useEffect(() => {
     void restoreSession();
   }, [restoreSession]);
+
+  // Smooth (eased) mouse-wheel scrolling across every scroll container.
+  useEffect(() => installSmoothScroll(), []);
 
   const openAdd = () => setServerModal("new");
   const openEdit = (c: ConnectionConfig) => setServerModal(c);
