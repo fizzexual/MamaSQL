@@ -33,3 +33,12 @@ chrono = { version = "0.4", features = ["serde"] }
 [dev-dependencies]
 tokio = { version = "1", features = ["full", "test-util"] }
 
+# Small release binary while keeping all three engines AND full resilience:
+# panic unwinds (so a panicking command becomes a caught error, not a crash).
+# strip + LTO + opt-level "z" still give most of the size reduction.
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+
