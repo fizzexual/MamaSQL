@@ -173,28 +173,89 @@ function toResult(raw, startedAt) {
 }
 
 /* ---- connecting ---- */
+// Fail fast instead of sitting on the OS defaults: mysql2 waits 10s, but pg has
+// no timeout of its own and inherits the kernel's SYN retry budget (~21s on
+// Linux, longer elsewhere).
+const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS) || 10_000;
+
+// Every driver code we can actually explain. A dropped SYN in particular
+// surfaces as a bare "connect ETIMEDOUT" with no address attached, which — once
+// resolveHost() has quietly rewritten the host — tells the user nothing at all.
+const CONNECT_HINTS = {
+  ETIMEDOUT: "nothing answered. A firewall is dropping the connection, or the port is wrong — check which port the server actually publishes.",
+  ETIMEOUT: "nothing answered. A firewall is dropping the connection, or the port is wrong — check which port the server actually publishes.",
+  ECONNREFUSED: "the machine answered but nothing is listening on that port. Check the port, and that the server is running.",
+  ENOTFOUND: "that hostname doesn't resolve. Compose service names (e.g. \"mysql\") only resolve from inside the same Docker network.",
+  EAI_AGAIN: "that hostname couldn't be resolved (DNS failure).",
+  EHOSTUNREACH: "no route to that host.",
+  ENETUNREACH: "no route to that network.",
+  ECONNRESET: "the server closed the connection during the handshake. It may require TLS, or be rejecting this client.",
+};
+
+// Codes that mean we never got a usable socket. Anything else (bad password,
+// unsupported auth plugin, TLS refusal) means we DID reach the server, so
+// "can't reach" would be actively misleading.
+const UNREACHABLE_CODES = new Set(["ETIMEDOUT", "ETIMEOUT", "ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "EHOSTUNREACH", "ENETUNREACH"]);
+
+function connectError(e, cfg, host, port) {
+  // pg's happy-eyeballs hides the real code inside an AggregateError, and its
+  // own connectionTimeoutMillis rejects with a bare "timeout expired" (no code).
+  const codes = [e?.code, ...(Array.isArray(e?.errors) ? e.errors.map((x) => x?.code) : [])].filter(Boolean);
+  let code = codes.find((c) => CONNECT_HINTS[c]) || codes[0] || "";
+  if (!code && /timeout expired|connection timeout/i.test(String(e?.message || ""))) code = "ETIMEDOUT";
+
+  // The user typed one host; resolveHost may have dialed another. Say so —
+  // otherwise the error names an address that appears nowhere in their settings.
+  const typed = String(cfg.host ?? "").trim();
+  const via =
+    IN_DOCKER && host !== typed
+      ? ` (you entered ${typed ? `"${typed}"` : "no host"} — inside Docker that means the container itself, so the bridge dialed ${host} instead)`
+      : "";
+
+  const why = CONNECT_HINTS[code] || errMessage(e);
+  const lead = UNREACHABLE_CODES.has(code)
+    ? `Can't reach ${cfg.engine} at ${host}:${port}${via}`
+    : `Reached ${cfg.engine} at ${host}:${port}${via}, but the connection was rejected`;
+  const err = new Error(`${lead} — ${why}${code ? ` [${code}]` : ""}`);
+  err.kind = "connectionError";
+  err.code = code;
+  // Not a dropped-mid-session connection: reopening won't help, so don't let the
+  // client burn a reopen+retry cycle on an endpoint that was never reachable.
+  err.connectFailed = true;
+  return err;
+}
+
 async function connect(cfg, password) {
   const host = resolveHost(cfg.host);
-  if (cfg.engine === "postgres") {
-    const client = new pg.Client({
-      host,
-      port: cfg.port || 5432,
-      user: cfg.username || "postgres",
-      password: password ?? undefined,
-      database: cfg.database || "postgres",
-    });
-    await client.connect();
-    return client;
-  }
-  if (cfg.engine === "mysql") {
-    return mysql.createConnection({
-      host,
-      port: cfg.port || 3306,
-      user: cfg.username || "root",
-      password: password ?? undefined,
-      database: cfg.database || undefined,
-      multipleStatements: true,
-    });
+  const port = cfg.port || (cfg.engine === "postgres" ? 5432 : 3306);
+  try {
+    if (cfg.engine === "postgres") {
+      const client = new pg.Client({
+        host,
+        port,
+        user: cfg.username || "postgres",
+        password: password ?? undefined,
+        database: cfg.database || "postgres",
+        connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+      });
+      await client.connect();
+      return client;
+    }
+    if (cfg.engine === "mysql") {
+      return await mysql.createConnection({
+        host,
+        port,
+        user: cfg.username || "root",
+        password: password ?? undefined,
+        database: cfg.database || undefined,
+        multipleStatements: true,
+        connectTimeout: CONNECT_TIMEOUT_MS,
+      });
+    }
+  } catch (e) {
+    // Log it too — until now a failed connection left no trace in `docker logs`.
+    console.error(`[bridge] connect failed: ${cfg.engine} ${host}:${port} — ${e?.code || ""} ${errMessage(e)}`);
+    throw connectError(e, cfg, host, port);
   }
   throw new Error(`Unsupported engine for the bridge: ${cfg.engine}`);
 }
@@ -584,6 +645,7 @@ function sendJson(res, status, obj) {
 // won't fix.
 function isConnLost(e) {
   if (!e) return false;
+  if (e.connectFailed) return false; // never established — reopening can't fix it
   if (e.fatal) return true;
   if (["PROTOCOL_CONNECTION_LOST", "ECONNRESET", "EPIPE"].includes(e.code)) return true;
   return /closed state|server has gone away|connection lost|connection terminated|terminating connection/i.test(String(e.message || ""));
