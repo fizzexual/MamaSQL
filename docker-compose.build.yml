@@ -11,8 +11,10 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
+    # No login sits in front of this, and the bridge behind it connects to any
+    # host it's given — set BIND_ADDR in .env to pin it to one interface.
     ports:
-      - "${WEB_PORT:-5001}:80"
+      - "${BIND_ADDR:-0.0.0.0}:${WEB_PORT:-5001}:80"
     depends_on:
       - bridge
     restart: unless-stopped
@@ -41,8 +43,10 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-mamasql}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-mamasql}
       POSTGRES_DB: ${DB_DATABASE:-demo}
+    # Well-known password — published to localhost only. The app reaches these
+    # over the compose network, so this only affects external clients.
     ports:
-      - "${PG_PORT:-5433}:5432"
+      - "${DB_BIND_ADDR:-127.0.0.1}:${PG_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
@@ -54,7 +58,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-mamasql}
       MYSQL_DATABASE: ${DB_DATABASE:-demo}
     ports:
-      - "${MYSQL_PORT:-3307}:3306"
+      - "${DB_BIND_ADDR:-127.0.0.1}:${MYSQL_PORT:-3307}:3306"
     volumes:
       - mysqldata:/var/lib/mysql
     restart: unless-stopped

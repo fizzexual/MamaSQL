@@ -14,8 +14,12 @@ services:
   web:
     container_name: mamasql_web
     image: ghcr.io/fizzexual/mamasql-web:${MAMASQL_VERSION:-latest}
+    # MamaSQL has no login, and the bridge behind it will connect to any host it
+    # is given — so anyone who can reach this port can reach your databases.
+    # On a machine that's exposed to a network you don't trust, set BIND_ADDR in
+    # .env to a single interface (e.g. 127.0.0.1, or a VPN address).
     ports:
-      - "${WEB_PORT:-5001}:80"
+      - "${BIND_ADDR:-0.0.0.0}:${WEB_PORT:-5001}:80"
     depends_on:
       - bridge
     restart: always
@@ -43,6 +47,15 @@ services:
   # --- Optional demo databases ---------------------------------------------
   # Connect from the app with host "postgres" / "mysql" (port 5432 / 3306).
   # Delete these two services if you only connect to your own databases.
+  #
+  # These ship with a well-known password, so they are published to localhost
+  # only. The app doesn't use these ports — it reaches the databases over the
+  # compose network — so this affects nothing but external clients on the host.
+  # To attach one (DBeaver, psql, …) from another machine, set DB_BIND_ADDR.
+  #
+  # NOTE: a published port bypasses ufw/firewalld, which filter the host's INPUT
+  # chain while Docker forwards ahead of it. The bind address is enforced by
+  # Docker itself, which is why it's set here rather than left to the firewall.
   postgres:
     container_name: mamasql_postgres
     image: postgres:16-alpine
@@ -51,7 +64,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD:-mamasql}
       POSTGRES_DB: ${DB_DATABASE:-demo}
     ports:
-      - "${PG_PORT:-5433}:5432"
+      - "${DB_BIND_ADDR:-127.0.0.1}:${PG_PORT:-5433}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: always
@@ -63,7 +76,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-mamasql}
       MYSQL_DATABASE: ${DB_DATABASE:-demo}
     ports:
-      - "${MYSQL_PORT:-3307}:3306"
+      - "${DB_BIND_ADDR:-127.0.0.1}:${MYSQL_PORT:-3307}:3306"
     volumes:
       - mysqldata:/var/lib/mysql
     restart: always

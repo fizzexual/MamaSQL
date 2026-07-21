@@ -97,6 +97,19 @@ Connect from the app via **＋ New connection**:
 
 `docker compose down` stops it (`-v` also removes the demo-DB volumes). Configure ports/credentials/version in `.env`. Don't want the demo databases? Delete the `postgres`/`mysql` services from `docker-compose.yml`.
 
+### Running it on a server
+
+MamaSQL has no login, and the bridge will open a connection to any host it is given — so anyone who can reach the web port can reach your databases, and can use the bridge to probe hosts on the same network. On anything beyond your own machine, publish it to one interface via `BIND_ADDR` in `.env`:
+
+```dotenv
+BIND_ADDR=127.0.0.1     # localhost only — reach it over an SSH tunnel
+BIND_ADDR=100.x.y.z     # a VPN/Tailscale address only
+```
+
+Note that a published container port is **not** filtered by `ufw`/`firewalld`: those filter the host's `INPUT` chain, while Docker forwards traffic ahead of it. A firewall rule alone will not close a published port — `BIND_ADDR` is enforced by Docker itself, so use that.
+
+The demo databases ship with a well-known password and are published to localhost only (`DB_BIND_ADDR`). The app doesn't use those host ports — it reaches the databases over the compose network — so widen it only to attach an external client.
+
 **Build the images yourself** from a source checkout instead of pulling:
 
 ```bash
