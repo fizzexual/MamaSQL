@@ -1,4 +1,4 @@
-# MamaSQL
+# MamaSQL 🌿
 
 *The only SQL app you'll ever need.*
 
@@ -9,6 +9,10 @@
 **A local-first, multi-engine SQL workbench** — one client for **PostgreSQL**, **MySQL/MariaDB**, and **SQLite** that runs as a single native desktop executable *or* entirely in the browser. Browse schemas, write SQL in a schema-aware CodeMirror editor, edit rows and tables inline, and pivot any result set into per-column statistics or a chart.
 
 One driver abstraction, three engines, two runtimes, zero telemetry — credentials live in the OS keychain and your queries never leave your machine.
+
+## About
+
+MamaSQL is a database client for people who work with PostgreSQL, MySQL/MariaDB and SQLite and want one fast, local tool instead of several. It runs as a native Windows desktop app (Tauri + Rust) or as a browser build via Docker. Milestones M1 to M5 (editor, inline editing, local databases, stats and charts) are done, and releases are built automatically by CI.
 
 ---
 
