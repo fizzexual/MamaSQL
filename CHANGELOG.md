@@ -4,9 +4,25 @@ All notable changes to MamaSQL are listed here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 CI builds a new `v0.1.N` release on every push to `main` (N is the CI run number), so
-there are many small releases. This file groups them by release date. Dates are
+there are many small releases. Docs-only commits marked `[skip ci]`, such as updates to
+this file, do not create a release. This file groups releases by date. Dates are
 YYYY-MM-DD (UTC). The per-release notes and the `MamaSQL.exe` downloads are on the
 [GitHub Releases page](https://github.com/fizzexual/MamaSQL/releases).
+
+## [0.1.98 - 0.1.100] - 2026-10-06
+
+### Added
+- CHANGELOG and CONTRIBUTING guides (0.1.98).
+- `npm test` runs the frontend tests (Vitest) (0.1.100).
+
+### Fixed
+- The store tests pass again: they now build their own in-memory SQLite connections instead
+  of relying on the demo connections removed earlier, and check the per-editor results and
+  the "Open a connection first." message (0.1.100). No app behaviour changed.
+
+### Security
+- Updated dependencies to close Dependabot alerts: mysql2 3.24.5, vitest 4.1.11, postcss,
+  shell-quote, browserslist (0.1.99). Build and the Rust tests pass unchanged.
 
 ## [0.1.97] - 2026-10-05
 
