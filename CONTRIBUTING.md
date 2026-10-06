@@ -53,7 +53,7 @@ cd src-tauri && cargo test
 The PostgreSQL and MySQL integration tests are skipped unless `MAMASQL_PG_TEST` or
 `MAMASQL_MYSQL_TEST` is set. Without them, the rest of the Rust suite still runs.
 
-The TypeScript store tests use Vitest (`src/state/store.test.ts`).
+The TypeScript store tests use Vitest (`src/state/store.test.ts`); run them with `npm test`.
 
 ## Type check and build
 
