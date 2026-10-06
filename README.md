@@ -189,6 +189,8 @@ See [`docs/superpowers/specs/`](docs/superpowers/specs/) for the full design spe
 
 [MIT](LICENSE) © 2026 Stiliyan Stoyanov
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) to send a change, [SECURITY.md](SECURITY.md) to report a vulnerability, and [CHANGELOG.md](CHANGELOG.md) for release history.
+
 ---
 
 _Built with [Claude Code](https://claude.com/claude-code)._
