@@ -156,14 +156,21 @@ const pools = new Map(); // id -> { engine, conn }
 function appError(kind, message) {
   return { error: { kind, message } };
 }
+/**
+ * The text of an error, for the client: only a message string — never the raw
+ * value, whose string form can carry a stack trace. Details stay in the log.
+ */
 function errMessage(e) {
+  if (typeof e === "string") return e;
   // pg's happy-eyeballs wraps connection failures in an AggregateError whose
   // inner errors hold the useful ECONNREFUSED/timeout detail.
   if (e && e.name === "AggregateError" && Array.isArray(e.errors) && e.errors.length) {
-    const inner = e.errors.map((x) => (x && x.message ? x.message : String(x)));
+    const inner = e.errors.map((x) => (x && typeof x.message === "string" ? x.message : "connection failed"));
     return [...new Set(inner)].join("; ");
   }
-  return e && e.message ? String(e.message) : String(e);
+  if (e && typeof e.message === "string" && e.message) return e.message;
+  console.error("[bridge] error without a message:", e);
+  return "Unexpected error";
 }
 
 /* ---- identifier quoting + placeholders per engine ---- */
@@ -722,7 +729,7 @@ function sendJson(res, status, obj) {
     body = JSON.stringify(obj, (_k, v) => (typeof v === "bigint" ? Number(v) : v));
   } catch (e) {
     code = 400;
-    body = JSON.stringify({ error: { kind: "internal", message: `Result not serializable: ${String(e)}` } });
+    body = JSON.stringify({ error: { kind: "internal", message: `Result not serializable: ${errMessage(e)}` } });
   }
   if (res.headersSent) {
     try {
