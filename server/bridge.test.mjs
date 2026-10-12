@@ -153,3 +153,69 @@ describe("bridge in Docker: the web container proxies with the page's own Host",
     expect(r.status).toBe(403);
   });
 });
+
+describe("bridge: SQLite writes reach the file on disk", () => {
+  let b;
+  beforeAll(async () => {
+    b = await startBridge();
+  });
+
+  async function freshDb(name) {
+    const cfg = { engine: "sqlite", database: name };
+    expect((await call(b, "open", { id: name, cfg })).status).toBe(200);
+    await call(b, "query", { id: name, sql: "CREATE TABLE t (x INTEGER)" });
+    return name;
+  }
+
+  it("persists a plain INSERT", async () => {
+    const id = await freshDb("plain");
+    await call(b, "query", { id, sql: "INSERT INTO t VALUES (1)" });
+    expect(onDisk(b, id, "SELECT x FROM t")).toEqual([[1]]);
+  });
+
+  it("persists a write that starts with WITH", async () => {
+    const id = await freshDb("cte");
+    await call(b, "query", { id, sql: "WITH a(v) AS (SELECT 7) INSERT INTO t SELECT v FROM a" });
+    expect(onDisk(b, id, "SELECT x FROM t")).toEqual([[7]]);
+  });
+
+  it("keeps saving after a one-shot BEGIN; …; COMMIT; script", async () => {
+    const id = await freshDb("script");
+    await call(b, "query", { id, sql: "BEGIN; INSERT INTO t VALUES (1); COMMIT;" });
+    await call(b, "query", { id, sql: "INSERT INTO t VALUES (2)" });
+    await call(b, "updateCell", { id, table: "t", pkColumn: "x", pkValue: 2, column: "x", value: 5 });
+    expect(onDisk(b, id, "SELECT x FROM t ORDER BY x")).toEqual([[1], [5]]);
+  });
+
+  it("does not save a transaction until it is committed, then saves it", async () => {
+    const id = await freshDb("txn");
+    await call(b, "query", { id, sql: "BEGIN" });
+    await call(b, "query", { id, sql: "INSERT INTO t VALUES (1)" });
+    expect(onDisk(b, id, "SELECT x FROM t")).toEqual([]);
+    await call(b, "query", { id, sql: "COMMIT" });
+    expect(onDisk(b, id, "SELECT x FROM t")).toEqual([[1]]);
+  });
+
+  it("drops a rolled-back transaction", async () => {
+    const id = await freshDb("rollback");
+    await call(b, "query", { id, sql: "INSERT INTO t VALUES (1)" });
+    await call(b, "query", { id, sql: "BEGIN; INSERT INTO t VALUES (2); ROLLBACK;" });
+    await call(b, "query", { id, sql: "INSERT INTO t VALUES (3)" });
+    expect(onDisk(b, id, "SELECT x FROM t ORDER BY x")).toEqual([[1], [3]]);
+  });
+
+  it("saves the statements that ran before a failing one in the same script", async () => {
+    const id = await freshDb("partial");
+    const r = await call(b, "query", { id, sql: "INSERT INTO t VALUES (1); INSERT INTO nope VALUES (2);" });
+    expect(r.status).toBe(400);
+    expect(onDisk(b, id, "SELECT x FROM t")).toEqual([[1]]);
+  });
+
+  it("persists schema-only changes (DDL, user_version)", async () => {
+    const id = await freshDb("ddl");
+    await call(b, "query", { id, sql: "CREATE INDEX ix ON t (x)" });
+    await call(b, "query", { id, sql: "PRAGMA user_version = 7" });
+    expect(onDisk(b, id, "SELECT name FROM sqlite_master WHERE type = 'index'")).toEqual([["ix"]]);
+    expect(onDisk(b, id, "PRAGMA user_version")).toEqual([[7]]);
+  });
+});

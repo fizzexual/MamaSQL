@@ -5,7 +5,7 @@
 // mysql2). Run it with `npm run bridge` (or `npm run dev:all`) and the web app
 // will route Postgres/MySQL connections here automatically. SQLite stays fully
 // in-browser and does not need this server.
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -41,26 +41,57 @@ function sqlitePath(fileKey) {
 // One in-memory sql.js database per file, shared by every connection pointing at
 // it (so concurrent browsers see each other's writes via this single process).
 const sqliteDbs = new Map(); // fileKey -> Database
-const sqliteTxn = new Set(); // fileKeys with an open transaction (defer persist)
+const sqliteSaved = new Map(); // fileKey -> changeStamp() of what is on disk
+
+// What SQLite itself says changed: row changes (any statement shape, including
+// WITH … INSERT), schema changes (DDL), and user_version. Asking the engine
+// instead of pattern-matching the SQL text is what keeps writes from being missed.
+function changeStamp(db) {
+  const one = (sql) => db.exec(sql)[0].values[0][0];
+  return `${one("SELECT total_changes()")}:${one("PRAGMA schema_version")}:${one("PRAGMA user_version")}`;
+}
+// sql.js has no autocommit getter; BEGIN fails exactly when a transaction is open.
+function inTransaction(db) {
+  try {
+    db.exec("BEGIN");
+  } catch {
+    return true;
+  }
+  db.exec("ROLLBACK");
+  return false;
+}
 
 async function openSqlite(fileKey) {
   let db = sqliteDbs.get(fileKey);
   if (db) return db;
   const SQL = await sqlJs();
   const file = sqlitePath(fileKey);
-  db = existsSync(file) ? new SQL.Database(readFileSync(file)) : new SQL.Database();
+  const existed = existsSync(file);
+  db = existed ? new SQL.Database(readFileSync(file)) : new SQL.Database();
   sqliteDbs.set(fileKey, db);
-  if (!existsSync(file)) writeFileSync(file, Buffer.from(db.export()));
+  if (existed) sqliteSaved.set(fileKey, changeStamp(db));
+  else persistSqlite(fileKey);
   return db;
 }
+/** Write the whole database to disk: temp file + rename, so a crash can't leave half a file. */
 function persistSqlite(fileKey) {
   const db = sqliteDbs.get(fileKey);
-  if (db) writeFileSync(sqlitePath(fileKey), Buffer.from(db.export()));
+  if (!db) return;
+  const file = sqlitePath(fileKey);
+  writeFileSync(`${file}.tmp`, Buffer.from(db.export()));
+  renameSync(`${file}.tmp`, file);
+  sqliteSaved.set(fileKey, changeStamp(db));
+}
+/** Save when something changed and no transaction is open (a transaction saves at COMMIT). */
+function saveIfChanged(fileKey) {
+  const db = sqliteDbs.get(fileKey);
+  if (!db || inTransaction(db)) return;
+  if (sqliteSaved.get(fileKey) !== changeStamp(db)) persistSqlite(fileKey);
 }
 function sqliteIdent(id) {
   return `"${String(id).replace(/"/g, '""')}"`;
 }
-/** Run one statement with bound params; persist (unless inside a transaction). */
+/** Run one statement with bound params, then save it. */
 function sqliteRun(fileKey, sql, params = []) {
   const db = sqliteDbs.get(fileKey);
   const st = db.prepare(sql);
@@ -68,15 +99,23 @@ function sqliteRun(fileKey, sql, params = []) {
     st.run(params);
   } finally {
     st.free();
+    saveIfChanged(fileKey);
   }
-  if (!sqliteTxn.has(fileKey)) persistSqlite(fileKey);
 }
 /** Run a (possibly multi-statement) query; returns the last result set. */
 function sqliteQuery(fileKey, sql, started) {
   const db = sqliteDbs.get(fileKey);
   let columns = [];
   let rows = [];
-  const res = db.exec(sql);
+  let res;
+  let rowsAffected = 0;
+  try {
+    res = db.exec(sql);
+    rowsAffected = db.getRowsModified(); // before saving: export() reopens the db and resets it
+  } finally {
+    // Statements before a failing one have already run — save them too.
+    saveIfChanged(fileKey);
+  }
   if (res.length) {
     const last = res[res.length - 1];
     columns = last.columns;
@@ -90,15 +129,10 @@ function sqliteQuery(fileKey, sql, started) {
       /* ignore */
     }
   }
-  const s = sql.trim().toLowerCase();
-  if (/^begin\b/.test(s)) sqliteTxn.add(fileKey);
-  else if (/^(commit|end|rollback)\b/.test(s)) sqliteTxn.delete(fileKey);
-  const isWrite = !/^\s*(select|with|pragma|explain)\b/i.test(sql);
-  if (isWrite && !sqliteTxn.has(fileKey)) persistSqlite(fileKey);
   return {
     columns: columns.map((name) => ({ name, dataType: "" })),
     rows,
-    rowsAffected: db.getRowsModified(),
+    rowsAffected,
     elapsedMs: Math.max(1, Math.round(performance.now() - started)),
     truncated: false,
   };
