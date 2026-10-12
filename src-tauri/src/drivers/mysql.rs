@@ -163,10 +163,11 @@ impl Driver for MySqlDriver {
         Ok(rows
             .iter()
             .map(|r| {
-                let table_type: String = try_get_text(r, "table_type");
+                // By position: MySQL 8 labels these TABLE_NAME / TABLE_TYPE.
+                let table_type: String = try_get_text(r, 1);
                 let kind = if table_type == "VIEW" { "view" } else { "table" };
                 TableInfo {
-                    name: try_get_text(r, "table_name"),
+                    name: try_get_text(r, 0),
                     kind: kind.to_string(),
                     schema: None,
                 }
