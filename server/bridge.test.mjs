@@ -123,6 +123,14 @@ describe("bridge: who may use it", () => {
     expect(r.status).toBe(403);
   });
 
+  it("only dispatches to its own endpoints, never inherited object methods", async () => {
+    for (const name of ["toString", "constructor", "hasOwnProperty", "__proto__", "valueOf"]) {
+      const r = await call(b, name, {});
+      expect(r.status, name).toBe(404);
+      expect(r.body.error.kind, name).toBe("notFound");
+    }
+  });
+
   it("refuses a cross-site CORS preflight", async () => {
     const r = await call(b, "query", null, { Origin: "https://evil.example", "Access-Control-Request-Method": "POST" }, "OPTIONS");
     expect(r.status).toBe(403);

@@ -665,6 +665,9 @@ const handlers = {
 
 /* ---- HTTP plumbing ---- */
 
+/** The endpoints the bridge serves: exactly the handlers above, nothing inherited. */
+const endpoints = new Map(Object.entries(handlers));
+
 // The bridge opens database connections for whoever asks, so it must only
 // answer the MamaSQL page itself — never another website the user happens to
 // have open (a browser lets any page POST to localhost).
@@ -752,7 +755,9 @@ const server = createServer((req, res) => {
     return;
   }
   const path = (req.url || "").replace(/^\/api\//, "").replace(/\?.*$/, "").replace(/^\//, "");
-  const handler = handlers[path];
+  // A Map, not handlers[path]: a plain object lookup would also reach inherited
+  // methods such as /api/toString or /api/constructor.
+  const handler = endpoints.get(path);
   if (!handler) return sendJson(res, 404, appError("notFound", `Unknown endpoint: ${path}`));
 
   if (req.method === "GET") {
