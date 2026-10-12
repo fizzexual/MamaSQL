@@ -39,7 +39,12 @@ fn sanitize_ident(name: &str) -> String {
 /// information_schema text columns can come back as utf8 strings OR as binary
 /// (varbinary/blob) depending on MySQL/MariaDB version + collation. Decode
 /// defensively so introspection never panics (a panic would hang the command).
-fn try_get_text(row: &sqlx::mysql::MySqlRow, col: &str) -> String {
+/// `col` is a column position or name; prefer the position for information_schema,
+/// whose column labels are UPPER case on MySQL 8 but as-written on MariaDB.
+fn try_get_text<I>(row: &sqlx::mysql::MySqlRow, col: I) -> String
+where
+    I: sqlx::ColumnIndex<sqlx::mysql::MySqlRow> + Copy,
+{
     if let Ok(s) = row.try_get::<String, _>(col) {
         return s;
     }
