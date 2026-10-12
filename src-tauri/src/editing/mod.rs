@@ -25,6 +25,59 @@ fn literal(v: &Value) -> String {
     }
 }
 
+/// A row's primary key as the UI sends it: one column (`"id"`), or every column
+/// of a composite key (`["a", "b"]`, with the key value an array of the same length).
+#[derive(Debug, Clone, serde::Deserialize)]
+#[serde(untagged)]
+pub enum KeyColumns {
+    One(String),
+    Many(Vec<String>),
+}
+
+/// `"a" = '1' AND "b" = '2'`. Matching on only part of a composite key would hit
+/// every row that shares it, so a key whose values don't line up is refused.
+fn key_where(engine: Engine, key: &KeyColumns, key_value: &Value) -> Result<String, String> {
+    let pairs: Vec<(&str, &Value)> = match key {
+        KeyColumns::One(c) => vec![(c.as_str(), key_value)],
+        KeyColumns::Many(cols) => match key_value {
+            Value::Array(vals) if !cols.is_empty() && cols.len() == vals.len() => {
+                cols.iter().map(String::as_str).zip(vals.iter()).collect()
+            }
+            _ => return Err("The row key needs one value per key column.".into()),
+        },
+    };
+    Ok(pairs
+        .iter()
+        .map(|(c, v)| format!("{} = {}", quote_ident(engine, c), literal(v)))
+        .collect::<Vec<_>>()
+        .join(" AND "))
+}
+
+pub fn build_update_key(
+    engine: Engine,
+    table: &str,
+    set_column: &str,
+    set_value: &Value,
+    key: &KeyColumns,
+    key_value: &Value,
+) -> Result<String, String> {
+    Ok(format!(
+        "UPDATE {} SET {} = {} WHERE {}",
+        quote_ident(engine, table),
+        quote_ident(engine, set_column),
+        literal(set_value),
+        key_where(engine, key, key_value)?,
+    ))
+}
+
+pub fn build_delete_key(engine: Engine, table: &str, key: &KeyColumns, key_value: &Value) -> Result<String, String> {
+    Ok(format!(
+        "DELETE FROM {} WHERE {}",
+        quote_ident(engine, table),
+        key_where(engine, key, key_value)?,
+    ))
+}
+
 pub fn build_update(
     engine: Engine,
     table: &str,
@@ -33,23 +86,13 @@ pub fn build_update(
     pk_column: &str,
     pk_value: &Value,
 ) -> String {
-    format!(
-        "UPDATE {} SET {} = {} WHERE {} = {}",
-        quote_ident(engine, table),
-        quote_ident(engine, set_column),
-        literal(set_value),
-        quote_ident(engine, pk_column),
-        literal(pk_value),
-    )
+    let key = KeyColumns::One(pk_column.to_string());
+    build_update_key(engine, table, set_column, set_value, &key, pk_value).expect("a single key always matches")
 }
 
 pub fn build_delete(engine: Engine, table: &str, pk_column: &str, pk_value: &Value) -> String {
-    format!(
-        "DELETE FROM {} WHERE {} = {}",
-        quote_ident(engine, table),
-        quote_ident(engine, pk_column),
-        literal(pk_value),
-    )
+    let key = KeyColumns::One(pk_column.to_string());
+    build_delete_key(engine, table, &key, pk_value).expect("a single key always matches")
 }
 
 pub fn build_insert(engine: Engine, table: &str, columns: &[String], values: &[Value]) -> String {
@@ -212,5 +255,40 @@ mod tests {
             ),
             r#"INSERT INTO "t" ("a", "b") VALUES ('x', '2')"#
         );
+    }
+
+    fn keys(v: Value) -> KeyColumns {
+        serde_json::from_value(v).unwrap()
+    }
+
+    #[test]
+    fn key_columns_accept_one_name_or_a_list() {
+        assert!(matches!(keys(json!("id")), KeyColumns::One(c) if c == "id"));
+        assert!(matches!(keys(json!(["a", "b"])), KeyColumns::Many(c) if c == ["a", "b"]));
+    }
+
+    #[test]
+    fn composite_key_update_names_every_key_column() {
+        let sql = build_update_key(Engine::Postgres, "ck", "v", &json!("x"), &keys(json!(["a", "b"])), &json!([1, 2])).unwrap();
+        assert_eq!(sql, r#"UPDATE "ck" SET "v" = 'x' WHERE "a" = '1' AND "b" = '2'"#);
+    }
+
+    #[test]
+    fn composite_key_delete_names_every_key_column() {
+        let sql = build_delete_key(Engine::MySql, "ck", &keys(json!(["a", "b"])), &json!([1, 3])).unwrap();
+        assert_eq!(sql, "DELETE FROM `ck` WHERE `a` = '1' AND `b` = '3'");
+    }
+
+    #[test]
+    fn single_key_still_builds_the_old_statement() {
+        let sql = build_delete_key(Engine::Postgres, "t", &keys(json!("id")), &json!(3)).unwrap();
+        assert_eq!(sql, build_delete(Engine::Postgres, "t", "id", &json!(3)));
+    }
+
+    #[test]
+    fn a_key_missing_values_is_refused_not_widened() {
+        assert!(build_delete_key(Engine::Postgres, "ck", &keys(json!(["a", "b"])), &json!([1])).is_err());
+        assert!(build_delete_key(Engine::Postgres, "ck", &keys(json!(["a", "b"])), &json!(1)).is_err());
+        assert!(build_delete_key(Engine::Postgres, "ck", &keys(json!([])), &json!([])).is_err());
     }
 }
