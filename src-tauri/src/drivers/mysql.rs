@@ -187,12 +187,13 @@ impl Driver for MySqlDriver {
         Ok(rows
             .iter()
             .map(|r| {
-                let name = try_get_text(r, "column_name");
+                // By position (column_name, data_type, is_nullable, column_key):
+                // MySQL 8 labels them COLUMN_NAME, DATA_TYPE, ….
                 ColumnInfo {
-                    is_primary_key: try_get_text(r, "column_key") == "PRI",
-                    nullable: try_get_text(r, "is_nullable") == "YES",
-                    data_type: try_get_text(r, "data_type"),
-                    name,
+                    name: try_get_text(r, 0),
+                    data_type: try_get_text(r, 1),
+                    nullable: try_get_text(r, 2) == "YES",
+                    is_primary_key: try_get_text(r, 3) == "PRI",
                 }
             })
             .collect())
