@@ -257,4 +257,40 @@ mod tests {
 
         d.execute("DROP TABLE mamasql_t").await.unwrap();
     }
+
+    // MySQL 8 labels information_schema columns in UPPER case (TABLE_NAME) while
+    // MariaDB keeps them as written, so reading them by lower-case name came back
+    // empty on MySQL 8: blank table names, no primary keys. Run this against both.
+    #[tokio::test]
+    async fn mysql_introspection_names_kinds_and_keys() {
+        let Some((cfg, pass)) = my_cfg() else {
+            eprintln!("skipping mysql_introspection (set MAMASQL_MYSQL_TEST to run)");
+            return;
+        };
+        let d = MySqlDriver::connect(&cfg, pass.as_deref()).await.unwrap();
+        d.execute("DROP VIEW IF EXISTS mamasql_iv").await.unwrap();
+        d.execute("DROP TABLE IF EXISTS mamasql_i").await.unwrap();
+        d.execute("CREATE TABLE mamasql_i (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, score DOUBLE)")
+            .await
+            .unwrap();
+        d.execute("CREATE VIEW mamasql_iv AS SELECT id, name FROM mamasql_i").await.unwrap();
+
+        let tables = d.list_tables().await.unwrap();
+        assert!(tables.iter().all(|t| !t.name.is_empty()), "blank table name in {tables:?}");
+        let kind = |n: &str| tables.iter().find(|t| t.name == n).map(|t| t.kind.clone());
+        assert_eq!(kind("mamasql_i").as_deref(), Some("table"));
+        assert_eq!(kind("mamasql_iv").as_deref(), Some("view"));
+
+        let cols = d.list_columns("mamasql_i").await.unwrap();
+        assert_eq!(cols.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["id", "name", "score"]);
+        assert_eq!(cols.iter().map(|c| c.is_primary_key).collect::<Vec<_>>(), [true, false, false]);
+        assert_eq!(cols.iter().map(|c| c.nullable).collect::<Vec<_>>(), [false, false, true]);
+        assert_eq!(cols.iter().map(|c| c.data_type.as_str()).collect::<Vec<_>>(), ["int", "varchar", "double"]);
+
+        let dbs = MySqlDriver::list_databases(&cfg, pass.as_deref()).await.unwrap();
+        assert!(dbs.contains(&cfg.database), "{} not in {dbs:?}", cfg.database);
+
+        d.execute("DROP VIEW mamasql_iv").await.unwrap();
+        d.execute("DROP TABLE mamasql_i").await.unwrap();
+    }
 }
