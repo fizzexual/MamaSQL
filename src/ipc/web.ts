@@ -48,7 +48,7 @@ export const webBackend: Backend = {
     } catch {
       /* bridge may be down — ignore */
     }
-    deleteSecret(id);
+    await deleteSecret(id);
     await localBackend.deleteConnection(id);
   },
 
