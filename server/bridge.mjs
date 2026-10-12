@@ -388,8 +388,14 @@ const handlers = {
       persistSqlite(key);
       return { ok: true };
     }
-    const safe = String(name).replace(/[^A-Za-z0-9_]/g, "");
-    if (!safe) throw new Error("Invalid database name");
+    // Plain names only, used exactly as typed. Stripping the rest instead would
+    // silently create a different database ("my-db" -> "mydb").
+    const safe = String(name ?? "");
+    if (!/^[A-Za-z_][A-Za-z0-9_]{0,62}$/.test(safe)) {
+      const err = new Error(`Invalid database name "${safe}": use letters, digits and _ (not starting with a digit).`);
+      err.kind = "badRequest";
+      throw err;
+    }
     const base = { ...cfg, database: cfg.engine === "postgres" ? "postgres" : "" };
     const conn = await connect(base, password);
     try {

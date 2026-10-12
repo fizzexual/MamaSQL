@@ -171,6 +171,35 @@ describe("bridge: error replies carry a message, never a stack trace", () => {
   });
 });
 
+describe("bridge: creating a database", () => {
+  let b;
+  beforeAll(async () => {
+    b = await startBridge();
+  });
+  const env = process.env;
+  const pg = () => ({
+    engine: "postgres",
+    host: env.MAMASQL_PG_HOST || "localhost",
+    port: Number(env.MAMASQL_PG_PORT) || 5432,
+    database: env.MAMASQL_PG_DB || "postgres",
+    username: env.MAMASQL_PG_USER || "postgres",
+  });
+  const names = async () => (await call(b, "databases", { cfg: pg(), password: env.MAMASQL_PG_PASS })).body;
+
+  it.skipIf(!env.MAMASQL_PG_TEST)("refuses a name it would have to change, instead of creating another database", async () => {
+    const r = await call(b, "createDatabase", { cfg: pg(), password: env.MAMASQL_PG_PASS, name: "my-db; x" });
+    expect(r.status).toBe(400);
+    expect(r.body.error.kind).toBe("badRequest");
+    expect(await names()).not.toContain("mydbx");
+  });
+
+  it.skipIf(!env.MAMASQL_PG_TEST)("creates a plain name as given", async () => {
+    const name = `mamasql_t_${Date.now()}`;
+    expect((await call(b, "createDatabase", { cfg: pg(), password: env.MAMASQL_PG_PASS, name })).status).toBe(200);
+    expect(await names()).toContain(name);
+  });
+});
+
 describe("bridge in Docker: the web container proxies with the page's own Host", () => {
   let b;
   beforeAll(async () => {
