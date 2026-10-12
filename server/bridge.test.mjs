@@ -131,6 +131,13 @@ describe("bridge: who may use it", () => {
     }
   });
 
+  it("refuses an engine it does not know, without touching the pool", async () => {
+    const r = await call(b, "open", { id: "odd", cfg: { engine: "toString", host: "127.0.0.1" } });
+    expect(r.status).toBe(400);
+    const after = await call(b, "updateCell", { id: "odd", table: "t", pkColumn: "a", pkValue: 1, column: "v", value: 1 });
+    expect(after.body.error.kind).toBe("notConnected");
+  });
+
   it("refuses a cross-site CORS preflight", async () => {
     const r = await call(b, "query", null, { Origin: "https://evil.example", "Access-Control-Request-Method": "POST" }, "OPTIONS");
     expect(r.status).toBe(403);

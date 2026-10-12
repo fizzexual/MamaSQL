@@ -173,6 +173,15 @@ const quote = {
 };
 const placeholder = { postgres: (i) => `$${i + 1}`, mysql: () => "?" };
 
+/** Quoting + placeholders for a server engine: an explicit switch, never a lookup by a client-sent name. */
+function dialect(engine) {
+  if (engine === "postgres") return { Q: quote.postgres, P: placeholder.postgres };
+  if (engine === "mysql") return { Q: quote.mysql, P: placeholder.mysql };
+  const err = new Error(`Unsupported engine: ${String(engine)}`);
+  err.kind = "badRequest";
+  throw err;
+}
+
 /**
  * The WHERE clause that names exactly one row: `pkColumn` is one key column, or
  * every column of a composite key (with `pkValue` the matching array). Matching
@@ -377,7 +386,7 @@ const handlers = {
     const base = { ...cfg, database: cfg.engine === "postgres" ? "postgres" : "" };
     const conn = await connect(base, password);
     try {
-      await conn.query(`CREATE DATABASE ${quote[cfg.engine](safe)}`);
+      await conn.query(`CREATE DATABASE ${dialect(cfg.engine).Q(safe)}`);
       return { ok: true };
     } finally {
       await closeConn({ engine: cfg.engine, conn });
@@ -521,8 +530,7 @@ const handlers = {
       sqliteRun(fileKey, `UPDATE ${sqliteIdent(table)} SET ${sqliteIdent(column)} = ? WHERE ${key.sql}`, [value, ...key.params]);
       return { ok: true };
     }
-    const Q = quote[engine];
-    const P = placeholder[engine];
+    const { Q, P } = dialect(engine);
     const key = keyWhere(Q, P, pkColumn, pkValue, 1);
     await conn.query(`UPDATE ${Q(table)} SET ${Q(column)} = ${P(0)} WHERE ${key.sql}`, [value, ...key.params]);
     return { ok: true };
@@ -534,8 +542,8 @@ const handlers = {
       sqliteRun(fileKey, `DELETE FROM ${sqliteIdent(table)} WHERE ${key.sql}`, key.params);
       return { ok: true };
     }
-    const Q = quote[engine];
-    const key = keyWhere(Q, placeholder[engine], pkColumn, pkValue, 0);
+    const { Q, P } = dialect(engine);
+    const key = keyWhere(Q, P, pkColumn, pkValue, 0);
     await conn.query(`DELETE FROM ${Q(table)} WHERE ${key.sql}`, key.params);
     return { ok: true };
   },
@@ -551,9 +559,9 @@ const handlers = {
       }
       return { ok: true };
     }
-    const Q = quote[engine];
+    const { Q, P } = dialect(engine);
     const cols = columns.map(Q).join(", ");
-    const ph = columns.map((_, i) => placeholder[engine](i)).join(", ");
+    const ph = columns.map((_, i) => P(i)).join(", ");
     await conn.query(`INSERT INTO ${Q(table)} (${cols}) VALUES (${ph})`, values);
     return { ok: true };
   },
@@ -607,7 +615,7 @@ const handlers = {
       sqliteRun(fileKey, `CREATE TABLE ${sqliteIdent(name)} (${defs})`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     const defs = cols
       .map((c) => {
         const parts = [Q(c.name), c.dataType || "TEXT"];
@@ -625,7 +633,7 @@ const handlers = {
       sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(table)} ADD COLUMN ${sqliteIdent(column.name)} ${column.dataType || "TEXT"}`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     await conn.query(`ALTER TABLE ${Q(table)} ADD COLUMN ${Q(column.name)} ${column.dataType || "TEXT"}`);
     return { ok: true };
   },
@@ -635,7 +643,7 @@ const handlers = {
       sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(table)} DROP COLUMN ${sqliteIdent(column)}`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     await conn.query(`ALTER TABLE ${Q(table)} DROP COLUMN ${Q(column)}`);
     return { ok: true };
   },
@@ -645,7 +653,7 @@ const handlers = {
       sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(table)} RENAME COLUMN ${sqliteIdent(from)} TO ${sqliteIdent(to)}`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     await conn.query(`ALTER TABLE ${Q(table)} RENAME COLUMN ${Q(from)} TO ${Q(to)}`);
     return { ok: true };
   },
@@ -655,7 +663,7 @@ const handlers = {
       sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(from)} RENAME TO ${sqliteIdent(to)}`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     const sql =
       engine === "mysql" ? `RENAME TABLE ${Q(from)} TO ${Q(to)}` : `ALTER TABLE ${Q(from)} RENAME TO ${Q(to)}`;
     await conn.query(sql);
