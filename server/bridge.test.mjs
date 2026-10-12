@@ -219,3 +219,69 @@ describe("bridge: SQLite writes reach the file on disk", () => {
     expect(onDisk(b, id, "PRAGMA user_version")).toEqual([[7]]);
   });
 });
+
+// Composite primary keys: the edit/delete must name every key column.
+const KEYED = "CREATE TABLE ck (a INTEGER, b INTEGER, v TEXT, PRIMARY KEY (a, b))";
+const KEYED_ROWS = "INSERT INTO ck VALUES (1, 1, 'x'), (1, 2, 'y'), (1, 3, 'z')";
+
+async function compositeKeyChecks(b, id) {
+  await call(b, "query", { id, sql: "DROP TABLE IF EXISTS ck" });
+  await call(b, "query", { id, sql: KEYED });
+  await call(b, "query", { id, sql: KEYED_ROWS });
+  const upd = await call(b, "updateCell", { id, table: "ck", pkColumn: ["a", "b"], pkValue: [1, 2], column: "v", value: "EDITED" });
+  expect(upd.status).toBe(200);
+  const del = await call(b, "deleteRow", { id, table: "ck", pkColumn: ["a", "b"], pkValue: [1, 3] });
+  expect(del.status).toBe(200);
+  const r = await call(b, "query", { id, sql: "SELECT a, b, v FROM ck ORDER BY b" });
+  expect(r.body.rows).toEqual([
+    [1, 1, "x"],
+    [1, 2, "EDITED"],
+  ]);
+  // A single key column (the old call shape) keeps working.
+  await call(b, "updateCell", { id, table: "ck", pkColumn: "b", pkValue: 1, column: "v", value: "one" });
+  expect((await call(b, "query", { id, sql: "SELECT v FROM ck WHERE b = 1" })).body.rows).toEqual([["one"]]);
+  // A key with the wrong number of values is refused, not widened.
+  const bad = await call(b, "deleteRow", { id, table: "ck", pkColumn: ["a", "b"], pkValue: [1] });
+  expect(bad.status).toBe(400);
+  // count(*) is a bigint: Postgres sends it as the string "2".
+  expect(Number((await call(b, "query", { id, sql: "SELECT count(*) FROM ck" })).body.rows[0][0])).toBe(2);
+}
+
+describe("bridge: composite primary keys", () => {
+  let b;
+  beforeAll(async () => {
+    b = await startBridge();
+  });
+
+  it("SQLite: edits and deletes exactly one row", async () => {
+    await call(b, "open", { id: "ck", cfg: { engine: "sqlite", database: "ck" } });
+    await compositeKeyChecks(b, "ck");
+  });
+
+  // Live engines: run with the same variables as the Rust integration tests.
+  // Skipped (shown as skipped, not passed) when they are not set.
+  const env = process.env;
+  it.skipIf(!env.MAMASQL_PG_TEST)("PostgreSQL: edits and deletes exactly one row", async () => {
+    const cfg = {
+      engine: "postgres",
+      host: env.MAMASQL_PG_HOST || "localhost",
+      port: Number(env.MAMASQL_PG_PORT) || 5432,
+      database: env.MAMASQL_PG_DB || "postgres",
+      username: env.MAMASQL_PG_USER || "postgres",
+    };
+    expect((await call(b, "open", { id: "pg", cfg, password: env.MAMASQL_PG_PASS })).status).toBe(200);
+    await compositeKeyChecks(b, "pg");
+  });
+
+  it.skipIf(!env.MAMASQL_MYSQL_TEST)("MySQL: edits and deletes exactly one row", async () => {
+    const cfg = {
+      engine: "mysql",
+      host: env.MAMASQL_MYSQL_HOST || "localhost",
+      port: Number(env.MAMASQL_MYSQL_PORT) || 3306,
+      database: env.MAMASQL_MYSQL_DB || "mamasql_test",
+      username: env.MAMASQL_MYSQL_USER || "root",
+    };
+    expect((await call(b, "open", { id: "my", cfg, password: env.MAMASQL_MYSQL_PASS })).status).toBe(200);
+    await compositeKeyChecks(b, "my");
+  });
+});

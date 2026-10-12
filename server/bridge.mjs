@@ -173,6 +173,22 @@ const quote = {
 };
 const placeholder = { postgres: (i) => `$${i + 1}`, mysql: () => "?" };
 
+/**
+ * The WHERE clause that names exactly one row: `pkColumn` is one key column, or
+ * every column of a composite key (with `pkValue` the matching array). Matching
+ * on only part of a composite key would edit/delete every row sharing it.
+ */
+function keyWhere(Q, P, pkColumn, pkValue, firstParam) {
+  const cols = Array.isArray(pkColumn) ? pkColumn : [pkColumn];
+  const vals = Array.isArray(pkColumn) ? pkValue : [pkValue];
+  if (!cols.length || !Array.isArray(vals) || vals.length !== cols.length) {
+    const err = new Error("The row key needs one value per key column.");
+    err.kind = "badRequest";
+    throw err;
+  }
+  return { sql: cols.map((c, i) => `${Q(c)} = ${P(firstParam + i)}`).join(" AND "), params: vals };
+}
+
 /* ---- low-level query helpers (rows as arrays, no key collisions) ---- */
 async function rawArrayRows(engine, conn, sql, params = []) {
   if (engine === "postgres") {
@@ -501,22 +517,26 @@ const handlers = {
   async updateCell({ id, table, pkColumn, pkValue, column, value }) {
     const { engine, conn, fileKey } = need(id);
     if (engine === "sqlite") {
-      sqliteRun(fileKey, `UPDATE ${sqliteIdent(table)} SET ${sqliteIdent(column)} = ? WHERE ${sqliteIdent(pkColumn)} = ?`, [value, pkValue]);
+      const key = keyWhere(sqliteIdent, () => "?", pkColumn, pkValue, 1);
+      sqliteRun(fileKey, `UPDATE ${sqliteIdent(table)} SET ${sqliteIdent(column)} = ? WHERE ${key.sql}`, [value, ...key.params]);
       return { ok: true };
     }
     const Q = quote[engine];
     const P = placeholder[engine];
-    await conn.query(`UPDATE ${Q(table)} SET ${Q(column)} = ${P(0)} WHERE ${Q(pkColumn)} = ${P(1)}`, [value, pkValue]);
+    const key = keyWhere(Q, P, pkColumn, pkValue, 1);
+    await conn.query(`UPDATE ${Q(table)} SET ${Q(column)} = ${P(0)} WHERE ${key.sql}`, [value, ...key.params]);
     return { ok: true };
   },
   async deleteRow({ id, table, pkColumn, pkValue }) {
     const { engine, conn, fileKey } = need(id);
     if (engine === "sqlite") {
-      sqliteRun(fileKey, `DELETE FROM ${sqliteIdent(table)} WHERE ${sqliteIdent(pkColumn)} = ?`, [pkValue]);
+      const key = keyWhere(sqliteIdent, () => "?", pkColumn, pkValue, 0);
+      sqliteRun(fileKey, `DELETE FROM ${sqliteIdent(table)} WHERE ${key.sql}`, key.params);
       return { ok: true };
     }
     const Q = quote[engine];
-    await conn.query(`DELETE FROM ${Q(table)} WHERE ${Q(pkColumn)} = ${placeholder[engine](0)}`, [pkValue]);
+    const key = keyWhere(Q, placeholder[engine], pkColumn, pkValue, 0);
+    await conn.query(`DELETE FROM ${Q(table)} WHERE ${key.sql}`, key.params);
     return { ok: true };
   },
   async insertRow({ id, table, columns, values }) {
