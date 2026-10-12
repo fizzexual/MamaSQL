@@ -610,8 +610,41 @@ const handlers = {
 };
 
 /* ---- HTTP plumbing ---- */
+
+// The bridge opens database connections for whoever asks, so it must only
+// answer the MamaSQL page itself — never another website the user happens to
+// have open (a browser lets any page POST to localhost).
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+function hostnameOf(hostHeader) {
+  try {
+    return new URL(`http://${hostHeader}`).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+/** The request's Origin when it may use the bridge, "" when it carries none, null when refused. */
+function allowedOrigin(req) {
+  const host = hostnameOf(req.headers.host || "");
+  // Outside Docker the bridge is localhost-only; a foreign Host name means DNS
+  // rebinding (evil.example resolved to 127.0.0.1).
+  if (!IN_DOCKER && !LOOPBACK.has(host)) return null;
+  const origin = req.headers.origin;
+  if (!origin) return ""; // not a cross-site browser request (curl, a server-side proxy)
+  let from;
+  try {
+    from = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return null; // e.g. "null" from a sandboxed frame or file://
+  }
+  // The dev server's page (localhost), or in Docker the page nginx served
+  // (same host name the browser used to reach the web container).
+  if (LOOPBACK.has(from) || (IN_DOCKER && from === host)) return origin;
+  return null;
+}
 function cors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  if (!res.allowedOrigin) return; // same-origin through the proxy: no CORS needed
+  res.setHeader("Access-Control-Allow-Origin", res.allowedOrigin);
+  res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
@@ -652,6 +685,12 @@ function isConnLost(e) {
 }
 
 const server = createServer((req, res) => {
+  const origin = allowedOrigin(req);
+  if (origin === null) {
+    console.error(`[bridge] refused ${req.method} ${req.url} from origin ${req.headers.origin ?? "-"} (host ${req.headers.host ?? "-"})`);
+    return sendJson(res, 403, appError("forbidden", "This page may not use the MamaSQL engine bridge."));
+  }
+  res.allowedOrigin = origin;
   if (req.method === "OPTIONS") {
     cors(res);
     res.writeHead(204);
@@ -705,6 +744,10 @@ const server = createServer((req, res) => {
 process.on("uncaughtException", (e) => console.error("[bridge] uncaughtException:", e));
 process.on("unhandledRejection", (e) => console.error("[bridge] unhandledRejection:", e));
 
-server.listen(PORT, () => {
-  console.log(`MamaSQL engine bridge listening on http://localhost:${PORT}  (PostgreSQL + MySQL)`);
+// Outside Docker, only this machine may connect. In Docker the web container
+// reaches it over the compose network, and the published web port's BIND_ADDR
+// decides who can reach that.
+const LISTEN_HOST = IN_DOCKER ? "0.0.0.0" : "127.0.0.1";
+server.listen(PORT, LISTEN_HOST, () => {
+  console.log(`MamaSQL engine bridge listening on http://${LISTEN_HOST}:${PORT}  (PostgreSQL + MySQL)`);
 });
