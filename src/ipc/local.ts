@@ -42,6 +42,16 @@ function q(id: string): string {
   return `"${String(id).replace(/"/g, '""')}"`;
 }
 
+/** WHERE clause naming one row: one key column, or every column of a composite key. */
+function keyWhere(pkColumn: string | string[], pkValue: unknown): { sql: string; params: unknown[] } {
+  const cols = Array.isArray(pkColumn) ? pkColumn : [pkColumn];
+  const vals = Array.isArray(pkColumn) ? pkValue : [pkValue];
+  if (!cols.length || !Array.isArray(vals) || vals.length !== cols.length) {
+    throw { kind: "badRequest", message: "The row key needs one value per key column." } as AppError;
+  }
+  return { sql: cols.map((c) => `${q(c)} = ?`).join(" AND "), params: vals };
+}
+
 function remoteErr(): AppError {
   return {
     kind: "notSupported",
@@ -255,11 +265,13 @@ class LocalBackend implements Backend {
   }
 
   /* ---- row + schema edits ---- */
-  async updateCell(connectionId: string, table: string, pkColumn: string, pkValue: unknown, column: string, value: unknown) {
-    await this.mutate(connectionId, `UPDATE ${q(table)} SET ${q(column)} = ? WHERE ${q(pkColumn)} = ?`, [value, pkValue]);
+  async updateCell(connectionId: string, table: string, pkColumn: string | string[], pkValue: unknown, column: string, value: unknown) {
+    const key = keyWhere(pkColumn, pkValue);
+    await this.mutate(connectionId, `UPDATE ${q(table)} SET ${q(column)} = ? WHERE ${key.sql}`, [value, ...key.params]);
   }
-  async deleteRow(connectionId: string, table: string, pkColumn: string, pkValue: unknown) {
-    await this.mutate(connectionId, `DELETE FROM ${q(table)} WHERE ${q(pkColumn)} = ?`, [pkValue]);
+  async deleteRow(connectionId: string, table: string, pkColumn: string | string[], pkValue: unknown) {
+    const key = keyWhere(pkColumn, pkValue);
+    await this.mutate(connectionId, `DELETE FROM ${q(table)} WHERE ${key.sql}`, key.params);
   }
   async insertRow(connectionId: string, table: string, columns: string[], values: unknown[]) {
     if (columns.length === 0) {
