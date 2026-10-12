@@ -165,14 +165,15 @@ pub async fn update_cell(
     state: State<'_, AppState>,
     connection_id: String,
     table: String,
-    pk_column: String,
+    pk_column: crate::editing::KeyColumns,
     pk_value: serde_json::Value,
     column: String,
     value: serde_json::Value,
 ) -> AppResult<()> {
     let engine = engine_of(&state.store, &connection_id).await?;
     let driver = state.registry.get(&connection_id).await?;
-    let sql = crate::editing::build_update(engine, &table, &column, &value, &pk_column, &pk_value);
+    let sql = crate::editing::build_update_key(engine, &table, &column, &value, &pk_column, &pk_value)
+        .map_err(|message| AppError::QueryError { message, position: None })?;
     driver.execute(&sql).await?;
     Ok(())
 }
@@ -182,12 +183,13 @@ pub async fn delete_row(
     state: State<'_, AppState>,
     connection_id: String,
     table: String,
-    pk_column: String,
+    pk_column: crate::editing::KeyColumns,
     pk_value: serde_json::Value,
 ) -> AppResult<()> {
     let engine = engine_of(&state.store, &connection_id).await?;
     let driver = state.registry.get(&connection_id).await?;
-    let sql = crate::editing::build_delete(engine, &table, &pk_column, &pk_value);
+    let sql = crate::editing::build_delete_key(engine, &table, &pk_column, &pk_value)
+        .map_err(|message| AppError::QueryError { message, position: None })?;
     driver.execute(&sql).await?;
     Ok(())
 }
