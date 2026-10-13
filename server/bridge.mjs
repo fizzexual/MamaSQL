@@ -161,7 +161,6 @@ function appError(kind, message) {
  * value, whose string form can carry a stack trace. Details stay in the log.
  */
 function errMessage(e) {
-  if (typeof e === "string") return e;
   // pg's happy-eyeballs wraps connection failures in an AggregateError whose
   // inner errors hold the useful ECONNREFUSED/timeout detail.
   if (e && e.name === "AggregateError" && Array.isArray(e.errors) && e.errors.length) {
@@ -171,6 +170,15 @@ function errMessage(e) {
   if (e && typeof e.message === "string" && e.message) return e.message;
   console.error("[bridge] error without a message:", e);
   return "Unexpected error";
+}
+
+// The error kinds the app understands. A reply's kind is always one of these
+// constants, never a value copied off the caught error.
+const ERROR_KINDS = ["badRequest", "connectionError", "notConnected", "queryError", "internal"];
+function errKind(e, fallback) {
+  const kind = e && typeof e === "object" ? e.kind : undefined;
+  for (const known of ERROR_KINDS) if (kind === known) return known;
+  return fallback;
 }
 
 /* ---- identifier quoting + placeholders per engine ---- */
@@ -778,13 +786,13 @@ const server = createServer((req, res) => {
   const path = (req.url || "").replace(/^\/api\//, "").replace(/\?.*$/, "").replace(/^\//, "");
   // A Map, not handlers[path]: a plain object lookup would also reach inherited
   // methods such as /api/toString or /api/constructor.
-  const handler = endpoints.get(path);
-  if (!handler) return sendJson(res, 404, appError("notFound", `Unknown endpoint: ${path}`));
+  const handler = endpoints.has(path) ? endpoints.get(path) : undefined;
+  if (typeof handler !== "function") return sendJson(res, 404, appError("notFound", `Unknown endpoint: ${path}`));
 
   if (req.method === "GET") {
     Promise.resolve(handler({}))
       .then((out) => sendJson(res, 200, out))
-      .catch((e) => sendJson(res, 400, appError(e.kind || "internal", errMessage(e))));
+      .catch((e) => sendJson(res, 400, appError(errKind(e, "internal"), errMessage(e))));
     return;
   }
 
@@ -815,7 +823,7 @@ const server = createServer((req, res) => {
         }
         return sendJson(res, 400, appError("notConnected", errMessage(e)));
       }
-      sendJson(res, 400, appError(e.kind || (e.code ? "connectionError" : "queryError"), errMessage(e)));
+      sendJson(res, 400, appError(errKind(e, e?.code ? "connectionError" : "queryError"), errMessage(e)));
     }
   });
 });

@@ -159,13 +159,15 @@ describe("bridge: error replies carry a message, never a stack trace", () => {
   });
 
   it.each([
-    ["a SQL error", "query", { id: "e1", sql: "SELEC 1" }, { open: { id: "e1", cfg: { engine: "sqlite", database: "errs" } } }],
-    ["an unknown connection", "query", { id: "nope", sql: "SELECT 1" }, {}],
-    ["a refused connection", "test", { cfg: { engine: "postgres", host: "127.0.0.1", port: 1 } }, {}],
-  ])("%s", async (_label, endpoint, body, { open }) => {
+    ["a SQL error", "query", { id: "e1", sql: "SELEC 1" }, { open: { id: "e1", cfg: { engine: "sqlite", database: "errs" } }, kind: "queryError" }],
+    ["an unknown connection", "query", { id: "nope", sql: "SELECT 1" }, { kind: "notConnected" }],
+    ["a refused connection", "test", { cfg: { engine: "postgres", host: "127.0.0.1", port: 1 } }, { kind: "connectionError" }],
+    ["an unknown engine", "open", { id: "x", cfg: { engine: "toString" } }, { kind: "queryError" }],
+  ])("%s", async (_label, endpoint, body, { open, kind }) => {
     if (open) await call(b, "open", open);
     const r = await call(b, endpoint, body);
     expect(r.status).toBe(400);
+    expect(r.body.error.kind).toBe(kind);
     expect(typeof r.body.error.message).toBe("string");
     expect(r.body.error.message).not.toMatch(/\n\s*at\s|\.mjs:\d+/);
   });
