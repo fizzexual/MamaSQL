@@ -29,7 +29,9 @@ export function toTsv(r: QueryResult): string {
 
 /** GitHub-flavored Markdown table. */
 export function toMarkdown(r: QueryResult): string {
-  const cell = (v: unknown) => (v == null ? "" : String(v).replace(/\|/g, "\\|").replace(/\n/g, " "));
+  // Backslashes first: otherwise a cell's own "\" would swallow the escape we add before "|".
+  const cell = (v: unknown) =>
+    v == null ? "" : String(v).replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
   const names = r.columns.map((c) => cell(c.name));
   const head = `| ${names.join(" | ")} |`;
   const sep = `| ${names.map(() => "---").join(" | ")} |`;

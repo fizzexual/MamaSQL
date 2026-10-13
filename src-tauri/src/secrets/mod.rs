@@ -40,8 +40,10 @@ mod tests {
     #[ignore = "requires an OS keychain; run locally with: cargo test secrets -- --ignored"]
     fn set_get_delete_roundtrip() {
         let id = "mamasql-test-conn-xyz";
-        set_password(id, "s3cret").unwrap();
-        assert_eq!(get_password(id).unwrap().as_deref(), Some("s3cret"));
+        // A fresh random value each run: no password literal lives in the source.
+        let secret = uuid::Uuid::new_v4().to_string();
+        set_password(id, &secret).unwrap();
+        assert_eq!(get_password(id).unwrap().as_deref(), Some(secret.as_str()));
         delete_password(id).unwrap();
         assert_eq!(get_password(id).unwrap(), None);
     }

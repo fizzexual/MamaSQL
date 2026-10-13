@@ -1,18 +1,20 @@
 // Browser-side client for the engine bridge (server/bridge.mjs). Routes real
 // PostgreSQL / MySQL traffic to the local bridge over HTTP. Connection configs
 // live in localStorage (shared with the local SQLite backend); passwords are
-// kept in a separate localStorage key so connections can be re-opened after a
-// reload or a bridge restart.
+// kept encrypted in IndexedDB (see ./secrets) so connections can be re-opened
+// after a reload or a bridge restart.
 import type { Backend } from "./backend";
 import { displayRows } from "../lib/cell";
+import { loadSecret } from "./secrets";
 import type { AppError, ConnectionConfig, QueryResult } from "./types";
+
+export { deleteSecret, loadSecret, saveSecret } from "./secrets";
 
 // Same-origin by default: the dev server (vite proxy) and the Docker web
 // container (nginx) both forward "/api" to the bridge, so no host/port is
 // baked in. Override with localStorage "mamasql.bridge" to point elsewhere.
 const DEFAULT_BRIDGE = "";
 const CONNS_KEY = "mamasql.connections";
-const SECRETS_KEY = "mamasql.secrets";
 
 export function bridgeUrl(): string {
   try {
@@ -29,110 +31,6 @@ function loadConns(): ConnectionConfig[] {
   } catch {
     return [];
   }
-}
-
-function secrets(): Record<string, string> {
-  try {
-    return JSON.parse(localStorage.getItem(SECRETS_KEY) ?? "{}") || {};
-  } catch {
-    return {};
-  }
-}
-function writeSecrets(s: Record<string, string>): void {
-  try {
-    localStorage.setItem(SECRETS_KEY, JSON.stringify(s));
-  } catch {
-    /* ignore */
-  }
-}
-
-// Passwords are encrypted with AES-GCM. The key is a non-extractable CryptoKey
-// kept in IndexedDB — it never touches localStorage, so it can't be read out
-// the way the stored ciphertext could. (SubtleCrypto needs a secure context;
-// over plain http on a LAN IP we fall back to base64.)
-const KEY_DB = "mamasql-keys";
-let _keyPromise: Promise<CryptoKey> | null = null;
-function keyDb(): Promise<IDBDatabase> {
-  return new Promise((res, rej) => {
-    const r = indexedDB.open(KEY_DB, 1);
-    r.onupgradeneeded = () => r.result.createObjectStore("keys");
-    r.onsuccess = () => res(r.result);
-    r.onerror = () => rej(r.error);
-  });
-}
-function getKey(): Promise<CryptoKey> {
-  if (_keyPromise) return _keyPromise;
-  _keyPromise = (async () => {
-    const db = await keyDb();
-    const existing = await new Promise<CryptoKey | undefined>((res, rej) => {
-      const t = db.transaction("keys", "readonly").objectStore("keys").get("k");
-      t.onsuccess = () => res(t.result as CryptoKey | undefined);
-      t.onerror = () => rej(t.error);
-    });
-    if (existing) return existing;
-    const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-    await new Promise<void>((res, rej) => {
-      const t = db.transaction("keys", "readwrite").objectStore("keys").put(key, "k");
-      t.onsuccess = () => res();
-      t.onerror = () => rej(t.error);
-    });
-    return key;
-  })();
-  return _keyPromise;
-}
-const b64 = (buf: ArrayBuffer) => btoa(String.fromCharCode(...new Uint8Array(buf)));
-const unb64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
-
-export async function saveSecret(id: string, password: string | null): Promise<void> {
-  const s = secrets();
-  if (!password) {
-    delete s[id];
-    writeSecrets(s);
-    return;
-  }
-  try {
-    const key = await getKey();
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(password));
-    s[id] = `enc:${b64(iv.buffer)}:${b64(ct)}`;
-  } catch {
-    s[id] = `b64:${btoa(unescape(encodeURIComponent(password)))}`;
-  }
-  writeSecrets(s);
-}
-
-export async function loadSecret(id: string): Promise<string | null> {
-  const v = secrets()[id];
-  if (!v) return null;
-  if (v.startsWith("b64:")) {
-    try {
-      return decodeURIComponent(escape(atob(v.slice(4))));
-    } catch {
-      return null;
-    }
-  }
-  if (v.startsWith("enc:")) {
-    const [, ivb, ctb] = v.split(":");
-    try {
-      const key = await getKey();
-      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(ivb) }, key, unb64(ctb).buffer);
-      return new TextDecoder().decode(pt);
-    } catch {
-      return null;
-    }
-  }
-  // legacy plain base64 (pre-encryption)
-  try {
-    return decodeURIComponent(escape(atob(v)));
-  } catch {
-    return null;
-  }
-}
-
-export function deleteSecret(id: string): void {
-  const s = secrets();
-  delete s[id];
-  writeSecrets(s);
 }
 
 // The bridge itself only ever replies 200 / 400 / 404. A 5xx therefore means the
