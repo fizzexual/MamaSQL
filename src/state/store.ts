@@ -177,7 +177,7 @@ export interface AppStore {
   error: AppError | null;
   running: boolean;
   history: HistoryEntry[];
-  editTable: { table: string; pkColumn: string | null } | null;
+  editTable: EditTable | null;
   openTables: string[];
   detected: ConnectionConfig[];
   loadingTables: boolean;
@@ -260,6 +260,27 @@ export interface AppStore {
 }
 
 const backend = getBackend();
+
+type EditTable = { table: string; pkColumn: string | null; pkColumns?: string[] };
+
+/**
+ * The key that names one row of the open table: its single primary-key column,
+ * or every column of a composite key. Editing by only part of a composite key
+ * would hit every row that shares it. Null when the result lacks a key column.
+ */
+function rowKey(
+  editTable: EditTable,
+  result: QueryResult,
+  rowIndex: number,
+): { column: string | string[]; value: unknown; label: string } | null {
+  const cols = editTable.pkColumns?.length ? editTable.pkColumns : editTable.pkColumn ? [editTable.pkColumn] : [];
+  if (!cols.length) return null;
+  const idx = cols.map((c) => result.columns.findIndex((rc) => rc.name === c));
+  if (idx.some((i) => i < 0)) return null;
+  const vals = idx.map((i) => result.rows[rowIndex][i]);
+  const label = cols.map((c, i) => `${c} = ${String(vals[i])}`).join(", ");
+  return cols.length === 1 ? { column: cols[0], value: vals[0], label } : { column: cols, value: vals, label };
+}
 
 /** Disable foreign-key checks (per engine) around an operation, then restore. */
 export async function withFkDisabled<T>(id: string, engine: string | undefined, skipFk: boolean, fn: () => Promise<T>): Promise<T> {
@@ -650,13 +671,14 @@ export const useStore = create<AppStore>((set, get) => ({
         /* fall back to the columns the query itself returns */
       }
       const cols = get().schema.columnsByTable[table] ?? [];
-      const pkColumn = cols.find((c) => c.isPrimaryKey)?.name ?? null;
+      const pkColumns = cols.filter((c) => c.isPrimaryKey).map((c) => c.name);
+      const pkColumn = pkColumns[0] ?? null;
       let result = await backend.runQuery(id, sql);
       // Empty tables yield no columns from the row set — show the schema's columns.
       if (result.columns.length === 0 && cols.length > 0) {
         result = { ...result, columns: cols.map((c) => ({ name: c.name, dataType: c.dataType })) };
       }
-      set({ result, editTable: { table, pkColumn }, loadingResult: false });
+      set({ result, editTable: { table, pkColumn, pkColumns }, loadingResult: false });
       await get().loadHistory();
     } catch (e) {
       set({ error: normalizeError(e), result: null, loadingResult: false });
@@ -706,19 +728,11 @@ export const useStore = create<AppStore>((set, get) => ({
     const { activeConnectionId, result, editTable } = get();
     if (!activeConnectionId || !result || !editTable?.pkColumn) return;
     if (get().readOnlyConns.includes(activeConnectionId)) return toast("Read-only — writes are blocked.", "error");
-    const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
-    if (pkIdx < 0) return;
-    const pkValue = result.rows[rowIndex][pkIdx];
+    const key = rowKey(editTable, result, rowIndex);
+    if (!key) return;
     const column = result.columns[colIndex].name;
     try {
-      await backend.updateCell(
-        activeConnectionId,
-        editTable.table,
-        editTable.pkColumn,
-        pkValue,
-        column,
-        value,
-      );
+      await backend.updateCell(activeConnectionId, editTable.table, key.column, key.value, column, value);
       const rows = result.rows.map((r, i) =>
         i === rowIndex ? r.map((c, j) => (j === colIndex ? value : c)) : r,
       );
@@ -732,20 +746,18 @@ export const useStore = create<AppStore>((set, get) => ({
     const { activeConnectionId, result, editTable } = get();
     if (!activeConnectionId || !result || !editTable?.pkColumn) return;
     if (get().readOnlyConns.includes(activeConnectionId)) return toast("Read-only — writes are blocked.", "error");
-    const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
-    if (pkIdx < 0) return;
-    const pkValue = result.rows[rowIndex][pkIdx];
-    const pkColumn = editTable.pkColumn;
+    const key = rowKey(editTable, result, rowIndex);
+    if (!key) return;
     const choice = await confirmDelete({
       title: "Delete row?",
-      message: `Delete the row where ${pkColumn} = ${String(pkValue)}? This can't be undone.`,
+      message: `Delete the row where ${key.label}? This can't be undone.`,
       confirmLabel: "Delete",
     });
     if (!choice.ok) return;
     const engine = get().connections.find((c) => c.id === activeConnectionId)?.engine;
     try {
       await withFkDisabled(activeConnectionId, engine, choice.skipFk, () =>
-        backend.deleteRow(activeConnectionId, editTable.table, pkColumn, pkValue),
+        backend.deleteRow(activeConnectionId, editTable.table, key.column, key.value),
       );
       const rows = result.rows.filter((_, i) => i !== rowIndex);
       set((s) => ({
@@ -1045,13 +1057,14 @@ export const useStore = create<AppStore>((set, get) => ({
         /* fall back to query columns */
       }
       const cols = get().schema.columnsByTable[view.table] ?? [];
-      const pkColumn = cols.find((c) => c.isPrimaryKey)?.name ?? null;
+      const pkColumns = cols.filter((c) => c.isPrimaryKey).map((c) => c.name);
+      const pkColumn = pkColumns[0] ?? null;
       let result = await backend.runQuery(id, sql);
       if (result.columns.length === 0 && cols.length > 0) {
         result = { ...result, columns: cols.map((c) => ({ name: c.name, dataType: c.dataType })) };
       }
       result = { ...result, rows: applyViewFilter(result.rows, result.columns, view.filter) };
-      set({ result, editTable: { table: view.table, pkColumn }, loadingResult: false });
+      set({ result, editTable: { table: view.table, pkColumn, pkColumns }, loadingResult: false });
       await get().loadHistory();
     } catch (e) {
       set({ error: normalizeError(e), result: null, loadingResult: false });
@@ -1075,12 +1088,10 @@ export const useStore = create<AppStore>((set, get) => ({
     const { activeConnectionId, result, editTable, selection } = get();
     if (!activeConnectionId || !result || !editTable?.pkColumn || selection.length === 0) return;
     if (get().readOnlyConns.includes(activeConnectionId)) return toast("Read-only — writes are blocked.", "error");
-    const pkIdx = result.columns.findIndex((c) => c.name === editTable.pkColumn);
-    if (pkIdx < 0) return;
-    const pks = selection.map((i) => result.rows[i][pkIdx]);
-    const pkColumn = editTable.pkColumn;
+    const keys = selection.map((i) => rowKey(editTable, result, i));
+    if (keys.some((k) => !k)) return;
     const choice = await confirmDelete({
-      title: `Delete ${pks.length} ${pks.length === 1 ? "row" : "rows"}?`,
+      title: `Delete ${keys.length} ${keys.length === 1 ? "row" : "rows"}?`,
       message: "This permanently deletes the selected rows. This can't be undone.",
       confirmLabel: "Delete",
     });
@@ -1088,8 +1099,8 @@ export const useStore = create<AppStore>((set, get) => ({
     const engine = get().connections.find((c) => c.id === activeConnectionId)?.engine;
     try {
       await withFkDisabled(activeConnectionId, engine, choice.skipFk, async () => {
-        for (const pk of pks) {
-          await backend.deleteRow(activeConnectionId, editTable.table, pkColumn, pk);
+        for (const key of keys) {
+          if (key) await backend.deleteRow(activeConnectionId, editTable.table, key.column, key.value);
         }
       });
       set({ selection: [] });

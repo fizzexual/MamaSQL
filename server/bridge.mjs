@@ -5,7 +5,7 @@
 // mysql2). Run it with `npm run bridge` (or `npm run dev:all`) and the web app
 // will route Postgres/MySQL connections here automatically. SQLite stays fully
 // in-browser and does not need this server.
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { createRequire } from "node:module";
 import path from "node:path";
@@ -41,26 +41,57 @@ function sqlitePath(fileKey) {
 // One in-memory sql.js database per file, shared by every connection pointing at
 // it (so concurrent browsers see each other's writes via this single process).
 const sqliteDbs = new Map(); // fileKey -> Database
-const sqliteTxn = new Set(); // fileKeys with an open transaction (defer persist)
+const sqliteSaved = new Map(); // fileKey -> changeStamp() of what is on disk
+
+// What SQLite itself says changed: row changes (any statement shape, including
+// WITH … INSERT), schema changes (DDL), and user_version. Asking the engine
+// instead of pattern-matching the SQL text is what keeps writes from being missed.
+function changeStamp(db) {
+  const one = (sql) => db.exec(sql)[0].values[0][0];
+  return `${one("SELECT total_changes()")}:${one("PRAGMA schema_version")}:${one("PRAGMA user_version")}`;
+}
+// sql.js has no autocommit getter; BEGIN fails exactly when a transaction is open.
+function inTransaction(db) {
+  try {
+    db.exec("BEGIN");
+  } catch {
+    return true;
+  }
+  db.exec("ROLLBACK");
+  return false;
+}
 
 async function openSqlite(fileKey) {
   let db = sqliteDbs.get(fileKey);
   if (db) return db;
   const SQL = await sqlJs();
   const file = sqlitePath(fileKey);
-  db = existsSync(file) ? new SQL.Database(readFileSync(file)) : new SQL.Database();
+  const existed = existsSync(file);
+  db = existed ? new SQL.Database(readFileSync(file)) : new SQL.Database();
   sqliteDbs.set(fileKey, db);
-  if (!existsSync(file)) writeFileSync(file, Buffer.from(db.export()));
+  if (existed) sqliteSaved.set(fileKey, changeStamp(db));
+  else persistSqlite(fileKey);
   return db;
 }
+/** Write the whole database to disk: temp file + rename, so a crash can't leave half a file. */
 function persistSqlite(fileKey) {
   const db = sqliteDbs.get(fileKey);
-  if (db) writeFileSync(sqlitePath(fileKey), Buffer.from(db.export()));
+  if (!db) return;
+  const file = sqlitePath(fileKey);
+  writeFileSync(`${file}.tmp`, Buffer.from(db.export()));
+  renameSync(`${file}.tmp`, file);
+  sqliteSaved.set(fileKey, changeStamp(db));
+}
+/** Save when something changed and no transaction is open (a transaction saves at COMMIT). */
+function saveIfChanged(fileKey) {
+  const db = sqliteDbs.get(fileKey);
+  if (!db || inTransaction(db)) return;
+  if (sqliteSaved.get(fileKey) !== changeStamp(db)) persistSqlite(fileKey);
 }
 function sqliteIdent(id) {
   return `"${String(id).replace(/"/g, '""')}"`;
 }
-/** Run one statement with bound params; persist (unless inside a transaction). */
+/** Run one statement with bound params, then save it. */
 function sqliteRun(fileKey, sql, params = []) {
   const db = sqliteDbs.get(fileKey);
   const st = db.prepare(sql);
@@ -68,15 +99,23 @@ function sqliteRun(fileKey, sql, params = []) {
     st.run(params);
   } finally {
     st.free();
+    saveIfChanged(fileKey);
   }
-  if (!sqliteTxn.has(fileKey)) persistSqlite(fileKey);
 }
 /** Run a (possibly multi-statement) query; returns the last result set. */
 function sqliteQuery(fileKey, sql, started) {
   const db = sqliteDbs.get(fileKey);
   let columns = [];
   let rows = [];
-  const res = db.exec(sql);
+  let res;
+  let rowsAffected = 0;
+  try {
+    res = db.exec(sql);
+    rowsAffected = db.getRowsModified(); // before saving: export() reopens the db and resets it
+  } finally {
+    // Statements before a failing one have already run — save them too.
+    saveIfChanged(fileKey);
+  }
   if (res.length) {
     const last = res[res.length - 1];
     columns = last.columns;
@@ -90,15 +129,10 @@ function sqliteQuery(fileKey, sql, started) {
       /* ignore */
     }
   }
-  const s = sql.trim().toLowerCase();
-  if (/^begin\b/.test(s)) sqliteTxn.add(fileKey);
-  else if (/^(commit|end|rollback)\b/.test(s)) sqliteTxn.delete(fileKey);
-  const isWrite = !/^\s*(select|with|pragma|explain)\b/i.test(sql);
-  if (isWrite && !sqliteTxn.has(fileKey)) persistSqlite(fileKey);
   return {
     columns: columns.map((name) => ({ name, dataType: "" })),
     rows,
-    rowsAffected: db.getRowsModified(),
+    rowsAffected,
     elapsedMs: Math.max(1, Math.round(performance.now() - started)),
     truncated: false,
   };
@@ -138,6 +172,31 @@ const quote = {
   mysql: (id) => `\`${String(id).replace(/`/g, "``")}\``,
 };
 const placeholder = { postgres: (i) => `$${i + 1}`, mysql: () => "?" };
+
+/** Quoting + placeholders for a server engine: an explicit switch, never a lookup by a client-sent name. */
+function dialect(engine) {
+  if (engine === "postgres") return { Q: quote.postgres, P: placeholder.postgres };
+  if (engine === "mysql") return { Q: quote.mysql, P: placeholder.mysql };
+  const err = new Error(`Unsupported engine: ${String(engine)}`);
+  err.kind = "badRequest";
+  throw err;
+}
+
+/**
+ * The WHERE clause that names exactly one row: `pkColumn` is one key column, or
+ * every column of a composite key (with `pkValue` the matching array). Matching
+ * on only part of a composite key would edit/delete every row sharing it.
+ */
+function keyWhere(Q, P, pkColumn, pkValue, firstParam) {
+  const cols = Array.isArray(pkColumn) ? pkColumn : [pkColumn];
+  const vals = Array.isArray(pkColumn) ? pkValue : [pkValue];
+  if (!cols.length || !Array.isArray(vals) || vals.length !== cols.length) {
+    const err = new Error("The row key needs one value per key column.");
+    err.kind = "badRequest";
+    throw err;
+  }
+  return { sql: cols.map((c, i) => `${Q(c)} = ${P(firstParam + i)}`).join(" AND "), params: vals };
+}
 
 /* ---- low-level query helpers (rows as arrays, no key collisions) ---- */
 async function rawArrayRows(engine, conn, sql, params = []) {
@@ -327,7 +386,7 @@ const handlers = {
     const base = { ...cfg, database: cfg.engine === "postgres" ? "postgres" : "" };
     const conn = await connect(base, password);
     try {
-      await conn.query(`CREATE DATABASE ${quote[cfg.engine](safe)}`);
+      await conn.query(`CREATE DATABASE ${dialect(cfg.engine).Q(safe)}`);
       return { ok: true };
     } finally {
       await closeConn({ engine: cfg.engine, conn });
@@ -467,22 +526,25 @@ const handlers = {
   async updateCell({ id, table, pkColumn, pkValue, column, value }) {
     const { engine, conn, fileKey } = need(id);
     if (engine === "sqlite") {
-      sqliteRun(fileKey, `UPDATE ${sqliteIdent(table)} SET ${sqliteIdent(column)} = ? WHERE ${sqliteIdent(pkColumn)} = ?`, [value, pkValue]);
+      const key = keyWhere(sqliteIdent, () => "?", pkColumn, pkValue, 1);
+      sqliteRun(fileKey, `UPDATE ${sqliteIdent(table)} SET ${sqliteIdent(column)} = ? WHERE ${key.sql}`, [value, ...key.params]);
       return { ok: true };
     }
-    const Q = quote[engine];
-    const P = placeholder[engine];
-    await conn.query(`UPDATE ${Q(table)} SET ${Q(column)} = ${P(0)} WHERE ${Q(pkColumn)} = ${P(1)}`, [value, pkValue]);
+    const { Q, P } = dialect(engine);
+    const key = keyWhere(Q, P, pkColumn, pkValue, 1);
+    await conn.query(`UPDATE ${Q(table)} SET ${Q(column)} = ${P(0)} WHERE ${key.sql}`, [value, ...key.params]);
     return { ok: true };
   },
   async deleteRow({ id, table, pkColumn, pkValue }) {
     const { engine, conn, fileKey } = need(id);
     if (engine === "sqlite") {
-      sqliteRun(fileKey, `DELETE FROM ${sqliteIdent(table)} WHERE ${sqliteIdent(pkColumn)} = ?`, [pkValue]);
+      const key = keyWhere(sqliteIdent, () => "?", pkColumn, pkValue, 0);
+      sqliteRun(fileKey, `DELETE FROM ${sqliteIdent(table)} WHERE ${key.sql}`, key.params);
       return { ok: true };
     }
-    const Q = quote[engine];
-    await conn.query(`DELETE FROM ${Q(table)} WHERE ${Q(pkColumn)} = ${placeholder[engine](0)}`, [pkValue]);
+    const { Q, P } = dialect(engine);
+    const key = keyWhere(Q, P, pkColumn, pkValue, 0);
+    await conn.query(`DELETE FROM ${Q(table)} WHERE ${key.sql}`, key.params);
     return { ok: true };
   },
   async insertRow({ id, table, columns, values }) {
@@ -497,9 +559,9 @@ const handlers = {
       }
       return { ok: true };
     }
-    const Q = quote[engine];
+    const { Q, P } = dialect(engine);
     const cols = columns.map(Q).join(", ");
-    const ph = columns.map((_, i) => placeholder[engine](i)).join(", ");
+    const ph = columns.map((_, i) => P(i)).join(", ");
     await conn.query(`INSERT INTO ${Q(table)} (${cols}) VALUES (${ph})`, values);
     return { ok: true };
   },
@@ -553,7 +615,7 @@ const handlers = {
       sqliteRun(fileKey, `CREATE TABLE ${sqliteIdent(name)} (${defs})`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     const defs = cols
       .map((c) => {
         const parts = [Q(c.name), c.dataType || "TEXT"];
@@ -571,7 +633,7 @@ const handlers = {
       sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(table)} ADD COLUMN ${sqliteIdent(column.name)} ${column.dataType || "TEXT"}`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     await conn.query(`ALTER TABLE ${Q(table)} ADD COLUMN ${Q(column.name)} ${column.dataType || "TEXT"}`);
     return { ok: true };
   },
@@ -581,7 +643,7 @@ const handlers = {
       sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(table)} DROP COLUMN ${sqliteIdent(column)}`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     await conn.query(`ALTER TABLE ${Q(table)} DROP COLUMN ${Q(column)}`);
     return { ok: true };
   },
@@ -591,7 +653,7 @@ const handlers = {
       sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(table)} RENAME COLUMN ${sqliteIdent(from)} TO ${sqliteIdent(to)}`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     await conn.query(`ALTER TABLE ${Q(table)} RENAME COLUMN ${Q(from)} TO ${Q(to)}`);
     return { ok: true };
   },
@@ -601,7 +663,7 @@ const handlers = {
       sqliteRun(fileKey, `ALTER TABLE ${sqliteIdent(from)} RENAME TO ${sqliteIdent(to)}`);
       return { ok: true };
     }
-    const Q = quote[engine];
+    const Q = dialect(engine).Q;
     const sql =
       engine === "mysql" ? `RENAME TABLE ${Q(from)} TO ${Q(to)}` : `ALTER TABLE ${Q(from)} RENAME TO ${Q(to)}`;
     await conn.query(sql);
@@ -610,8 +672,44 @@ const handlers = {
 };
 
 /* ---- HTTP plumbing ---- */
+
+/** The endpoints the bridge serves: exactly the handlers above, nothing inherited. */
+const endpoints = new Map(Object.entries(handlers));
+
+// The bridge opens database connections for whoever asks, so it must only
+// answer the MamaSQL page itself — never another website the user happens to
+// have open (a browser lets any page POST to localhost).
+const LOOPBACK = new Set(["localhost", "127.0.0.1", "[::1]", "::1"]);
+function hostnameOf(hostHeader) {
+  try {
+    return new URL(`http://${hostHeader}`).hostname.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+/** The request's Origin when it may use the bridge, "" when it carries none, null when refused. */
+function allowedOrigin(req) {
+  const host = hostnameOf(req.headers.host || "");
+  // Outside Docker the bridge is localhost-only; a foreign Host name means DNS
+  // rebinding (evil.example resolved to 127.0.0.1).
+  if (!IN_DOCKER && !LOOPBACK.has(host)) return null;
+  const origin = req.headers.origin;
+  if (!origin) return ""; // not a cross-site browser request (curl, a server-side proxy)
+  let from;
+  try {
+    from = new URL(origin).hostname.toLowerCase();
+  } catch {
+    return null; // e.g. "null" from a sandboxed frame or file://
+  }
+  // The dev server's page (localhost), or in Docker the page nginx served
+  // (same host name the browser used to reach the web container).
+  if (LOOPBACK.has(from) || (IN_DOCKER && from === host)) return origin;
+  return null;
+}
 function cors(res) {
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  if (!res.allowedOrigin) return; // same-origin through the proxy: no CORS needed
+  res.setHeader("Access-Control-Allow-Origin", res.allowedOrigin);
+  res.setHeader("Vary", "Origin");
   res.setHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 }
@@ -652,6 +750,12 @@ function isConnLost(e) {
 }
 
 const server = createServer((req, res) => {
+  const origin = allowedOrigin(req);
+  if (origin === null) {
+    console.error(`[bridge] refused ${req.method} ${req.url} from origin ${req.headers.origin ?? "-"} (host ${req.headers.host ?? "-"})`);
+    return sendJson(res, 403, appError("forbidden", "This page may not use the MamaSQL engine bridge."));
+  }
+  res.allowedOrigin = origin;
   if (req.method === "OPTIONS") {
     cors(res);
     res.writeHead(204);
@@ -659,7 +763,9 @@ const server = createServer((req, res) => {
     return;
   }
   const path = (req.url || "").replace(/^\/api\//, "").replace(/\?.*$/, "").replace(/^\//, "");
-  const handler = handlers[path];
+  // A Map, not handlers[path]: a plain object lookup would also reach inherited
+  // methods such as /api/toString or /api/constructor.
+  const handler = endpoints.get(path);
   if (!handler) return sendJson(res, 404, appError("notFound", `Unknown endpoint: ${path}`));
 
   if (req.method === "GET") {
@@ -705,6 +811,10 @@ const server = createServer((req, res) => {
 process.on("uncaughtException", (e) => console.error("[bridge] uncaughtException:", e));
 process.on("unhandledRejection", (e) => console.error("[bridge] unhandledRejection:", e));
 
-server.listen(PORT, () => {
-  console.log(`MamaSQL engine bridge listening on http://localhost:${PORT}  (PostgreSQL + MySQL)`);
+// Outside Docker, only this machine may connect. In Docker the web container
+// reaches it over the compose network, and the published web port's BIND_ADDR
+// decides who can reach that.
+const LISTEN_HOST = IN_DOCKER ? "0.0.0.0" : "127.0.0.1";
+server.listen(PORT, LISTEN_HOST, () => {
+  console.log(`MamaSQL engine bridge listening on http://${LISTEN_HOST}:${PORT}  (PostgreSQL + MySQL)`);
 });

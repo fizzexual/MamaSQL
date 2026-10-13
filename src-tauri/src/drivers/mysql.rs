@@ -39,7 +39,12 @@ fn sanitize_ident(name: &str) -> String {
 /// information_schema text columns can come back as utf8 strings OR as binary
 /// (varbinary/blob) depending on MySQL/MariaDB version + collation. Decode
 /// defensively so introspection never panics (a panic would hang the command).
-fn try_get_text(row: &sqlx::mysql::MySqlRow, col: &str) -> String {
+/// `col` is a column position or name; prefer the position for information_schema,
+/// whose column labels are UPPER case on MySQL 8 but as-written on MariaDB.
+fn try_get_text<I>(row: &sqlx::mysql::MySqlRow, col: I) -> String
+where
+    I: sqlx::ColumnIndex<sqlx::mysql::MySqlRow> + Copy,
+{
     if let Ok(s) = row.try_get::<String, _>(col) {
         return s;
     }
@@ -158,10 +163,11 @@ impl Driver for MySqlDriver {
         Ok(rows
             .iter()
             .map(|r| {
-                let table_type: String = try_get_text(r, "table_type");
+                // By position: MySQL 8 labels these TABLE_NAME / TABLE_TYPE.
+                let table_type: String = try_get_text(r, 1);
                 let kind = if table_type == "VIEW" { "view" } else { "table" };
                 TableInfo {
-                    name: try_get_text(r, "table_name"),
+                    name: try_get_text(r, 0),
                     kind: kind.to_string(),
                     schema: None,
                 }
@@ -181,12 +187,13 @@ impl Driver for MySqlDriver {
         Ok(rows
             .iter()
             .map(|r| {
-                let name = try_get_text(r, "column_name");
+                // By position (column_name, data_type, is_nullable, column_key):
+                // MySQL 8 labels them COLUMN_NAME, DATA_TYPE, ….
                 ColumnInfo {
-                    is_primary_key: try_get_text(r, "column_key") == "PRI",
-                    nullable: try_get_text(r, "is_nullable") == "YES",
-                    data_type: try_get_text(r, "data_type"),
-                    name,
+                    name: try_get_text(r, 0),
+                    data_type: try_get_text(r, 1),
+                    nullable: try_get_text(r, 2) == "YES",
+                    is_primary_key: try_get_text(r, 3) == "PRI",
                 }
             })
             .collect())
@@ -256,5 +263,41 @@ mod tests {
         assert!(cols.iter().find(|c| c.name == "id").unwrap().is_primary_key);
 
         d.execute("DROP TABLE mamasql_t").await.unwrap();
+    }
+
+    // MySQL 8 labels information_schema columns in UPPER case (TABLE_NAME) while
+    // MariaDB keeps them as written, so reading them by lower-case name came back
+    // empty on MySQL 8: blank table names, no primary keys. Run this against both.
+    #[tokio::test]
+    async fn mysql_introspection_names_kinds_and_keys() {
+        let Some((cfg, pass)) = my_cfg() else {
+            eprintln!("skipping mysql_introspection (set MAMASQL_MYSQL_TEST to run)");
+            return;
+        };
+        let d = MySqlDriver::connect(&cfg, pass.as_deref()).await.unwrap();
+        d.execute("DROP VIEW IF EXISTS mamasql_iv").await.unwrap();
+        d.execute("DROP TABLE IF EXISTS mamasql_i").await.unwrap();
+        d.execute("CREATE TABLE mamasql_i (id INT PRIMARY KEY, name VARCHAR(50) NOT NULL, score DOUBLE)")
+            .await
+            .unwrap();
+        d.execute("CREATE VIEW mamasql_iv AS SELECT id, name FROM mamasql_i").await.unwrap();
+
+        let tables = d.list_tables().await.unwrap();
+        assert!(tables.iter().all(|t| !t.name.is_empty()), "blank table name in {tables:?}");
+        let kind = |n: &str| tables.iter().find(|t| t.name == n).map(|t| t.kind.clone());
+        assert_eq!(kind("mamasql_i").as_deref(), Some("table"));
+        assert_eq!(kind("mamasql_iv").as_deref(), Some("view"));
+
+        let cols = d.list_columns("mamasql_i").await.unwrap();
+        assert_eq!(cols.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), ["id", "name", "score"]);
+        assert_eq!(cols.iter().map(|c| c.is_primary_key).collect::<Vec<_>>(), [true, false, false]);
+        assert_eq!(cols.iter().map(|c| c.nullable).collect::<Vec<_>>(), [false, false, true]);
+        assert_eq!(cols.iter().map(|c| c.data_type.as_str()).collect::<Vec<_>>(), ["int", "varchar", "double"]);
+
+        let dbs = MySqlDriver::list_databases(&cfg, pass.as_deref()).await.unwrap();
+        assert!(dbs.contains(&cfg.database), "{} not in {dbs:?}", cfg.database);
+
+        d.execute("DROP VIEW mamasql_iv").await.unwrap();
+        d.execute("DROP TABLE mamasql_i").await.unwrap();
     }
 }

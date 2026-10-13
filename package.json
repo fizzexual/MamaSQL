@@ -48,6 +48,7 @@
     "vitest": "^4.1.9"
   },
   "overrides": {
-    "esbuild": "^0.28.1"
+    "esbuild": "^0.28.1",
+    "shell-quote": "^1.11.0"
   }
 }

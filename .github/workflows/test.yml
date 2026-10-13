@@ -1,0 +1,119 @@
+name: Tests
+
+# Runs every test suite on each pull request and push to main, against real
+# databases, so the env-gated live tests actually run instead of skipping.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web (tsc + Vitest, live PostgreSQL + MySQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mamasql
+          POSTGRES_PASSWORD: mamasql
+          POSTGRES_DB: demo
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mamasql" --health-interval 5s --health-timeout 5s --health-retries 20
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: mamasql
+          MYSQL_DATABASE: demo
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pmamasql" --health-interval 5s --health-timeout 5s --health-retries 30
+    env:
+      MAMASQL_PG_TEST: "1"
+      MAMASQL_PG_HOST: 127.0.0.1
+      MAMASQL_PG_PORT: "5432"
+      MAMASQL_PG_DB: demo
+      MAMASQL_PG_USER: mamasql
+      MAMASQL_PG_PASS: mamasql
+      MAMASQL_MYSQL_TEST: "1"
+      MAMASQL_MYSQL_HOST: 127.0.0.1
+      MAMASQL_MYSQL_PORT: "3306"
+      MAMASQL_MYSQL_DB: demo
+      MAMASQL_MYSQL_USER: root
+      MAMASQL_MYSQL_PASS: mamasql
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npx vitest run
+      - run: npx vite build
+
+  rust:
+    name: Rust (cargo test, live PostgreSQL + ${{ matrix.mysql }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # MySQL 8 and MariaDB label information_schema columns differently.
+        mysql: ["mysql:8.4", "mariadb:11"]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: mamasql
+          POSTGRES_PASSWORD: mamasql
+          POSTGRES_DB: demo
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U mamasql" --health-interval 5s --health-timeout 5s --health-retries 20
+      mysql:
+        image: ${{ matrix.mysql }}
+        env:
+          MYSQL_ROOT_PASSWORD: mamasql
+          MYSQL_DATABASE: demo
+          MARIADB_ROOT_PASSWORD: mamasql
+          MARIADB_DATABASE: demo
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pmamasql || mariadb-admin ping -h 127.0.0.1 -pmamasql"
+          --health-interval 5s --health-timeout 5s --health-retries 30
+    env:
+      MAMASQL_PG_TEST: "1"
+      MAMASQL_PG_HOST: 127.0.0.1
+      MAMASQL_PG_PORT: "5432"
+      MAMASQL_PG_DB: demo
+      MAMASQL_PG_USER: mamasql
+      MAMASQL_PG_PASS: mamasql
+      MAMASQL_MYSQL_TEST: "1"
+      MAMASQL_MYSQL_HOST: 127.0.0.1
+      MAMASQL_MYSQL_PORT: "3306"
+      MAMASQL_MYSQL_DB: demo
+      MAMASQL_MYSQL_USER: root
+      MAMASQL_MYSQL_PASS: mamasql
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tauri system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      # tauri::generate_context! embeds ../dist at compile time.
+      - run: npm ci && npx vite build
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+      - run: cargo test
+        working-directory: src-tauri

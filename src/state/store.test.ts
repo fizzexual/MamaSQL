@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getBackend } from "../ipc/backend";
 import { useStore } from "./store";
 import { useToast } from "./toast";
 
@@ -23,7 +24,9 @@ vi.mock("../ipc/backend", async (importOriginal) => {
       CREATE TABLE customers (id INTEGER PRIMARY KEY, name TEXT NOT NULL);
       INSERT INTO customers (name) VALUES ('Ada'), ('Grace'), ('Linus');
       CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER REFERENCES customers(id), total REAL);
-      INSERT INTO orders (customer_id, total) VALUES (1, 9.5), (2, 20);`,
+      INSERT INTO orders (customer_id, total) VALUES (1, 9.5), (2, 20);
+      CREATE TABLE order_items (order_id INTEGER, line INTEGER, qty INTEGER, PRIMARY KEY (order_id, line));
+      INSERT INTO order_items VALUES (1, 1, 1), (1, 2, 2), (1, 3, 3);`,
     "fx-analytics": `
       CREATE TABLE events (id INTEGER PRIMARY KEY, kind TEXT);
       INSERT INTO events (kind) VALUES ('signup'), ('login');`,
@@ -75,6 +78,19 @@ vi.mock("../ipc/backend", async (importOriginal) => {
         isPrimaryKey: Number(r[5]) > 0,
       }));
     },
+    // Same contract as the real backends: one key column, or every column of a composite key.
+    updateCell: async (id, table, pkColumn, pkValue, column, value) => {
+      const keys = Array.isArray(pkColumn) ? pkColumn : [pkColumn];
+      const vals = Array.isArray(pkColumn) ? (pkValue as unknown[]) : [pkValue];
+      const where = keys.map((k) => `"${k}" = ?`).join(" AND ");
+      db(id).run(`UPDATE "${table}" SET "${column}" = ? WHERE ${where}`, [value, ...vals] as never);
+    },
+    deleteRow: async (id, table, pkColumn, pkValue) => {
+      const keys = Array.isArray(pkColumn) ? pkColumn : [pkColumn];
+      const vals = Array.isArray(pkColumn) ? (pkValue as unknown[]) : [pkValue];
+      const where = keys.map((k) => `"${k}" = ?`).join(" AND ");
+      db(id).run(`DELETE FROM "${table}" WHERE ${where}`, vals as never);
+    },
   };
   // Anything the store calls that the fixture doesn't cover fails loudly.
   const fixture = new Proxy(impl, {
@@ -85,6 +101,29 @@ vi.mock("../ipc/backend", async (importOriginal) => {
 
   return { ...actual, getBackend: () => fixture };
 });
+
+// Row deletes ask for confirmation; the tests answer "yes".
+vi.mock("./dialog", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("./dialog")>()),
+  confirmDelete: async () => ({ ok: true, skipFk: false }),
+}));
+
+async function itemsRows(): Promise<unknown[][]> {
+  const r = await getBackend().runQuery("fx-shop", "SELECT order_id, line, qty FROM order_items ORDER BY line");
+  return r.rows;
+}
+
+async function openItems(): Promise<{ rowOf: (line: number) => number; qtyCol: number }> {
+  await useStore.getState().loadConnections();
+  await useStore.getState().openAndIntrospect("fx-shop");
+  await useStore.getState().openTableData("order_items");
+  const { result } = useStore.getState();
+  const lineCol = result!.columns.findIndex((c) => c.name === "line");
+  return {
+    rowOf: (line) => result!.rows.findIndex((r) => r[lineCol] === line),
+    qtyCol: result!.columns.findIndex((c) => c.name === "qty"),
+  };
+}
 
 describe("store", () => {
   beforeEach(() => {
@@ -102,7 +141,7 @@ describe("store", () => {
     const id = useStore.getState().connections[0].id;
     await useStore.getState().openAndIntrospect(id);
     expect(useStore.getState().activeConnectionId).toBe(id);
-    expect(useStore.getState().schema.tables.map((t) => t.name)).toEqual(["customers", "orders"]);
+    expect(useStore.getState().schema.tables.map((t) => t.name)).toEqual(["customers", "order_items", "orders"]);
   });
 
   // Since 9698408 (multiple SQL editor tabs) a query's result/error is stored per
@@ -162,5 +201,35 @@ describe("store", () => {
     expect(useStore.getState().editTable).toBeNull();
     expect(useStore.getState().result).toBeNull();
     expect(useStore.getState().schema.tables.map((t) => t.name)).not.toContain(firstTable);
+  });
+
+  it("editing a cell in a composite-key table changes only that row", async () => {
+    const { rowOf, qtyCol } = await openItems();
+    await useStore.getState().editCell(rowOf(2), qtyCol, 99);
+    expect(useStore.getState().error).toBeNull();
+    expect(await itemsRows()).toEqual([
+      [1, 1, 1],
+      [1, 2, 99],
+      [1, 3, 3],
+    ]);
+  });
+
+  it("deleting a row in a composite-key table deletes only that row", async () => {
+    const { rowOf } = await openItems();
+    await useStore.getState().deleteRowAt(rowOf(3));
+    expect(useStore.getState().error).toBeNull();
+    expect((await itemsRows()).map((r) => r[1])).toEqual([1, 2]);
+  });
+
+  it("editing a single-key table still sends one key column", async () => {
+    await useStore.getState().loadConnections();
+    await useStore.getState().openAndIntrospect("fx-shop");
+    await useStore.getState().openTableData("customers");
+    const { result } = useStore.getState();
+    const nameCol = result!.columns.findIndex((c) => c.name === "name");
+    const spy = vi.spyOn(getBackend(), "updateCell");
+    await useStore.getState().editCell(0, nameCol, "Ada L.");
+    expect(spy).toHaveBeenCalledWith("fx-shop", "customers", "id", 1, "name", "Ada L.");
+    spy.mockRestore();
   });
 });

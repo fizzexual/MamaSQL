@@ -32,7 +32,9 @@ export default defineConfig(async () => ({
     // matching how the Docker web container proxies /api to the bridge.
     proxy: {
       // @ts-expect-error process is a nodejs global
-      "/api": { target: process.env.BRIDGE_URL || "http://localhost:5174", changeOrigin: true },
+      // 127.0.0.1, not "localhost": the bridge listens on IPv4 loopback only, and
+      // "localhost" can resolve to ::1 first.
+      "/api": { target: process.env.BRIDGE_URL || "http://127.0.0.1:5174", changeOrigin: true },
     },
   },
 }));
