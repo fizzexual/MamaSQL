@@ -56,8 +56,14 @@ where
 
 impl MySqlDriver {
     pub async fn connect(cfg: &ConnectionConfig, password: Option<&str>) -> AppResult<Self> {
+        // One session per open connection: the app runs each statement as its
+        // own call, so BEGIN … COMMIT, SET and temp tables only work if every
+        // call reaches the same session. Never recycled, so an open transaction
+        // can't be dropped by an idle timeout.
         let pool = MySqlPoolOptions::new()
-            .max_connections(5)
+            .max_connections(1)
+            .idle_timeout(None)
+            .max_lifetime(None)
             .connect_with(options(cfg, password))
             .await?;
         Ok(Self { pool })
@@ -363,5 +369,28 @@ mod tests {
 
         d.execute("DROP TABLE mamasql_bk").await.unwrap();
         d.execute("DROP TABLE mamasql_bs").await.unwrap();
+    }
+
+    // The app runs each statement as its own call. BEGIN, the write and ROLLBACK
+    // must reach the same session, also after the pool was busy with two things
+    // at once (a query and the schema tree loading, say).
+    #[tokio::test]
+    async fn mysql_transaction_spans_separate_statements() {
+        let Some((cfg, pass)) = my_cfg() else {
+            eprintln!("skipping mysql_transaction (set MAMASQL_MYSQL_TEST to run)");
+            return;
+        };
+        let d = MySqlDriver::connect(&cfg, pass.as_deref()).await.unwrap();
+        d.execute("DROP TABLE IF EXISTS mamasql_txm").await.unwrap();
+        d.execute("CREATE TABLE mamasql_txm (x INT) ENGINE=InnoDB").await.unwrap();
+        let (a, b) = tokio::join!(d.execute("SELECT SLEEP(0.3)"), d.execute("SELECT SLEEP(0.3)"));
+        a.unwrap();
+        b.unwrap();
+        d.execute("BEGIN").await.unwrap();
+        d.execute("INSERT INTO mamasql_txm VALUES (1)").await.unwrap();
+        d.execute("ROLLBACK").await.unwrap();
+        let left = d.execute("SELECT x FROM mamasql_txm").await.unwrap();
+        assert!(left.rows.is_empty(), "the rolled-back insert is still there: {:?}", left.rows);
+        d.execute("DROP TABLE mamasql_txm").await.unwrap();
     }
 }
