@@ -233,6 +233,8 @@ export interface AppStore {
   setView: (v: "data" | "sql" | "history") => void;
   refresh: () => Promise<void>;
   reload: (table: string) => Promise<void>;
+  /** Re-read the active connection's tables (e.g. after CREATE TABLE in the editor), keeping the open grid. */
+  refreshSchema: () => Promise<void>;
   addColumn: (table: string, column: ColumnDef) => Promise<void>;
   dropColumn: (table: string, column: string) => Promise<void>;
   renameColumn: (table: string, from: string, to: string) => Promise<void>;
@@ -943,6 +945,19 @@ export const useStore = create<AppStore>((set, get) => ({
   refresh: async () => {
     const t = get().editTable?.table;
     if (t) await get().openTableData(t);
+  },
+
+  refreshSchema: async () => {
+    const id = get().activeConnectionId;
+    if (!id) return;
+    const ticket = connTicket;
+    try {
+      const tables = await backend.listTables(id);
+      if (ticket !== connTicket) return; // switched connections meanwhile
+      set({ schema: { tables, columnsByTable: {} } });
+    } catch (e) {
+      toast(normalizeError(e).message ?? "Could not refresh tables", "error");
+    }
   },
 
   reload: async (table) => {

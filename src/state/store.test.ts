@@ -233,6 +233,19 @@ describe("store", () => {
     spy.mockRestore();
   });
 
+  it("refreshSchema shows a table created in the editor, and keeps the open grid", async () => {
+    await useStore.getState().loadConnections();
+    await useStore.getState().openAndIntrospect("fx-analytics");
+    await useStore.getState().openTableData("events");
+    await getBackend().runQuery("fx-analytics", "CREATE TABLE IF NOT EXISTS created_later (id INTEGER PRIMARY KEY)");
+    await useStore.getState().refreshSchema();
+    const s = useStore.getState();
+    expect(s.schema.tables.map((t) => t.name)).toContain("created_later");
+    expect(s.editTable?.table).toBe("events");
+    expect(s.result).not.toBeNull();
+    await getBackend().runQuery("fx-analytics", "DROP TABLE created_later");
+  });
+
   describe("a slow answer never lands on top of a newer click", () => {
     const later = <T>(ms: number, run: () => Promise<T>) => new Promise<T>((r) => setTimeout(() => r(run()), ms));
 

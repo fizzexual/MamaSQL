@@ -141,6 +141,9 @@ export function Sources({
           onClick={() => {
             void loadConnections();
             void scanLocal();
+            // Also re-read the open connection's tables, so a table just created
+            // in the editor shows up (this button used to refresh only the list).
+            void useStore.getState().refreshSchema();
           }}
         >
           <IconRefresh size={15} stroke={1.7} />
