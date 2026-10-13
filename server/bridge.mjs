@@ -778,8 +778,8 @@ const server = createServer((req, res) => {
   const path = (req.url || "").replace(/^\/api\//, "").replace(/\?.*$/, "").replace(/^\//, "");
   // A Map, not handlers[path]: a plain object lookup would also reach inherited
   // methods such as /api/toString or /api/constructor.
-  const handler = endpoints.get(path);
-  if (!handler) return sendJson(res, 404, appError("notFound", `Unknown endpoint: ${path}`));
+  const handler = endpoints.has(path) ? endpoints.get(path) : undefined;
+  if (typeof handler !== "function") return sendJson(res, 404, appError("notFound", `Unknown endpoint: ${path}`));
 
   if (req.method === "GET") {
     Promise.resolve(handler({}))
