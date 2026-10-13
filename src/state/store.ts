@@ -261,6 +261,14 @@ export interface AppStore {
 
 const backend = getBackend();
 
+// Load tickets. Every load into the grid (table, view, search, connection
+// switch) takes the next ticket; an answer that comes back after a newer load
+// started is dropped. Otherwise a slow table A lands on top of table B, and
+// edits made "in B" then use A's rows.
+let gridTicket = 0;
+// The same for the schema of the active connection.
+let connTicket = 0;
+
 type EditTable = { table: string; pkColumn: string | null; pkColumns?: string[] };
 
 /**
@@ -430,6 +438,8 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   openAndIntrospect: async (id) => {
+    const ticket = ++connTicket;
+    gridTicket++;
     persistLocal(LASTCONN_KEY, id);
     // Reset everything tied to the previous source so its tables/data don't
     // bleed through while the new source introspects (or if it errors).
@@ -449,6 +459,7 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       await backend.openConnection(id);
       const tables = await backend.listTables(id);
+      if (ticket !== connTicket) return;
       set({ schema: { tables, columnsByTable: {} }, loadingTables: false });
       // Eagerly cache columns for small schemas so SQL autocomplete has them.
       if (tables.length <= 40) {
@@ -461,7 +472,7 @@ export const useStore = create<AppStore>((set, get) => ({
               /* best-effort */
             }
           }
-          if (get().activeConnectionId === id) {
+          if (ticket === connTicket) {
             set((s) => ({
               schema: { ...s.schema, columnsByTable: { ...s.schema.columnsByTable, ...cols } },
             }));
@@ -469,6 +480,7 @@ export const useStore = create<AppStore>((set, get) => ({
         })();
       }
     } catch (e) {
+      if (ticket !== connTicket) return;
       const err = normalizeError(e);
       set({ error: err, loadingTables: false });
       toast(err.message ?? "Could not open connection", "error");
@@ -478,7 +490,9 @@ export const useStore = create<AppStore>((set, get) => ({
   expandTable: async (table) => {
     const id = get().activeConnectionId;
     if (!id || get().schema.columnsByTable[table]) return;
+    const ticket = connTicket;
     const cols = await backend.listColumns(id, table);
+    if (ticket !== connTicket) return;
     set((s) => ({
       schema: {
         ...s.schema,
@@ -652,6 +666,7 @@ export const useStore = create<AppStore>((set, get) => ({
       nextTabs = [...openTables, table];
     }
     const sql = `SELECT * FROM ${table} LIMIT 1000;`;
+    const ticket = ++gridTicket;
     set({
       view: "data",
       topView: "data",
@@ -674,6 +689,7 @@ export const useStore = create<AppStore>((set, get) => ({
       const pkColumns = cols.filter((c) => c.isPrimaryKey).map((c) => c.name);
       const pkColumn = pkColumns[0] ?? null;
       let result = await backend.runQuery(id, sql);
+      if (ticket !== gridTicket) return;
       // Empty tables yield no columns from the row set — show the schema's columns.
       if (result.columns.length === 0 && cols.length > 0) {
         result = { ...result, columns: cols.map((c) => ({ name: c.name, dataType: c.dataType })) };
@@ -681,6 +697,7 @@ export const useStore = create<AppStore>((set, get) => ({
       set({ result, editTable: { table, pkColumn, pkColumns }, loadingResult: false });
       await get().loadHistory();
     } catch (e) {
+      if (ticket !== gridTicket) return;
       set({ error: normalizeError(e), result: null, loadingResult: false });
     }
   },
@@ -715,11 +732,14 @@ export const useStore = create<AppStore>((set, get) => ({
     const lit = `'%${query.replace(/'/g, "''")}%'`;
     const where = cols.map((c) => `${toText(qid(c))} LIKE ${lit}`).join(" OR ");
     const from = qid(editTable.table);
+    const ticket = ++gridTicket;
     set({ loadingResult: true, error: null });
     try {
       const r = await backend.runQuery(activeConnectionId, `SELECT * FROM ${from} WHERE ${where} LIMIT 1000;`);
+      if (ticket !== gridTicket) return;
       set({ result: r, loadingResult: false });
     } catch (e) {
+      if (ticket !== gridTicket) return;
       set({ error: normalizeError(e), loadingResult: false });
     }
   },
@@ -731,8 +751,10 @@ export const useStore = create<AppStore>((set, get) => ({
     const key = rowKey(editTable, result, rowIndex);
     if (!key) return;
     const column = result.columns[colIndex].name;
+    const ticket = gridTicket;
     try {
       await backend.updateCell(activeConnectionId, editTable.table, key.column, key.value, column, value);
+      if (ticket !== gridTicket) return; // the grid shows another table now
       const rows = result.rows.map((r, i) =>
         i === rowIndex ? r.map((c, j) => (j === colIndex ? value : c)) : r,
       );
@@ -755,10 +777,12 @@ export const useStore = create<AppStore>((set, get) => ({
     });
     if (!choice.ok) return;
     const engine = get().connections.find((c) => c.id === activeConnectionId)?.engine;
+    const ticket = gridTicket;
     try {
       await withFkDisabled(activeConnectionId, engine, choice.skipFk, () =>
         backend.deleteRow(activeConnectionId, editTable.table, key.column, key.value),
       );
+      if (ticket !== gridTicket) return; // the grid shows another table now
       const rows = result.rows.filter((_, i) => i !== rowIndex);
       set((s) => ({
         result: { ...result, rows },
@@ -1040,6 +1064,7 @@ export const useStore = create<AppStore>((set, get) => ({
     const id = get().activeConnectionId;
     if (!id || id !== view.connectionId) return;
     const sql = `SELECT * FROM ${view.table} LIMIT 200;`;
+    const ticket = ++gridTicket;
     set({
       view: "data",
       topView: "data",
@@ -1060,6 +1085,7 @@ export const useStore = create<AppStore>((set, get) => ({
       const pkColumns = cols.filter((c) => c.isPrimaryKey).map((c) => c.name);
       const pkColumn = pkColumns[0] ?? null;
       let result = await backend.runQuery(id, sql);
+      if (ticket !== gridTicket) return;
       if (result.columns.length === 0 && cols.length > 0) {
         result = { ...result, columns: cols.map((c) => ({ name: c.name, dataType: c.dataType })) };
       }
@@ -1067,6 +1093,7 @@ export const useStore = create<AppStore>((set, get) => ({
       set({ result, editTable: { table: view.table, pkColumn, pkColumns }, loadingResult: false });
       await get().loadHistory();
     } catch (e) {
+      if (ticket !== gridTicket) return;
       set({ error: normalizeError(e), result: null, loadingResult: false });
     }
   },

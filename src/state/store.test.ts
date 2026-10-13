@@ -232,4 +232,58 @@ describe("store", () => {
     expect(spy).toHaveBeenCalledWith("fx-shop", "customers", "id", 1, "name", "Ada L.");
     spy.mockRestore();
   });
+
+  describe("a slow answer never lands on top of a newer click", () => {
+    const later = <T>(ms: number, run: () => Promise<T>) => new Promise<T>((r) => setTimeout(() => r(run()), ms));
+
+    it("a table that answers late is dropped once another table was opened", async () => {
+      await useStore.getState().loadConnections();
+      await useStore.getState().openAndIntrospect("fx-shop");
+      const b = getBackend();
+      const real = b.runQuery.bind(b);
+      const spy = vi.spyOn(b, "runQuery").mockImplementation((id, sql) =>
+        /from orders/i.test(sql) ? later(60, () => real(id, sql)) : real(id, sql),
+      );
+      const slow = useStore.getState().openTableData("orders");
+      await useStore.getState().openTableData("customers");
+      await slow;
+      spy.mockRestore();
+      const { editTable, result } = useStore.getState();
+      expect(editTable?.table).toBe("customers");
+      expect(result?.columns.map((c) => c.name)).toEqual(["id", "name"]);
+    });
+
+    it("a connection that answers late is dropped once another connection was opened", async () => {
+      await useStore.getState().loadConnections();
+      const b = getBackend();
+      const real = b.listTables.bind(b);
+      const spy = vi.spyOn(b, "listTables").mockImplementation((id) =>
+        id === "fx-shop" ? later(60, () => real(id)) : real(id),
+      );
+      const slow = useStore.getState().openAndIntrospect("fx-shop");
+      await useStore.getState().openAndIntrospect("fx-analytics");
+      await slow;
+      spy.mockRestore();
+      const s = useStore.getState();
+      expect(s.activeConnectionId).toBe("fx-analytics");
+      expect(s.schema.tables.map((t) => t.name)).toEqual(["events"]);
+    });
+
+    it("an edit that finishes after another table was opened doesn't put the old grid back", async () => {
+      await useStore.getState().loadConnections();
+      await useStore.getState().openAndIntrospect("fx-shop");
+      await useStore.getState().openTableData("customers");
+      const nameCol = useStore.getState().result!.columns.findIndex((c) => c.name === "name");
+      const b = getBackend();
+      const real = b.updateCell.bind(b);
+      const spy = vi.spyOn(b, "updateCell").mockImplementation((...a) => later(60, () => real(...a)));
+      const edit = useStore.getState().editCell(0, nameCol, "Ada L.");
+      await useStore.getState().openTableData("orders");
+      await edit;
+      spy.mockRestore();
+      const { editTable, result } = useStore.getState();
+      expect(editTable?.table).toBe("orders");
+      expect(result?.columns.map((c) => c.name)).toEqual(["id", "customer_id", "total"]);
+    });
+  });
 });
