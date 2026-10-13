@@ -105,6 +105,26 @@ impl MySqlDriver {
 
 #[async_trait]
 impl Driver for MySqlDriver {
+    async fn execute_bound(&self, sql: &str, params: &[serde_json::Value]) -> AppResult<u64> {
+        use serde_json::Value;
+        let mut q = sqlx::query(sql);
+        for p in params {
+            q = match p {
+                Value::Null => q.bind(None::<String>),
+                Value::Bool(b) => q.bind(*b),
+                Value::Number(n) => match (n.as_i64(), n.as_u64(), n.as_f64()) {
+                    (Some(i), _, _) => q.bind(i),
+                    (_, Some(u), _) => q.bind(u),
+                    (_, _, Some(f)) => q.bind(f),
+                    _ => q.bind(n.to_string()),
+                },
+                Value::String(s) => q.bind(s.clone()),
+                other => q.bind(other.to_string()),
+            };
+        }
+        Ok(q.execute(&self.pool).await?.rows_affected())
+    }
+
     async fn execute(&self, sql: &str) -> AppResult<QueryResult> {
         let started = std::time::Instant::now();
         let head = sql.trim_start().to_uppercase();
@@ -299,5 +319,47 @@ mod tests {
 
         d.execute("DROP VIEW mamasql_iv").await.unwrap();
         d.execute("DROP TABLE mamasql_i").await.unwrap();
+    }
+
+    // MySQL treats a backslash in a string literal as an escape, so edits built
+    // as literals stored "C:\temp\new" with a tab and a newline, and a value
+    // ending in "\" broke the statement. The edit path must keep every value exactly.
+    #[tokio::test]
+    async fn mysql_edits_keep_backslashes_and_quotes_exactly() {
+        use crate::editing::{run_delete, run_insert, run_update, KeyColumns};
+        use serde_json::json;
+        let Some((cfg, pass)) = my_cfg() else {
+            eprintln!("skipping mysql_edits (set MAMASQL_MYSQL_TEST to run)");
+            return;
+        };
+        let d = MySqlDriver::connect(&cfg, pass.as_deref()).await.unwrap();
+        let e = Engine::MySql;
+        d.execute("DROP TABLE IF EXISTS mamasql_bs").await.unwrap();
+        d.execute("CREATE TABLE mamasql_bs (id INT PRIMARY KEY, v TEXT)").await.unwrap();
+        let tricky = [r"C:\temp\new", r"ends with \", r"x\' ; DROP TABLE mamasql_bs; -- ", "it's", r"\\server\share"];
+        let cols = ["id".to_string(), "v".to_string()];
+        for (i, v) in tricky.iter().enumerate() {
+            run_insert(&d, e, "mamasql_bs", &cols, &[json!(i), json!("placeholder")]).await.unwrap();
+            run_update(&d, e, "mamasql_bs", "v", &json!(v), &KeyColumns::One("id".into()), &json!(i)).await.unwrap();
+        }
+        run_insert(&d, e, "mamasql_bs", &cols, &[json!(100), json!(r"C:\temp\new")]).await.unwrap();
+        let r = d.execute("SELECT v FROM mamasql_bs ORDER BY id").await.unwrap();
+        let got: Vec<_> = r.rows.iter().map(|row| row[0].clone()).collect();
+        let mut want: Vec<_> = tricky.iter().map(|v| json!(v)).collect();
+        want.push(json!(r"C:\temp\new"));
+        assert_eq!(got, want);
+
+        // A key that contains a backslash names exactly its own row.
+        d.execute("DROP TABLE IF EXISTS mamasql_bk").await.unwrap();
+        d.execute("CREATE TABLE mamasql_bk (k VARCHAR(50) PRIMARY KEY)").await.unwrap();
+        let kcol = ["k".to_string()];
+        run_insert(&d, e, "mamasql_bk", &kcol, &[json!(r"a\b")]).await.unwrap();
+        run_insert(&d, e, "mamasql_bk", &kcol, &[json!("ab")]).await.unwrap();
+        run_delete(&d, e, "mamasql_bk", &KeyColumns::One("k".into()), &json!(r"a\b")).await.unwrap();
+        let left = d.execute("SELECT k FROM mamasql_bk").await.unwrap();
+        assert_eq!(left.rows, vec![vec![json!("ab")]]);
+
+        d.execute("DROP TABLE mamasql_bk").await.unwrap();
+        d.execute("DROP TABLE mamasql_bs").await.unwrap();
     }
 }
