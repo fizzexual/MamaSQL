@@ -318,4 +318,22 @@ mod tests {
         assert!(left.rows.is_empty(), "the rolled-back insert is still there: {:?}", left.rows);
         d.execute("DROP TABLE mamasql_tx").await.unwrap();
     }
+
+    // When the server offers TLS the connection must use it: servers that
+    // require it (RDS, Supabase, Neon, Azure) refuse anything else.
+    #[tokio::test]
+    async fn pg_uses_tls_when_the_server_offers_it() {
+        let Some((cfg, pass)) = pg_cfg() else {
+            eprintln!("skipping pg_tls (set MAMASQL_PG_TEST to run)");
+            return;
+        };
+        let d = PgDriver::connect(&cfg, pass.as_deref()).await.unwrap();
+        let ssl = d.execute("SHOW ssl").await.unwrap();
+        if ssl.rows[0][0] != serde_json::json!("on") {
+            eprintln!("skipping pg_tls: this server has ssl = off");
+            return;
+        }
+        let r = d.execute("SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()").await.unwrap();
+        assert_eq!(r.rows[0][0], serde_json::json!(true), "connected without TLS to a server that offers it");
+    }
 }

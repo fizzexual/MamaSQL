@@ -393,4 +393,30 @@ mod tests {
         assert!(left.rows.is_empty(), "the rolled-back insert is still there: {:?}", left.rows);
         d.execute("DROP TABLE mamasql_txm").await.unwrap();
     }
+
+    // When the server offers TLS the connection must use it: servers that
+    // require it (RDS, Azure, PlanetScale) refuse anything else.
+    #[tokio::test]
+    async fn mysql_uses_tls_when_the_server_offers_it() {
+        use serde_json::json;
+        let Some((cfg, pass)) = my_cfg() else {
+            eprintln!("skipping mysql_tls (set MAMASQL_MYSQL_TEST to run)");
+            return;
+        };
+        let d = MySqlDriver::connect(&cfg, pass.as_deref()).await.unwrap();
+        // MySQL 8 shows its auto-generated certificate; MariaDB reports have_ssl.
+        let vars = d
+            .execute("SHOW GLOBAL VARIABLES WHERE Variable_name IN ('have_ssl', 'ssl_cert')")
+            .await
+            .unwrap();
+        let offers = vars.rows.iter().any(|r| {
+            (r[0] == json!("have_ssl") && r[1] == json!("YES")) || (r[0] == json!("ssl_cert") && r[1] != json!(""))
+        });
+        if !offers {
+            eprintln!("skipping mysql_tls: this server does not offer TLS");
+            return;
+        }
+        let cipher = d.execute("SHOW SESSION STATUS LIKE 'Ssl_cipher'").await.unwrap();
+        assert_ne!(cipher.rows[0][1], json!(""), "connected without TLS to a server that offers it");
+    }
 }
