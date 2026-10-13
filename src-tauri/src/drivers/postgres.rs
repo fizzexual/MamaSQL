@@ -41,8 +41,14 @@ fn sanitize_ident(name: &str) -> String {
 
 impl PgDriver {
     pub async fn connect(cfg: &ConnectionConfig, password: Option<&str>) -> AppResult<Self> {
+        // One session per open connection: the app runs each statement as its
+        // own call, so BEGIN … COMMIT, SET and temp tables only work if every
+        // call reaches the same session. Never recycled, so an open transaction
+        // can't be dropped by an idle timeout.
         let pool = PgPoolOptions::new()
-            .max_connections(5)
+            .max_connections(1)
+            .idle_timeout(None)
+            .max_lifetime(None)
             .connect_with(options(cfg, password))
             .await?;
         Ok(Self { pool })
@@ -288,5 +294,46 @@ mod tests {
         assert_eq!(r2.rows[0][0], serde_json::json!("renamed"));
 
         d.execute("DROP TABLE mamasql_t").await.unwrap();
+    }
+
+    // The app runs each statement as its own call. BEGIN, the write and ROLLBACK
+    // must reach the same session, also after the pool was busy with two things
+    // at once (a query and the schema tree loading, say).
+    #[tokio::test]
+    async fn pg_transaction_spans_separate_statements() {
+        let Some((cfg, pass)) = pg_cfg() else {
+            eprintln!("skipping pg_transaction (set MAMASQL_PG_TEST to run)");
+            return;
+        };
+        let d = PgDriver::connect(&cfg, pass.as_deref()).await.unwrap();
+        d.execute("DROP TABLE IF EXISTS mamasql_tx").await.unwrap();
+        d.execute("CREATE TABLE mamasql_tx (x INT)").await.unwrap();
+        let (a, b) = tokio::join!(d.execute("SELECT pg_sleep(0.3)"), d.execute("SELECT pg_sleep(0.3)"));
+        a.unwrap();
+        b.unwrap();
+        d.execute("BEGIN").await.unwrap();
+        d.execute("INSERT INTO mamasql_tx VALUES (1)").await.unwrap();
+        d.execute("ROLLBACK").await.unwrap();
+        let left = d.execute("SELECT x FROM mamasql_tx").await.unwrap();
+        assert!(left.rows.is_empty(), "the rolled-back insert is still there: {:?}", left.rows);
+        d.execute("DROP TABLE mamasql_tx").await.unwrap();
+    }
+
+    // When the server offers TLS the connection must use it: servers that
+    // require it (RDS, Supabase, Neon, Azure) refuse anything else.
+    #[tokio::test]
+    async fn pg_uses_tls_when_the_server_offers_it() {
+        let Some((cfg, pass)) = pg_cfg() else {
+            eprintln!("skipping pg_tls (set MAMASQL_PG_TEST to run)");
+            return;
+        };
+        let d = PgDriver::connect(&cfg, pass.as_deref()).await.unwrap();
+        let ssl = d.execute("SHOW ssl").await.unwrap();
+        if ssl.rows[0][0] != serde_json::json!("on") {
+            eprintln!("skipping pg_tls: this server has ssl = off");
+            return;
+        }
+        let r = d.execute("SELECT ssl FROM pg_stat_ssl WHERE pid = pg_backend_pid()").await.unwrap();
+        assert_eq!(r.rows[0][0], serde_json::json!(true), "connected without TLS to a server that offers it");
     }
 }

@@ -3,8 +3,57 @@
 //! type). This keeps a stray quote or backtick in a cell from breaking — or
 //! injecting into — the statement.
 
+use crate::drivers::Driver;
+use crate::error::{AppError, AppResult};
 use crate::types::{ColumnDef, Engine};
 use serde_json::Value;
+
+fn key_error(message: String) -> AppError {
+    AppError::QueryError { message, position: None }
+}
+
+/// Edit one cell of one row: what the grid's inline edit runs.
+pub async fn run_update(
+    driver: &dyn Driver,
+    engine: Engine,
+    table: &str,
+    column: &str,
+    value: &Value,
+    key: &KeyColumns,
+    key_value: &Value,
+) -> AppResult<()> {
+    if engine == Engine::MySql {
+        let (sql, params) = mysql_update(table, column, value, key, key_value).map_err(key_error)?;
+        driver.execute_bound(&sql, &params).await?;
+        return Ok(());
+    }
+    let sql = build_update_key(engine, table, column, value, key, key_value).map_err(key_error)?;
+    driver.execute(&sql).await?;
+    Ok(())
+}
+
+/// Delete one row, named by its key.
+pub async fn run_delete(driver: &dyn Driver, engine: Engine, table: &str, key: &KeyColumns, key_value: &Value) -> AppResult<()> {
+    if engine == Engine::MySql {
+        let (sql, params) = mysql_delete(table, key, key_value).map_err(key_error)?;
+        driver.execute_bound(&sql, &params).await?;
+        return Ok(());
+    }
+    let sql = build_delete_key(engine, table, key, key_value).map_err(key_error)?;
+    driver.execute(&sql).await?;
+    Ok(())
+}
+
+/// Insert one row.
+pub async fn run_insert(driver: &dyn Driver, engine: Engine, table: &str, columns: &[String], values: &[Value]) -> AppResult<()> {
+    if engine == Engine::MySql {
+        let (sql, params) = mysql_insert(table, columns, values);
+        driver.execute_bound(&sql, &params).await?;
+        return Ok(());
+    }
+    driver.execute(&build_insert(engine, table, columns, values)).await?;
+    Ok(())
+}
 
 fn quote_ident(engine: Engine, name: &str) -> String {
     match engine {
@@ -36,8 +85,8 @@ pub enum KeyColumns {
 
 /// `"a" = '1' AND "b" = '2'`. Matching on only part of a composite key would hit
 /// every row that shares it, so a key whose values don't line up is refused.
-fn key_where(engine: Engine, key: &KeyColumns, key_value: &Value) -> Result<String, String> {
-    let pairs: Vec<(&str, &Value)> = match key {
+fn key_pairs<'a>(key: &'a KeyColumns, key_value: &'a Value) -> Result<Vec<(&'a str, &'a Value)>, String> {
+    Ok(match key {
         KeyColumns::One(c) => vec![(c.as_str(), key_value)],
         KeyColumns::Many(cols) => match key_value {
             Value::Array(vals) if !cols.is_empty() && cols.len() == vals.len() => {
@@ -45,12 +94,42 @@ fn key_where(engine: Engine, key: &KeyColumns, key_value: &Value) -> Result<Stri
             }
             _ => return Err("The row key needs one value per key column.".into()),
         },
-    };
-    Ok(pairs
+    })
+}
+
+fn key_where(engine: Engine, key: &KeyColumns, key_value: &Value) -> Result<String, String> {
+    Ok(key_pairs(key, key_value)?
         .iter()
         .map(|(c, v)| format!("{} = {}", quote_ident(engine, c), literal(v)))
         .collect::<Vec<_>>()
         .join(" AND "))
+}
+
+/// MySQL reads a backslash inside a string literal as an escape ("C:\temp\new"
+/// would be stored with a tab and a newline, a trailing "\" breaks the
+/// statement), so MySQL edits send their values as bound parameters instead.
+/// Returns the statement with `?` placeholders and the values in order.
+fn mysql_update(table: &str, column: &str, value: &Value, key: &KeyColumns, key_value: &Value) -> Result<(String, Vec<Value>), String> {
+    let q = |s: &str| quote_ident(Engine::MySql, s);
+    let pairs = key_pairs(key, key_value)?;
+    let cond = pairs.iter().map(|(c, _)| format!("{} = ?", q(c))).collect::<Vec<_>>().join(" AND ");
+    let mut params = vec![value.clone()];
+    params.extend(pairs.iter().map(|(_, v)| (*v).clone()));
+    Ok((format!("UPDATE {} SET {} = ? WHERE {}", q(table), q(column), cond), params))
+}
+
+fn mysql_delete(table: &str, key: &KeyColumns, key_value: &Value) -> Result<(String, Vec<Value>), String> {
+    let q = |s: &str| quote_ident(Engine::MySql, s);
+    let pairs = key_pairs(key, key_value)?;
+    let cond = pairs.iter().map(|(c, _)| format!("{} = ?", q(c))).collect::<Vec<_>>().join(" AND ");
+    Ok((format!("DELETE FROM {} WHERE {}", q(table), cond), pairs.iter().map(|(_, v)| (*v).clone()).collect()))
+}
+
+fn mysql_insert(table: &str, columns: &[String], values: &[Value]) -> (String, Vec<Value>) {
+    let q = |s: &str| quote_ident(Engine::MySql, s);
+    let cols = columns.iter().map(|c| q(c)).collect::<Vec<_>>().join(", ");
+    let marks = vec!["?"; values.len()].join(", ");
+    (format!("INSERT INTO {} ({}) VALUES ({})", q(table), cols, marks), values.to_vec())
 }
 
 pub fn build_update_key(
