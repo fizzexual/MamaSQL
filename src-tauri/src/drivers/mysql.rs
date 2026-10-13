@@ -137,7 +137,9 @@ impl Driver for MySqlDriver {
             || head.starts_with("VALUES");
 
         if !returns_rows {
-            let res = sqlx::query(sql).execute(&self.pool).await?;
+            // Text protocol, not a prepared statement: MySQL 8 refuses to
+            // prepare BEGIN, LOCK TABLES, CREATE PROCEDURE and others.
+            let res = sqlx::raw_sql(sql).execute(&self.pool).await?;
             return Ok(QueryResult {
                 columns: vec![],
                 rows: vec![],
