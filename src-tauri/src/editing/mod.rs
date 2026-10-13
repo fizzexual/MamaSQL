@@ -3,8 +3,42 @@
 //! type). This keeps a stray quote or backtick in a cell from breaking — or
 //! injecting into — the statement.
 
+use crate::drivers::Driver;
+use crate::error::{AppError, AppResult};
 use crate::types::{ColumnDef, Engine};
 use serde_json::Value;
+
+fn key_error(message: String) -> AppError {
+    AppError::QueryError { message, position: None }
+}
+
+/// Edit one cell of one row: what the grid's inline edit runs.
+pub async fn run_update(
+    driver: &dyn Driver,
+    engine: Engine,
+    table: &str,
+    column: &str,
+    value: &Value,
+    key: &KeyColumns,
+    key_value: &Value,
+) -> AppResult<()> {
+    let sql = build_update_key(engine, table, column, value, key, key_value).map_err(key_error)?;
+    driver.execute(&sql).await?;
+    Ok(())
+}
+
+/// Delete one row, named by its key.
+pub async fn run_delete(driver: &dyn Driver, engine: Engine, table: &str, key: &KeyColumns, key_value: &Value) -> AppResult<()> {
+    let sql = build_delete_key(engine, table, key, key_value).map_err(key_error)?;
+    driver.execute(&sql).await?;
+    Ok(())
+}
+
+/// Insert one row.
+pub async fn run_insert(driver: &dyn Driver, engine: Engine, table: &str, columns: &[String], values: &[Value]) -> AppResult<()> {
+    driver.execute(&build_insert(engine, table, columns, values)).await?;
+    Ok(())
+}
 
 fn quote_ident(engine: Engine, name: &str) -> String {
     match engine {

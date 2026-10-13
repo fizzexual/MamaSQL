@@ -172,10 +172,7 @@ pub async fn update_cell(
 ) -> AppResult<()> {
     let engine = engine_of(&state.store, &connection_id).await?;
     let driver = state.registry.get(&connection_id).await?;
-    let sql = crate::editing::build_update_key(engine, &table, &column, &value, &pk_column, &pk_value)
-        .map_err(|message| AppError::QueryError { message, position: None })?;
-    driver.execute(&sql).await?;
-    Ok(())
+    crate::editing::run_update(driver.as_ref(), engine, &table, &column, &value, &pk_column, &pk_value).await
 }
 
 #[tauri::command]
@@ -188,10 +185,7 @@ pub async fn delete_row(
 ) -> AppResult<()> {
     let engine = engine_of(&state.store, &connection_id).await?;
     let driver = state.registry.get(&connection_id).await?;
-    let sql = crate::editing::build_delete_key(engine, &table, &pk_column, &pk_value)
-        .map_err(|message| AppError::QueryError { message, position: None })?;
-    driver.execute(&sql).await?;
-    Ok(())
+    crate::editing::run_delete(driver.as_ref(), engine, &table, &pk_column, &pk_value).await
 }
 
 #[tauri::command]
@@ -204,9 +198,7 @@ pub async fn insert_row(
 ) -> AppResult<()> {
     let engine = engine_of(&state.store, &connection_id).await?;
     let driver = state.registry.get(&connection_id).await?;
-    let sql = crate::editing::build_insert(engine, &table, &columns, &values);
-    driver.execute(&sql).await?;
-    Ok(())
+    crate::editing::run_insert(driver.as_ref(), engine, &table, &columns, &values).await
 }
 
 #[tauri::command]
