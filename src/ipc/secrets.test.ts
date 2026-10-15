@@ -150,3 +150,95 @@ describe("saved connection passwords (web build)", () => {
     expect(await (await reload()).loadSecret("c1")).toBeNull();
   });
 });
+
+/** Everything stored in every IndexedDB database, as text (binary as base64). */
+async function idbDump(): Promise<string> {
+  const out: unknown[] = [];
+  for (const info of await indexedDB.databases()) {
+    if (!info.name) continue;
+    const db = await new Promise<IDBDatabase>((res, rej) => {
+      const r = indexedDB.open(info.name!);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    try {
+      for (const name of [...db.objectStoreNames]) {
+        out.push(
+          await new Promise((res, rej) => {
+            const r = db.transaction(name, "readonly").objectStore(name).getAll();
+            r.onsuccess = () => res(r.result);
+            r.onerror = () => rej(r.error);
+          }),
+        );
+      }
+    } finally {
+      db.close();
+    }
+  }
+  return JSON.stringify(out, (_k, v) => (v instanceof ArrayBuffer || ArrayBuffer.isView(v) ? b64(new Uint8Array(v as ArrayBuffer)) : v));
+}
+
+/** Plain http on a LAN IP: not a secure context, so the page has no crypto.subtle. */
+const insecureContext = () => vi.stubGlobal("crypto", { getRandomValues: (a: Uint8Array) => a });
+
+describe("old localStorage passwords on plain http (no crypto.subtle)", () => {
+  // Clearly fake values; the non-ASCII letter checks the UTF-8 decoding.
+  const FAKE_A = "fake-test-pw-ä";
+  const FAKE_B = "fake-test-pw-b";
+
+  it("are moved to memory for this page only, and the readable entry is deleted", async () => {
+    storage.setItem(LEGACY, JSON.stringify({ a: `b64:${utf8b64(FAKE_A)}`, b: utf8b64(FAKE_B) }));
+    insecureContext();
+    const m = await reload();
+
+    // (2) usable for the current session
+    expect(await m.loadSecret("a")).toBe(FAKE_A);
+    expect(await m.loadSecret("b")).toBe(FAKE_B);
+
+    // (1) the readable legacy entry is gone, and (3) nothing readable is left in localStorage
+    expect(storage.getItem(LEGACY)).toBeNull();
+    expect(storage.length).toBe(0);
+
+    // (3) nothing readable was written to IndexedDB either
+    const idb = await idbDump();
+    for (const pw of [FAKE_A, FAKE_B]) {
+      expect(idb).not.toContain(pw);
+      expect(idb).not.toContain(utf8b64(pw));
+    }
+    expect(await storedSecrets()).toHaveLength(0);
+
+    // (2) ...and for this session only: after a reload they must be typed again
+    const after = await reload();
+    expect(await after.loadSecret("a")).toBeNull();
+    expect(await after.loadSecret("b")).toBeNull();
+    expect(storage.length).toBe(0);
+  });
+
+  it("delete the readable entry on first use, even before that connection's password is asked for", async () => {
+    storage.setItem(LEGACY, JSON.stringify({ a: `b64:${utf8b64(FAKE_A)}` }));
+    insecureContext();
+    const m = await reload();
+    expect(await m.loadSecret("some-other-connection")).toBeNull();
+    expect(storage.getItem(LEGACY)).toBeNull();
+    expect(storage.dump()).not.toContain(utf8b64(FAKE_A));
+  });
+
+  it("an already-encrypted (enc:) entry is dropped: it can't be decrypted here, so the password must be typed again", async () => {
+    // The enc: form was written by a secure context under the key kept in IndexedDB.
+    await (await reload()).saveSecret("seed", "x");
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv }, await storedKey(), new TextEncoder().encode(FAKE_A)));
+    await (await reload()).deleteSecret("seed");
+    // ...next to an old base64 one, which must still be moved.
+    storage.setItem(LEGACY, JSON.stringify({ c: `enc:${b64(iv)}:${b64(ct)}`, b: `b64:${utf8b64(FAKE_B)}` }));
+
+    insecureContext();
+    const m = await reload();
+    expect(await m.loadSecret("c")).toBeNull(); // no error, just no password
+    expect(await m.loadSecret("b")).toBe(FAKE_B); // the sibling entry is not lost
+    expect(storage.getItem(LEGACY)).toBeNull();
+    expect(storage.length).toBe(0);
+    expect(await storedSecrets()).toHaveLength(0); // the ciphertext was not copied into IndexedDB
+    expect(await idbDump()).not.toContain(utf8b64(FAKE_B));
+  });
+});

@@ -11,10 +11,12 @@ services:
     build:
       context: .
       dockerfile: docker/web.Dockerfile
-    # No login sits in front of this, and the bridge behind it connects to any
-    # host it's given — set BIND_ADDR in .env to pin it to one interface.
+    # Localhost only by default. To reach it from a network you trust, set
+    # BIND_ADDR in .env (an interface address, or 0.0.0.0 for all). It is off by
+    # default because there is no login, the bridge connects to any host it's
+    # given, and it is plain http, so passwords cross the network unencrypted.
     ports:
-      - "${BIND_ADDR:-0.0.0.0}:${WEB_PORT:-5001}:80"
+      - "${BIND_ADDR:-127.0.0.1}:${WEB_PORT:-5001}:80"
     depends_on:
       - bridge
     restart: unless-stopped

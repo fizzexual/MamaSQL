@@ -9,6 +9,20 @@ this file, do not create a release. This file groups releases by date. Dates are
 YYYY-MM-DD (UTC). The per-release notes and the `MamaSQL.exe` downloads are on the
 [GitHub Releases page](https://github.com/fizzexual/MamaSQL/releases).
 
+## [Unreleased]
+
+### Security
+- Docker: the web UI is published on localhost only by default (`BIND_ADDR` now defaults
+  to `127.0.0.1` instead of `0.0.0.0`, in both compose files and `.env.example`). To reach
+  it from a trusted network, set `BIND_ADDR` in `.env`.
+- README: a new note, "Use https or localhost". On plain http to an address other than
+  localhost, the browser build can't encrypt saved passwords (they are kept for the open tab
+  only), and passwords travel to the bridge unencrypted.
+
+### Added
+- Tests for moving old saved passwords out of localStorage on plain http (no
+  `crypto.subtle`). No app behaviour changed.
+
 ## [0.1.98 - 0.1.100] - 2026-10-06
 
 ### Added
