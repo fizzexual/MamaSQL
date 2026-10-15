@@ -14,12 +14,15 @@ services:
   web:
     container_name: mamasql_web
     image: ghcr.io/fizzexual/mamasql-web:${MAMASQL_VERSION:-latest}
-    # MamaSQL has no login, and the bridge behind it will connect to any host it
-    # is given — so anyone who can reach this port can reach your databases.
-    # On a machine that's exposed to a network you don't trust, set BIND_ADDR in
-    # .env to a single interface (e.g. 127.0.0.1, or a VPN address).
+    # Published on localhost only by default: open it from this machine.
+    # To reach it from other machines on a network you trust, set BIND_ADDR in
+    # .env to that interface's address (e.g. a VPN/Tailscale IP), or 0.0.0.0 for
+    # every interface. Why it's off by default: MamaSQL has no login, the bridge
+    # behind it will connect to any host it is given (so anyone who can reach
+    # this port can reach your databases), and it is served over plain http, so
+    # passwords cross the network unencrypted.
     ports:
-      - "${BIND_ADDR:-0.0.0.0}:${WEB_PORT:-5001}:80"
+      - "${BIND_ADDR:-127.0.0.1}:${WEB_PORT:-5001}:80"
     depends_on:
       - bridge
     restart: always

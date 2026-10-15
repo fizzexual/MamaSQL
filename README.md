@@ -103,11 +103,12 @@ Connect from the app via **＋ New connection**:
 
 ### Running it on a server
 
-MamaSQL has no login, and the bridge will open a connection to any host it is given — so anyone who can reach the web port can reach your databases, and can use the bridge to probe hosts on the same network. On anything beyond your own machine, publish it to one interface via `BIND_ADDR` in `.env`:
+MamaSQL has no login, and the bridge will open a connection to any host it is given — so anyone who can reach the web port can reach your databases, and can use the bridge to probe hosts on the same network. That's why the web port is published on **localhost only** by default (`BIND_ADDR=127.0.0.1`). To use it from other machines, set `BIND_ADDR` in `.env`, and only on a network you trust:
 
 ```dotenv
-BIND_ADDR=127.0.0.1     # localhost only — reach it over an SSH tunnel
+BIND_ADDR=127.0.0.1     # the default: this machine only — from elsewhere, use an SSH tunnel
 BIND_ADDR=100.x.y.z     # a VPN/Tailscale address only
+BIND_ADDR=0.0.0.0       # every interface — trusted networks only
 ```
 
 Note that a published container port is **not** filtered by `ufw`/`firewalld`: those filter the host's `INPUT` chain, while Docker forwards traffic ahead of it. A firewall rule alone will not close a published port — `BIND_ADDR` is enforced by Docker itself, so use that.
