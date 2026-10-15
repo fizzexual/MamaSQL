@@ -29,7 +29,13 @@ export function DialogHost() {
   // Keyboard for confirm dialogs (prompt handles its own keys via the input).
   useEffect(() => {
     if (!current || current.kind !== "confirm") return;
+    // Ignore the key press that opened this dialog. Ctrl+Enter runs a query, and
+    // React adds this listener while that same keydown is still on its way up to
+    // window, so its Enter would otherwise answer "Run anyway" to the very
+    // DROP/no-WHERE warning it just raised. Held-down repeats are ignored too.
+    const openedAt = performance.now();
     const onKey = (e: KeyboardEvent) => {
+      if (e.timeStamp < openedAt || e.repeat) return;
       if (e.key === "Escape") {
         e.preventDefault();
         cancel();
