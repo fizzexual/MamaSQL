@@ -60,7 +60,7 @@ The React frontend speaks to a single `Backend` interface; three implementations
 ### Two runtimes
 
 - **Desktop (Tauri 2).** React renders in a WebView2 surface and `invoke()`s Rust commands over IPC; Rust opens real database sockets via `sqlx`. Passwords are stored in the Windows Credential Manager through `keyring` — never written to disk or config.
-- **Browser (web build).** SQLite runs client-side as WebAssembly (`sql.js`) persisted to IndexedDB; Postgres/MySQL queries `POST` to a Node bridge (`server/bridge.mjs`) that owns the real `pg` / `mysql2` connections, since browsers cannot open raw TCP. Secrets are encrypted in IndexedDB with AES-GCM via SubtleCrypto, and the bridge is Docker-aware (remaps `localhost` → `host.docker.internal`).
+- **Browser (web build).** SQLite runs client-side as WebAssembly (`sql.js`) persisted to IndexedDB; Postgres/MySQL queries `POST` to a Node bridge (`server/bridge.mjs`) that owns the real `pg` / `mysql2` connections, since browsers cannot open raw TCP. In a secure context (https or localhost), secrets are encrypted in IndexedDB with AES-GCM via SubtleCrypto; on plain http to any other address they are kept in memory for the open tab only (see [Running it on a server](#running-it-on-a-server)). The bridge is Docker-aware (remaps `localhost` → `host.docker.internal`).
 
 ### Safety
 
@@ -112,6 +112,10 @@ BIND_ADDR=0.0.0.0       # every interface — trusted networks only
 ```
 
 Note that a published container port is **not** filtered by `ufw`/`firewalld`: those filter the host's `INPUT` chain, while Docker forwards traffic ahead of it. A firewall rule alone will not close a published port — `BIND_ADDR` is enforced by Docker itself, so use that.
+
+**Use https or localhost.** The web container serves plain http. Browsers treat plain http on any address other than `localhost` / `127.0.0.1` (for example `http://192.168.1.20:5001`) as an insecure context, where SubtleCrypto is not available. There the browser build **can't encrypt saved passwords**: it keeps them in memory for that tab only, and you type them again after a reload. Passwords also travel from the browser to the bridge **unencrypted** over plain http, so anyone on the network path can read them.
+
+To use MamaSQL from another machine, reach it over an SSH tunnel (the browser then sees `localhost`) or put it behind an https reverse proxy. Keep `BIND_ADDR` on `127.0.0.1` unless the network is trusted.
 
 The demo databases ship with a well-known password and are published to localhost only (`DB_BIND_ADDR`). The app doesn't use those host ports — it reaches the databases over the compose network — so widen it only to attach an external client.
 
